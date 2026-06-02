@@ -125,33 +125,97 @@ def extract_toc(
 
         page_count = 0
         for col_name, lines in cols:
-            for line in lines:
-                line_sorted = sorted(line, key=lambda b: b["x"])
-                def _is_page_num(b):
-                    clean = b["text"].lstrip("/").strip(".,，。、:：_ ")
-                    return bool(re.match(r"^\d{2,4}$", clean))
+            def _is_num_block(b):
+                clean = b["text"].lstrip("/").strip(".,，。、:：_ ")
+                return bool(re.match(r"^\d{2,4}$", clean))
 
-                text_blocks = [b for b in line_sorted if not _is_page_num(b)]
-                number_blocks = [b for b in line_sorted if _is_page_num(b)]
+            # Collect all blocks in this column
+            col_blocks = [
+                b for b in blocks
+                if col_split <= 0 or (b["x"] < col_split) == (col_name == "left")
+            ]
+            if not col_blocks:
+                continue
+
+            # Find the "page number zone": rightmost 25% x-range of this column
+            col_min_x = min(b["x"] for b in col_blocks)
+            col_max_x = max(b["x"] for b in col_blocks)
+            page_zone = col_min_x + (col_max_x - col_min_x) * 0.70
+
+            # Group column blocks into lines by y
+            sorted_col = sorted(col_blocks, key=lambda b: (b["y"], b["x"]))
+            col_lines = []
+            cur_line, cur_y = [], None
+            for b in sorted_col:
+                if cur_y is None or abs(b["y"] - cur_y) > 10:
+                    if cur_line:
+                        col_lines.append(cur_line)
+                    cur_line, cur_y = [b], b["y"]
+                else:
+                    cur_line.append(b)
+            if cur_line:
+                col_lines.append(cur_line)
+
+            # Pass 1: same-line detection
+            used_numbers: list[Any] = []
+            pending_text: list[Any] = []
+
+            for line in col_lines:
+                line_sorted_col = sorted(line, key=lambda b: b["x"])
+                # A block is a "page number" only if in page_zone AND matches number regex
+                page_blocks = [
+                    b for b in line_sorted_col
+                    if _is_num_block(b) and b["x"] > page_zone
+                ]
+                text_blocks = [
+                    b for b in line_sorted_col if not _is_num_block(b)
+                    # Also filter OCR artifact blocks: purely symbol-only, short blocks
+                    and re.search(r"[\u4e00-\u9fff\w]", b["text"])
+                ]
+
                 rightmost_num = None
-                if number_blocks and text_blocks:
-                    last_text_x = max(b["x"] for b in text_blocks)
-                    rightmost = max(number_blocks, key=lambda b: b["x"])
-                    if rightmost["x"] > last_text_x:
-                        clean = rightmost["text"].lstrip("/").strip(".,，。、:：_ ")
-                        m = re.match(r"^\d{2,4}$", clean)
-                        if m:
-                            rightmost_num = int(m.group())
-                # OCR correction: strip leading "1" prefix (e.g., 1001→001)
-                if rightmost_num and rightmost_num > 999:
-                    s = str(rightmost_num)
-                    for i in range(1, len(s)):
-                        cand = int(s[i:])
-                        if cand < rightmost_num:
-                            rightmost_num = cand
-                            break
+                used_blk = None
+                if page_blocks and text_blocks:
+                    rightmost = max(page_blocks, key=lambda b: b["x"])
+                    raw = rightmost["text"].lstrip("/").strip(".,，。、:：_ ")
+                    m = re.match(r"^\d{2,4}$", raw)
+                    if m:
+                        pn = int(m.group())
+                        if pn > 999:
+                            s = str(pn)
+                            for i in range(1, len(s)):
+                                cand = int(s[i:])
+                                if cand < pn:
+                                    pn = cand
+                                    break
+                        rightmost_num = pn
+                        used_blk = rightmost
+
                 texts = [b["text"] for b in text_blocks]
                 title = re.sub(r"\s+", " ", " ".join(texts)).strip()
+
+                if used_blk:
+                    used_numbers.append(used_blk)
+
+                # If no separate page number block found, check if the title
+                # has a trailing slash-page-number (OCR sometimes merges the
+                # page number into the text block, e.g. "...)/186")
+                if rightmost_num is None and title:
+                    trailing_m = re.search(r'[/／]\s*(\d{2,4})\s*\)?\s*$', title)
+                    if trailing_m:
+                        raw_pn = trailing_m.group(1)
+                        pn = int(raw_pn)
+                        if pn > 999:
+                            s = str(pn)
+                            for i in range(1, len(s)):
+                                cand = int(s[i:])
+                                if cand < pn:
+                                    pn = cand
+                                    break
+                        rightmost_num = pn
+                        # Strip the page number from the title
+                        title = re.sub(r'\s*[/／]\s*\d{2,4}\s*\)?\s*$', '', title).strip()
+
                 if title and rightmost_num is not None:
                     all_entries.append({
                         "title": title,
@@ -163,7 +227,54 @@ def extract_toc(
                     })
                     page_count += 1
                 elif title:
-                    print(f"  ⚠ No page# [{col_name}]: {title[:50]}")
+                    # Text-only or no page number on same line → try Pass 2
+                    pending_text.append((text_blocks, line))
+
+            # Pass 2: nearest-y matching using page-number-zone blocks
+            # NOTE: we do NOT exclude Pass 1 used numbers — multiple text lines
+            # on the same page may share the same page number block.
+            all_page_numbers = sorted([
+                b for b in col_blocks
+                if _is_num_block(b) and b["x"] > page_zone
+            ], key=lambda b: b["y"])
+
+            for text_blocks, line in pending_text:
+                text_y = line[0]["y"]
+                best_blk, best_dist = None, 999
+                for nb in all_page_numbers:
+                    dist = nb["y"] - text_y
+                    if 0 < dist < 80 and dist < best_dist:
+                        best_blk, best_dist = nb, dist
+                if best_blk:
+                    raw = best_blk["text"].lstrip("/").strip(".,，。、:：_ ")
+                    m = re.match(r"^\d{2,4}$", raw)
+                    if m:
+                        pn = int(m.group())
+                        if pn > 999:
+                            s = str(pn)
+                            for i in range(1, len(s)):
+                                cand = int(s[i:])
+                                if cand < pn:
+                                    pn = cand
+                                    break
+                        title = re.sub(r"\s+", " ", " ".join(b["text"] for b in text_blocks)).strip()
+                        all_entries.append({
+                            "title": title,
+                            "printed_page": pn,
+                            "pdf_page": pn + offset,
+                            "y": text_y,
+                            "src_page": src_page,
+                            "col": col_name,
+                        })
+                        page_count += 1
+                        # Mark this number as used so next line doesn't reuse it
+                        used_numbers.append(best_blk)
+                        all_page_numbers = [
+                            nb for nb in all_page_numbers if nb is not best_blk
+                        ]
+                        continue
+                title = re.sub(r"\s+", " ", " ".join(b["text"] for b in text_blocks)).strip()
+                print(f"  ⚠ No page# [{col_name}]: {title[:50]}")
 
         print(f"  Page {src_page}: {page_count} entries")
 
