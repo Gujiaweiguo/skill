@@ -16,8 +16,16 @@ compatibility: >
   cd skills/pdf/pdf-toc-master
   uv sync                  # install core deps (pypdf, pdf2image, Pillow)
   uv sync --extra ocr      # include easyocr for scanned PDFs
-  uv run pdf-toc-extract input.pdf [output.pdf]
+
+  # Extract TOC and embed bookmarks
+  uv run pdf-toc-extract input.pdf --offset 8 --toc-start 6 --toc-end 8
   ```
+
+  Parameters:
+  - `--offset N`     PDF page index = printed_page + N (critical for correct jumps)
+  - `--toc-start M`  First page of TOC in PDF, 1-indexed
+  - `--toc-end K`    Last page of TOC in PDF, 1-indexed
+  - `--dpi N`        OCR resolution (default: 200)
 
   System requirement: poppler-utils (for pdf2image)
 
