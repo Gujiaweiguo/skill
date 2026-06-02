@@ -13,6 +13,8 @@ requires:
 
 爬取赢商大数据网站（winshangdata.com）的商业地产项目信息，包括项目名称、状态、商业面积、所在城市等字段。
 
+**自包含 skill**：所有代码、依赖配置都在本目录内，使用 `uv` 管理依赖。
+
 ## 执行流程
 
 当用户查询项目数据时，按以下顺序执行：
@@ -29,11 +31,32 @@ requires:
 - "查询已爬取的广州项目"
 - "更新之前爬取的数据"
 
+## 快速开始（自包含版本）
+
+本 skill 已自带完整 Python 项目，可直接使用：
+
+```bash
+# 1. 进入 skill 目录
+cd skills/crawler/winshang-crawler
+
+# 2. 安装依赖（首次运行）
+uv sync
+uv run playwright install chromium
+
+# 3. 配置凭据
+cp .env.example .env
+# 编辑 .env，填入 WINSHANG_USERNAME 和 WINSHANG_PASSWORD
+
+# 4. 爬取数据
+uv run python -m src.crawler.cli crawl --province 上海
+```
+
 ## 触发指令
 
 ### 爬取项目数据
 
-```
+```bash
+cd skills/crawler/winshang-crawler
 uv run python -m src.crawler.cli crawl --province 上海 --status 未开业
 ```
 
@@ -46,7 +69,8 @@ uv run python -m src.crawler.cli crawl --province 上海 --status 未开业
 
 ### 查询已爬取的数据
 
-```
+```bash
+cd skills/crawler/winshang-crawler
 uv run python -m src.crawler.cli query --province 广东
 uv run python -m src.crawler.cli query --city 广州 --status 已开业 --year 2025
 uv run python -m src.crawler.cli query --status 未开业 --year-after 2020
@@ -63,15 +87,16 @@ uv run python -m src.crawler.cli query --status 未开业 --year-after 2020
 
 ## 安装与配置
 
-1. 克隆项目后，执行 `uv sync && uv run playwright install chromium`
-2. 在项目根目录创建 `.env` 文件，填入凭据：
+1. 进入 skill 目录：`cd skills/crawler/winshang-crawler`
+2. 执行 `uv sync && uv run playwright install chromium`
+3. 在 skill 根目录创建 `.env` 文件，填入凭据：
 
 ```
 WINSHANG_USERNAME=your_email@example.com
 WINSHANG_PASSWORD=your_password
 ```
 
-3. 执行 `uv run python -m src.crawler.cli crawl` 开始爬取
+4. 执行 `uv run python -m src.crawler.cli crawl` 开始爬取
 
 ## 输出示例
 
@@ -85,4 +110,6 @@ WINSHANG_PASSWORD=your_password
 
 - 首次运行会通过 Playwright 登录获取 JWT token（约 10s），后续 API 调用走 httpx 直连
 - 数据保存在 `data/winshang_data.csv`
+- `.env` 文件包含敏感凭据，已在 `.gitignore` 中，**不要**提交到 git
 - 请合理使用，避免高频请求对目标网站造成压力
+- 完整文档见 `README.md`
