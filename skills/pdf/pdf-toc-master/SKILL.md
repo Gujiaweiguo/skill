@@ -14,6 +14,13 @@ compatibility: >
   - pytesseract + tesseract-ocr + Chinese language pack
   - paddleocr (best Chinese accuracy but heavy)
   Degrades gracefully: text-based PDFs work without OCR.
+
+  Optional: bootstrap an isolated environment with uv (recommended for one-off runs):
+  ```bash
+  uv venv && uv pip install pypdf pdf2image Pillow easyocr
+  source .venv/bin/activate
+  ```
+  Otherwise `pip install pypdf pdf2image Pillow easyocr` into your system Python works equally well.
 ---
 
 # PDF TOC Master — PDF 目录书签生成 Agent Pipeline
