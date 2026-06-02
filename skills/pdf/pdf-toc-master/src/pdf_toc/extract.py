@@ -159,6 +159,7 @@ def extract_toc(
             # Pass 1: same-line detection
             used_numbers: list[Any] = []
             pending_text: list[Any] = []
+            last_reasonable_page: int | None = None  # Track trend for sanity check
 
             for line in col_lines:
                 line_sorted_col = sorted(line, key=lambda b: b["x"])
@@ -217,6 +218,18 @@ def extract_toc(
                         title = re.sub(r'\s*[/／]\s*\d{2,4}\s*\)?\s*$', '', title).strip()
 
                 if title and rightmost_num is not None:
+                    # Sanity check: if page is wildly smaller than the previous
+                    # reasonable page in this column, warn (likely OCR error
+                    # like "1040" read as 40 when correct is 404).
+                    if (last_reasonable_page is not None
+                            and rightmost_num < last_reasonable_page - 50):
+                        print(
+                            f"  ⚠ Suspicious page# [{col_name}]: "
+                            f"'{title[:30]}' → page {rightmost_num} "
+                            f"(previous: {last_reasonable_page})"
+                        )
+                    else:
+                        last_reasonable_page = rightmost_num
                     all_entries.append({
                         "title": title,
                         "printed_page": rightmost_num,
@@ -274,9 +287,50 @@ def extract_toc(
                         ]
                         continue
                 title = re.sub(r"\s+", " ", " ".join(b["text"] for b in text_blocks)).strip()
-                print(f"  ⚠ No page# [{col_name}]: {title[:50]}")
+                # Label common special pages so the user can identify them
+                label = title[:50]
+                stripped = title.strip().replace(" ", "")
+                if stripped in ("目录", "目 录", "目次") or stripped.startswith("目"):
+                    label = f"{label} [目录页 / TOC title]"
+                elif not any(c.isalnum() or '\u4e00' <= c <= '\u9fff' for c in title):
+                    label = f"{label} [无页码 / No page#]"
+                else:
+                    label = f"{label} [无页码 / No page#]"
+                print(f"  ⚠ No page# [{col_name}]: {label}")
 
         print(f"  Page {src_page}: {page_count} entries")
+
+    # --- Post-process: fix pages wildly off from column trend ---
+    fixed_count = 0
+    by_col: dict[tuple[Any, Any], list[Any]] = {}
+    for e in all_entries:
+        key = (e["src_page"], e["col"])
+        by_col.setdefault(key, []).append(e)
+    for key, col_entries in by_col.items():
+        for i, e in enumerate(col_entries):
+            cur = e["printed_page"]
+            prev = col_entries[i - 1]["printed_page"] if i > 0 else None
+            nxt = (
+                col_entries[i + 1]["printed_page"]
+                if i + 1 < len(col_entries) else None
+            )
+            if prev is not None and cur < prev - 100:
+                if nxt is not None and nxt > prev:
+                    new_page = (prev + nxt) // 2
+                elif nxt is not None:
+                    new_page = nxt
+                else:
+                    new_page = prev + 1
+                e["printed_page"] = new_page
+                e["pdf_page"] = new_page + offset
+                fixed_count += 1
+                print(
+                    f"  ✓ Fixed: '{e['title'][:30]}' "
+                    f"page {cur} → {new_page} "
+                    f"(neighbors: {prev}, {nxt})"
+                )
+    if fixed_count:
+        print(f"\n  Total fixed: {fixed_count} entries")
 
     # --- Sort by content page number ---
     all_entries.sort(key=lambda e: e["printed_page"])  # type: ignore[typeddict-item]
