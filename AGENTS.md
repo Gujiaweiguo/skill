@@ -33,7 +33,7 @@ skills/                              # ACTUAL files — edit here
 ├── bidding/
 │   └── bid-doc-master/              # Python-only (despite old "or Node.js" wording — was wrong)
 └── crawler/
-    └── winshang-crawler/            # Has its own pyproject.toml + uv workflow
+    └── winshang-crawler/            # Self-contained: full Python project (src/, pyproject.toml) managed by uv
 
 .opencode/                           # OpenCode entry — symlinks + commands
 ├── skills/                          # Symlinks to skills/<category>/<name>/
