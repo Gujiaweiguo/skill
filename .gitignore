@@ -4,8 +4,14 @@ node_modules/
 .DS_Store
 .env
 .env.local
+
+# OpenSpec transient artifacts
 openspec/changes/*/proposal.md
 openspec/changes/*/design.md
 openspec/changes/*/tasks.md
 openspec/changes/*/specs/
 openspec/changes/archive/
+
+# Unrelated subprojects
+skills/crawler/
+skills/新建文件夹/
