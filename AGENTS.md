@@ -130,7 +130,7 @@ The default schema is `spec-driven` (proposal → specs → design → tasks). C
 
 - **Always edit under `skills/<category>/<skill>/`**, never under `.opencode/skills/` (the latter is symlinks)
 - The `compatibility` field is plain prose — keep it accurate to what the skill actually needs
-- For Python skills that pull in dependencies, include the **Optional uv bootstrap** block (see "uv guidance" below)
+- For Python skills that pull in dependencies, add `pyproject.toml` (see "uv requirement" below)
 - Test by running the skill's documented commands
 
 ### When adding new custom skills:
@@ -140,9 +140,9 @@ The default schema is `spec-driven` (proposal → specs → design → tasks). C
 3. Create symlink: `ln -s ../../skills/<category>/<skill-name> .opencode/skills/<skill-name>`
 4. Update AGENTS.md skill inventory if it's a major addition
 
-### uv strategy for Python skills
+### uv requirement for Python skills
 
-All Python skills in this repo now use `pyproject.toml` for deterministic dependency management. The approach varies by skill type:
+All Python skills in this repo require **uv** for environment management (`pip` is no longer supported). Using `pyproject.toml` for deterministic dependency management. The approach varies by skill type:
 
 **Skills WITH Python code** (e.g., `pdf-toc-master`, `winshang-crawler`):
 
@@ -172,8 +172,6 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 ```
 Usage: `cd skills/bidding/bid-doc-master && uv sync && source .venv/bin/activate`
-
-Both patterns replace the old "Optional uv bootstrap" manual `uv pip install` approach.
 
 ### Dependency note:
 

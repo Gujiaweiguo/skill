@@ -11,17 +11,15 @@ description: |-
   当用户提供招标文件、采购文件、投标模板、历史投标文件或报价表，并要求生成/改写/
   检查投标材料时，同样触发此 skill。
 compatibility: >
-  Requires Python 3.10+ with uv (recommended) or pip.
+  Requires Python 3.10+ and uv.
   Provides a `pyproject.toml` for deterministic dependency setup.
 
-  Quick start (recommended):
+  Quick start:
   ```bash
   cd skills/bidding/bid-doc-master
-  uv sync               # install python-docx openpyxl markitdown
+  uv sync                  # install python-docx openpyxl markitdown
+  source .venv/bin/activate  # or prefix commands with uv run
   ```
-  Then activate: `source .venv/bin/activate` or prefix commands with `uv run`.
-
-  Without uv: `pip install python-docx openpyxl markitdown`
 
   Also recommends (system): pandoc, libreoffice for advanced document conversion.
   Degrades gracefully: if editable Office generation is unavailable, produce structured Markdown drafts,

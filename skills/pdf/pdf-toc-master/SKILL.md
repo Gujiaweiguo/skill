@@ -8,18 +8,17 @@ description: >
   "给 PDF 加一个可导航的目录"、"PDF 没有书签，帮我加一下"、
   "帮我把这本书的目录做成点击跳转"、"提取这个 PDF 的目录结构"。
 compatibility: >
-  Requires Python 3.9+ with uv (recommended) or pip.
+  Requires Python 3.9+ and uv.
   Provides a `pyproject.toml` with pinned dependencies for deterministic setup.
 
-  Quick start (recommended):
+  Quick start:
   ```bash
   cd skills/pdf/pdf-toc-master
-  uv sync               # install core deps
-  uv sync --group ocr   # include easyocr for scanned PDFs
+  uv sync                  # install core deps (pypdf, pdf2image, Pillow)
+  uv sync --extra ocr      # include easyocr for scanned PDFs
   uv run pdf-toc-extract input.pdf [output.pdf]
   ```
 
-  Without uv: `pip install pypdf pdf2image Pillow easyocr`
   System requirement: poppler-utils (for pdf2image)
 
   Requires at least one OCR engine for scanned PDFs:
