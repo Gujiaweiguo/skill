@@ -1,0 +1,11 @@
+node_modules/
+*.lock
+*.log
+.DS_Store
+.env
+.env.local
+openspec/changes/*/proposal.md
+openspec/changes/*/design.md
+openspec/changes/*/tasks.md
+openspec/changes/*/specs/
+openspec/changes/archive/
