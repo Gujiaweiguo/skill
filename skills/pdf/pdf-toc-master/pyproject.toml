@@ -1,0 +1,26 @@
+[project]
+name = "pdf-toc-tools"
+version = "1.0.0"
+description = "PDF TOC extraction and bookmark embedding tool (reference implementation)"
+readme = "SKILL.md"
+requires-python = ">=3.9"
+dependencies = [
+    "pypdf>=6.0",
+    "pdf2image>=1.16",
+    "Pillow>=9.0",
+]
+
+[project.optional-dependencies]
+ocr = [
+    "easyocr>=1.7",
+]
+
+[project.scripts]
+pdf-toc-extract = "pdf_toc.extract:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pdf_toc"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

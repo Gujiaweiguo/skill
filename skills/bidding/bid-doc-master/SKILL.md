@@ -11,18 +11,21 @@ description: |-
   当用户提供招标文件、采购文件、投标模板、历史投标文件或报价表，并要求生成/改写/
   检查投标材料时，同样触发此 skill。
 compatibility: >
-  Requires Python 3.9+ for document processing.
-  Recommended tools: python-docx/openpyxl for DOCX/XLSX editing, markitdown/pandoc/libreoffice
-  for Office document extraction and conversion.
+  Requires Python 3.10+ with uv (recommended) or pip.
+  Provides a `pyproject.toml` for deterministic dependency setup.
+
+  Quick start (recommended):
+  ```bash
+  cd skills/bidding/bid-doc-master
+  uv sync               # install python-docx openpyxl markitdown
+  ```
+  Then activate: `source .venv/bin/activate` or prefix commands with `uv run`.
+
+  Without uv: `pip install python-docx openpyxl markitdown`
+
+  Also recommends (system): pandoc, libreoffice for advanced document conversion.
   Degrades gracefully: if editable Office generation is unavailable, produce structured Markdown drafts,
   response matrix, and manual editing instructions.
-
-  Optional: bootstrap an isolated environment with uv (recommended for one-off runs):
-  ```bash
-  uv venv && uv pip install python-docx openpyxl markitdown
-  source .venv/bin/activate
-  ```
-  Otherwise `pip install python-docx openpyxl markitdown` into your system Python works equally well.
 ---
 
 # Bid Doc Master — 投标文件制作 Agent Pipeline

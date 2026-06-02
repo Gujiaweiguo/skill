@@ -8,19 +8,25 @@ description: >
   "给 PDF 加一个可导航的目录"、"PDF 没有书签，帮我加一下"、
   "帮我把这本书的目录做成点击跳转"、"提取这个 PDF 的目录结构"。
 compatibility: >
-  Requires Python 3.8+ with pypdf ≥ 6.0, pdf2image ≥ 1.16, Pillow ≥ 9.0.
+  Requires Python 3.9+ with uv (recommended) or pip.
+  Provides a `pyproject.toml` with pinned dependencies for deterministic setup.
+
+  Quick start (recommended):
+  ```bash
+  cd skills/pdf/pdf-toc-master
+  uv sync               # install core deps
+  uv sync --group ocr   # include easyocr for scanned PDFs
+  uv run pdf-toc-extract input.pdf [output.pdf]
+  ```
+
+  Without uv: `pip install pypdf pdf2image Pillow easyocr`
+  System requirement: poppler-utils (for pdf2image)
+
   Requires at least one OCR engine for scanned PDFs:
   - easyocr (recommended, Chinese-ready out of the box)
   - pytesseract + tesseract-ocr + Chinese language pack
   - paddleocr (best Chinese accuracy but heavy)
   Degrades gracefully: text-based PDFs work without OCR.
-
-  Optional: bootstrap an isolated environment with uv (recommended for one-off runs):
-  ```bash
-  uv venv && uv pip install pypdf pdf2image Pillow easyocr
-  source .venv/bin/activate
-  ```
-  Otherwise `pip install pypdf pdf2image Pillow easyocr` into your system Python works equally well.
 ---
 
 # PDF TOC Master — PDF 目录书签生成 Agent Pipeline
@@ -52,14 +58,23 @@ P4: QA 验收 + 交付
 
 ### 0.1 环境检测
 
+先设置 uv 环境（一次性）：
+```bash
+cd skills/pdf/pdf-toc-master
+uv sync
+# 如需 OCR 支持（扫描版 PDF）：
+uv sync --all-extras
 ```
-1. pypdf ≥ 6.0 可用?  →  PDF 读写与书签操作
-2. pdf2image 可用?    →  扫描版 PDF 转图片
+
+然后确认依赖就绪：
+```
+1. pypdf ≥ 6.0 可用?  →  PDF 读写与书签操作  (uv run python -c "from pypdf import PdfReader")
+2. pdf2image 可用?    →  扫描版 PDF 转图片 (uv run python -c "import pdf2image")
 3. OCR 引擎可用?       →  扫描版提取目录文字
-   - easyocr (推荐)    →  pip install easyocr
-   - pytesseract       →  pip install pytesseract + tesseract-ocr
-   - paddleocr         →  pip install paddlepaddle paddleocr
-4. pdf-lib 可用?       →  备用 Node.js PDF 操作方案
+   - easyocr (推荐)    →  uv run python -c "import easyocr"
+   - pytesseract       →  uv run python -c "import pytesseract"
+   - paddleocr         →  uv run python -c "import paddleocr"
+4. 参考脚本可用?       →  uv run pdf-toc-extract --help
 ```
 
 ### 0.2 任务类型判断
@@ -359,13 +374,13 @@ def verify_toc(output_path, expected_count):
 
 ## 依赖清单
 
-| 工具 | 版本 | 用途 | 安装命令 |
+| 工具 | 版本 | 用途 | uv 安装 |
 |------|------|------|---------|
-| pypdf | ≥ 6.0 | PDF 读写与书签操作 | `pip install pypdf` |
-| pdf2image | ≥ 1.16 | PDF 页转图片（OCR 用） | `pip install pdf2image` |
-| Pillow | ≥ 9.0 | 图片处理 | `pip install Pillow` |
-| easyocr | ≥ 1.7 | 中文 OCR（推荐） | `pip install easyocr` |
-| 可选: pytesseract | ≥ 0.3 | Tesseract 封装 | `pip install pytesseract` |
+| pypdf | ≥ 6.0 | PDF 读写与书签操作 | `uv sync`（核心依赖） |
+| pdf2image | ≥ 1.16 | PDF 页转图片（OCR 用） | `uv sync`（核心依赖） |
+| Pillow | ≥ 9.0 | 图片处理 | `uv sync`（核心依赖） |
+| easyocr | ≥ 1.7 | 中文 OCR（推荐） | `uv sync --all-extras` |
+| 可选: pytesseract | ≥ 0.3 | Tesseract 封装 | `pip install pytesseract`（手动） |
 | 可选: pdf-lib | ≥ 1.17 | Node.js 端辅助 | `npm install -g pdf-lib` |
 
 ---

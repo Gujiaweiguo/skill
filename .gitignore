@@ -12,6 +12,13 @@ openspec/changes/*/tasks.md
 openspec/changes/*/specs/
 openspec/changes/archive/
 
+# Virtual environments
+.venv/
+
+# Python build artifacts
+*.egg-info/
+__pycache__/
+
 # Unrelated subprojects
 skills/crawler/crawler_mall/
 skills/新建文件夹/

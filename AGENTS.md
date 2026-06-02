@@ -140,23 +140,40 @@ The default schema is `spec-driven` (proposal → specs → design → tasks). C
 3. Create symlink: `ln -s ../../skills/<category>/<skill-name> .opencode/skills/<skill-name>`
 4. Update AGENTS.md skill inventory if it's a major addition
 
-### uv guidance for Python skills
+### uv strategy for Python skills
 
-Skills are not full projects — they don't need `pyproject.toml` or `uv.lock`. When declaring Python dependencies, use the **Optional uv bootstrap** pattern in `compatibility`:
+All Python skills in this repo now use `pyproject.toml` for deterministic dependency management. The approach varies by skill type:
 
-```yaml
-compatibility: >
-  Requires Python 3.9+ with <deps>.
+**Skills WITH Python code** (e.g., `pdf-toc-master`, `winshang-crawler`):
 
-  Optional: bootstrap an isolated environment with uv (recommended for one-off runs):
-  ```bash
-  uv venv && uv pip install <deps>
-  source .venv/bin/activate
-  ```
-  Otherwise `pip install <deps>` into your system Python works equally well.
+Full project structure with `src/<package>/`, entry points, and build backend:
 ```
+skills/<category>/<skill>/
+├── SKILL.md
+├── pyproject.toml
+├── .gitignore
+└── src/<package>/
+    ├── __init__.py
+    └── *.py
+```
+Usage: `cd skills/<...>/<skill> && uv sync && uv run <entry-point>`
 
-This preserves pip as a fully supported option while giving new users a one-liner to start. Exception: `winshang-crawler` has its own `pyproject.toml` and is meant to be run with `uv run` directly.
+**Skills WITHOUT Python code but WITH tool dependencies** (e.g., `bid-doc-master`):
+
+`pyproject.toml` declares only dependencies (no build artifacts). Build backend is `setuptools` with no packages:
+```toml
+[project]
+name = "bid-doc-tools"
+requires-python = ">=3.10"
+dependencies = ["python-docx>=1.1.0", "openpyxl>=3.1.0", ...]
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+```
+Usage: `cd skills/bidding/bid-doc-master && uv sync && source .venv/bin/activate`
+
+Both patterns replace the old "Optional uv bootstrap" manual `uv pip install` approach.
 
 ### Dependency note:
 
