@@ -5,11 +5,12 @@
 This is an **OpenCode skills repository** combining:
 
 - **OpenSpec workflow skills** (10) — managed change workflow: proposal → specs → design → tasks → implementation → archive
+  - **Governance**: NOT managed in this repo. Tracked in `.opencode/skills/openspec-*/` directly as bundled upstream artifacts. Do not edit, do not move, do not copy into `skills/<category>/`. Upgrades come from the OpenSpec project, not from here.
 - **Custom skills** (6) under `skills/<category>/` — domain-specific (PPT, PDF, bidding, crawler)
-  - `skills/ppt/` — 3 PPT generation skills (ppt-master, frontend-slides, mckinsey-pptx)
+  - `skills/ppt/` — 3 PPT generation skills (ppt-master, frontend-slides, mckinsey-pptx) — downloaded from GitHub, **maintained as a local fork** so prompts/templates can be tuned to team style
   - `skills/pdf/` — pdf-toc-master
-  - `skills/bidding/` — bid-doc-master (custom)
-  - `skills/crawler/` — winshang-crawler (custom)
+  - `skills/bidding/` — bid-doc-master (custom, sole developer)
+  - `skills/crawler/` — winshang-crawler (custom, with its own pyproject.toml + uv workflow)
 
 `.opencode/skills/` is the **OpenCode entry point** and contains symlinks to `skills/<category>/`. Always edit files under `skills/<category>/` — never under `.opencode/skills/`.
 
