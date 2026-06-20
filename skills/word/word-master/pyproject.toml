@@ -1,0 +1,9 @@
+[project]
+name = "word-master"
+version = "0.1.0"
+description = "专业 Word 文档创作 Skill - 内容包解析、模板渲染、格式排版、投标文档生成"
+requires-python = ">=3.10"
+dependencies = [
+    "python-docx>=1.1.0",
+    "pyyaml>=6.0",
+]

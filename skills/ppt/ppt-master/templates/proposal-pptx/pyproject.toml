@@ -1,0 +1,9 @@
+[project]
+name = "proposal-pptx-template"
+version = "1.0.0"
+description = "方案介绍PPT模板编译器 — 基于参考PPT + YAML内容包生成客户定制方案"
+requires-python = ">=3.10"
+dependencies = [
+    "python-pptx>=1.0.0",
+    "pyyaml>=6.0",
+]

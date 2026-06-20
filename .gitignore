@@ -22,3 +22,14 @@ __pycache__/
 # Unrelated subprojects
 skills/crawler/crawler_mall/
 skills/新建文件夹/
+
+# Backup of old materials (migrated to /opt/code/docs/lanlnk/)
+materials_backup_*/
+
+# User data is at /opt/code/docs/lanlnk/, not in this repo
+
+# Generated artifacts
+skills/word/word-master/templates/_analysis_report.json
+skills/word/word-master/test/*.docx
+skills/word/word-master/output/
+skills/ppt/ppt-master/output/

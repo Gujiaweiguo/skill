@@ -17,8 +17,8 @@ compatibility: >
   uv sync                  # install core deps (pypdf, pdf2image, Pillow)
   uv sync --extra ocr      # include easyocr for scanned PDFs
 
-  # Extract TOC and embed bookmarks
-  uv run pdf-toc-extract input.pdf --offset 8 --toc-start 6 --toc-end 8
+  # Extract TOC + per-page index, merge into one outline (recommended)
+  uv run pdf-toc-extract input.pdf --offset 8 --toc-start 6 --toc-end 8 --gpu auto --mode merged
   ```
 
   Parameters:
@@ -26,6 +26,7 @@ compatibility: >
   - `--toc-start M`  First page of TOC in PDF, 1-indexed
   - `--toc-end K`    Last page of TOC in PDF, 1-indexed
   - `--dpi N`        OCR resolution (default: 200)
+  - `--gpu MODE`     EasyOCR device selection: `auto` / `on` / `off`
 
   System requirement: poppler-utils (for pdf2image)
 
@@ -81,7 +82,8 @@ uv sync --all-extras
    - easyocr (推荐)    →  uv run python -c "import easyocr"
    - pytesseract       →  uv run python -c "import pytesseract"
    - paddleocr         →  uv run python -c "import paddleocr"
-4. 参考脚本可用?       →  uv run pdf-toc-extract --help
+4. CUDA 可用?          →  uv run python -c "import torch; print(torch.cuda.is_available())"
+5. 参考脚本可用?       →  uv run pdf-toc-extract --help
 ```
 
 ### 0.2 任务类型判断
@@ -94,13 +96,15 @@ uv sync --all-extras
 | **扫描版 PDF + 无目录页** | 全文 OCR → NLP 识别章节标题 → 嵌入书签（慢，需用户确认） |
 | **已有书签的 PDF** | 检查书签完整性，询问是否替换或补充 |
 
-### 0.3 三种工作模式
+### 0.3 三种 CLI 模式（`--mode`）
 
-| 模式 | 输入要求 | 速度 | 准确率 |
-|------|---------|------|--------|
-| **A — 目录页提取**（默认） | PDF 有目录页 | 最快（秒级） | 最高 |
-| **B — 已有书签复用** | PDF 已有 outline | 最快 | 取决于已有书签质量 |
-| **C — 标题推断** | 无目录页 | 慢（需遍历全文） | 中高（取决于排版一致性） |
+| 模式 | 说明 | 速度 | 适用场景 |
+|------|------|------|---------|
+| **merged**（推荐） | TOC 干净标题 + 逐页索引补齐，每页都有书签 | 中（需 OCR 全部页面） | 日常使用，导航最完整 |
+| **toc** | 只从目录页提取书签，标题最干净 | 最快（秒级） | 只需曲目/章节跳转，不需要逐页覆盖 |
+| **index** | 每页 OCR 顶部文本作为书签，不依赖目录页 | 中 | 无目录页或目录页质量极差时 |
+
+**选择建议**：优先 `merged`；如果只需要精简目录或 PDF 页数很多想省时间，用 `toc`；目录页完全不可用时回退 `index`。
 
 ---
 
@@ -150,22 +154,25 @@ existing_outlines = reader.outline  # 是否已有书签
 
 ---
 
-## P2: 目录提取
+## P2: 目录提取 + 逐页索引（merged 流程）
 
-### 2.1 模式 A — 从目录页提取
+merged 模式分两阶段执行：先提取目录页（干净标题），再逐页 OCR 补齐。
+
+### 2.1 Phase 1 — 从目录页提取（toc 路径）
 
 #### 扫描版（OCR 路径）
 
 ```python
 from pdf2image import convert_from_path
 import easyocr
+import torch
 
 # 1. 目录页转图片
 images = convert_from_path(pdf_path, dpi=300,
                            first_page=toc_start, last_page=toc_end)
 
 # 2. OCR 识别
-reader = easyocr.Reader(['ch_sim', 'en'])
+reader = easyocr.Reader(['ch_sim', 'en'], gpu=torch.cuda.is_available())
 for img in images:
     results = reader.readtext(np.array(img))
 
@@ -185,17 +192,33 @@ pattern = r'^[\s　]*([^\d]+?)[\s　]+(\d{1,4})[\s　]*$'
 matches = re.findall(pattern, text, re.MULTILINE)
 ```
 
-### 2.2 模式 C — 标题推断
+### 2.2 Phase 2 — 逐页索引（index 路径）
+
+对 PDF 每一页裁剪顶部 1/3，OCR 识别第一个非数字文本块作为页面标题。
 
 ```python
-# 1. 遍历全文，收集每页文本
-# 2. 按字号、字体、样式聚类
-# 3. 大字号 + 单行 = 可能的章节标题
-# 4. 检查左侧导航 / 页眉页脚中的章节标记
-# 5. 构建推断的 TOC
+for page_idx, img in enumerate(all_images):
+    top = img.crop((0, 0, img.width, img.height // 3))
+    results = reader.readtext(np.array(top), detail=1)
+    title = first_qualifying_text(results)  # 跳过纯数字、括号符号
+    bookmarks.append({"pdf_page": page_idx + 1, "title": f"{title} (P. {page_idx+1})"})
 ```
 
-### 2.3 结构解析
+### 2.3 合并策略
+
+```
+Phase 1 输出: 202 个 TOC 书签（标题干净，来自目录页）
+Phase 2 输出: 405 个索引书签（每页一个，标题可能有噪声）
+合并:
+  1. covered = {Phase 1 的 pdf_page 集合}
+  2. extras = Phase 2 中 pdf_page 不在 covered 的条目
+  3. merged = Phase 1 + extras
+  4. 按 pdf_page 排序，去重（每页只保留一个书签）
+```
+
+结果：每页都有书签；TOC 页的书签标题更干净，其余页面用索引标题兜底。
+
+### 2.4 结构解析
 
 OCR / 提取后的原始文本需要转换为结构化 TOC：
 
@@ -261,7 +284,7 @@ OCR / 提取后的原始文本需要转换为结构化 TOC：
 
 ---
 
-## P3: 书签嵌入
+## P3: 书签嵌入（合并后写入）
 
 ### 3.1 pypdf Outline 操作
 
@@ -334,12 +357,11 @@ with open(output_path, "wb") as f:
 
 ### 验收清单
 
-- [ ] 书签数量 ≈ TOC 条目数（误差 ±3 以内）
+- [ ] 书签数量 = PDF 页数（merged 模式）或 ≈ TOC 条目数（toc 模式）
 - [ ] 目录章节与正文结构一致
-- [ ] 随机选取 3-5 个书签点击 → 跳转到正确内容页
+- [ ] 随机选取 5 个书签 → OCR 目标页验证跳转内容与书签标题匹配
 - [ ] 输出的 PDF 可在浏览器 / PDF 阅读器中正常打开
 - [ ] 文件未损坏（写入后可被重新读取、解析）
-- [ ] 章节父节点不跳转，歌曲子节点准确跳转
 
 ### 自动化验证
 
@@ -370,7 +392,7 @@ def verify_toc(output_path, expected_count):
 
 | 条件 | 行为 |
 |------|------|
-| 无 OCR 引擎 + 扫描版 | 报错并给出安装指引：`pip install easyocr` |
+| 无 OCR 引擎 + 扫描版 | 报错并给出安装指引：`cd skills/pdf/pdf-toc-master && uv sync --extra ocr` |
 | 无 OCR 引擎 + 文字版 | 正常处理（文字版不需要 OCR） |
 | 找不到目录页 + 文字版 | 回退「标题推断」模式 |
 | 找不到目录页 + 扫描版 | 提示用户指定目录页范围，或回退全文 OCR（需用户确认） |
@@ -395,7 +417,7 @@ def verify_toc(output_path, expected_count):
 ## 最小可用 Prompt
 
 ```
-用 pdf-toc-master 给 PDF 生成目录书签。
+用 pdf-toc-master 给 PDF 生成目录书签（merged 模式）。
 
 输入 PDF 路径：{pdf_path}
 输出 PDF 路径：{output_path（可选，默认在输入文件旁生成）}
@@ -406,14 +428,17 @@ def verify_toc(output_path, expected_count):
 3) 印刷页码与 PDF 页码的偏移量
 4) 现有书签情况
 
-确认后再执行书签嵌入：
-1) 从目录页提取标题与页码
-2) 计算页码映射
-3) 按章节分层生成书签
+确认后再执行书签嵌入（merged 模式）：
+1) Phase 1: 从目录页 OCR 提取标题+页码 → 干净 TOC 书签
+2) Phase 2: 逐页 OCR 顶部文本 → 索引书签（补齐无 TOC 条目的页面）
+3) 合并：TOC 书签优先，索引书签填空，去重后嵌入
 4) 嵌入到 PDF Outline
 
 完成后执行验证：
-1) 读取书签数量核对
-2) 抽样 3-5 个条目确认跳转正确
+1) 读取书签数量 = PDF 页数
+2) 抽样 5 个书签，OCR 目标页确认跳转正确
 3) 确认文件可正常打开
+
+推荐命令：
+uv run pdf-toc-extract {pdf_path} --offset {N} --toc-start {M} --toc-end {K} --gpu auto --mode merged
 ```

@@ -1,0 +1,29 @@
+# ============================================================
+#  蓝联科技素材库配置模板
+# ============================================================
+# 使用方式：
+#   1. 设置环境变量 LANLNK_BASE 指向你的素材根目录
+#       export LANLNK_BASE=/path/to/your/materials
+#   2. 所有路径相对于 $LANLNK_BASE
+#   3. 如果不设置，默认使用当前工作目录
+# ============================================================
+project: 蓝联科技
+base: "${LANLNK_BASE:-.}"
+
+directories:
+  incoming: incoming   # 原始素材入口（用户丢文件的地方）
+  raw: raw             # 转换后的 Markdown + 提取的图片（中间产物）
+  materials: materials # 加工后的结构化素材（最终产出）
+  proposals: proposals   # 方案汇报 + 立项报告统一存放
+  bidding: bidding
+
+categories:
+  company: 01-company-overview
+  qualifications: 02-qualifications
+  products: 03-products
+  cases: 04-cases
+  implementation: 05-implementation
+  services: 06-services
+  personnel: 07-personnel
+
+scripts: scripts  # 相对于 skill 根目录

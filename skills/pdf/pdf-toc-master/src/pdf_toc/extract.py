@@ -34,11 +34,40 @@ from pypdf import PdfReader, PdfWriter
 CONF_THRESHOLD: float = 0.5
 
 
+def resolve_easyocr_gpu(gpu_mode: str) -> bool:
+    if gpu_mode == "off":
+        print("EasyOCR backend: CPU (--gpu off)")
+        return False
+
+    import torch
+
+    use_gpu = bool(torch.cuda.is_available())
+    if gpu_mode == "on" and not use_gpu:
+        raise RuntimeError("--gpu on requested, but torch.cuda.is_available() is False")
+
+    if use_gpu:
+        print(f"EasyOCR backend: GPU (CUDA {torch.version.cuda})")
+    else:
+        print("EasyOCR backend: CPU (CUDA unavailable)")
+    return use_gpu
+
+
+def block_y(block: dict[str, Any]) -> float:
+    return float(block["y"])
+
+
+def ocr_result_center_y(result: Any) -> float:
+    bbox = result[0]
+    return (float(bbox[0][1]) + float(bbox[2][1])) / 2
+
+
 def extract_toc(
     pdf_path: str, output_path: str | None = None,
     offset: int = 0, dpi: int = 200,
     toc_start: int = 1, toc_end: int = 3,
     conf_threshold: float = CONF_THRESHOLD,
+    write_output: bool = True,
+    gpu_mode: str = "auto",
 ) -> list[dict[str, Any]]:
 
     if output_path is None:
@@ -46,7 +75,7 @@ def extract_toc(
 
     import easyocr
     print("Initializing EasyOCR...")
-    reader = easyocr.Reader(["ch_sim", "en"], gpu=False)
+    reader = easyocr.Reader(["ch_sim", "en"], gpu=resolve_easyocr_gpu(gpu_mode))
 
     print(f"Converting PDF pages {toc_start}-{toc_end} to images (dpi={dpi})...")
     images = pdf2image.convert_from_path(
@@ -249,7 +278,7 @@ def extract_toc(
             all_page_numbers = sorted([
                 b for b in col_blocks
                 if _is_num_block(b) and b["x"] > page_zone
-            ], key=lambda b: b["y"])
+            ], key=block_y)
 
             for text_blocks, line in pending_text:
                 text_y = line[0]["y"]
@@ -358,6 +387,9 @@ def extract_toc(
                 page_number=pdf_idx,
             )
 
+    if not write_output:
+        return all_entries
+
     with open(output_path, "wb") as f:
         writer.write(f)
 
@@ -375,6 +407,180 @@ def extract_toc(
             print(f"    {e['printed_page']:>3} → {e['title'][:50]}")
 
     return all_entries
+
+
+def extract_page_index(
+    pdf_path: str,
+    output_path: str | None = None,
+    dpi: int = 100,
+    write_output: bool = True,
+    gpu_mode: str = "auto",
+) -> list[dict[str, Any]]:
+    """Index every page of the PDF by OCR-ing the top portion.
+
+    For each page, looks for a song/section title in the top 1/3. If found,
+    creates a bookmark "title (P. X)". Otherwise, "P. X". This bypasses
+    TOC OCR errors at the cost of slower processing (one OCR per page).
+    """
+    import easyocr
+    import numpy as np  # easyocr requires numpy arrays, not PIL images
+
+    if output_path is None:
+        output_path = pdf_path.replace(".pdf", "-indexed.pdf")
+
+    print("Initializing EasyOCR for per-page indexing...")
+    reader_ocr = easyocr.Reader(["ch_sim", "en"], gpu=resolve_easyocr_gpu(gpu_mode))
+    print(f"Converting PDF to images (dpi={dpi})...")
+    images = pdf2image.convert_from_path(pdf_path, dpi=dpi, fmt="jpeg")
+    total = len(images)
+    print(f"Total pages: {total}")
+
+    # Patterns that indicate a non-title token (page numbers, headers, etc.)
+    num_only = re.compile(r"^[\d\s\W]+$")
+    bracket_only = re.compile(r"^[（(\[].*[)）\]]$")
+
+    bookmarks: list[dict[str, Any]] = []
+    current_title: str | None = None
+    last_progress = 0
+
+    for pdf_idx, img in enumerate(images):
+        # OCR only the top 1/3 where titles usually appear
+        top_img = img.crop((0, 0, img.width, img.height // 3))
+        top_arr = np.array(top_img)
+        results = reader_ocr.readtext(top_arr, detail=1, paragraph=False)
+
+        # Sort by y (top to bottom), find first qualifying title
+        title: str | None = None
+        sorted_results = sorted(
+            results,
+            key=ocr_result_center_y,
+        )
+        for bbox, text, conf in sorted_results:
+            if float(conf) < 0.4:
+                continue
+            clean = text.strip()
+            if not clean or len(clean) < 2:
+                continue
+            if num_only.match(clean):
+                continue
+            if bracket_only.match(clean) and len(clean) < 6:
+                continue
+            title = clean
+            break
+
+        if title:
+            current_title = title
+
+        bookmark_name = (
+            f"{current_title} (P. {pdf_idx + 1})"
+            if current_title
+            else f"P. {pdf_idx + 1}"
+        )
+        bookmarks.append({
+            "pdf_page": pdf_idx + 1,
+            "title": bookmark_name,
+        })
+
+        if pdf_idx - last_progress >= 25:
+            print(f"  Processed {pdf_idx + 1}/{total} pages...")
+            last_progress = pdf_idx
+
+    print(f"\nEmbedding {len(bookmarks)} bookmarks (per-page mode)...")
+    reader_pdf = PdfReader(pdf_path)
+    writer = PdfWriter()
+    writer.append(reader_pdf)
+    for b in bookmarks:
+        pdf_idx = b["pdf_page"] - 1
+        if 0 <= pdf_idx < len(reader_pdf.pages):
+            writer.add_outline_item(
+                title=str(b["title"]),
+                page_number=pdf_idx,
+            )
+
+    if not write_output:
+        return bookmarks
+
+    with open(output_path, "wb") as f:
+        writer.write(f)
+    print(f"✓ Saved: {output_path}")
+    print(f"  Bookmarks: {len(writer.outline)}  PDF Pages: {total}")
+
+    print("\n  Sample entries:")
+    for b in bookmarks[:5]:
+        print(f"    {b['pdf_page']:>3} → {b['title'][:60]}")
+    if len(bookmarks) > 10:
+        print(f"    ... ({len(bookmarks) - 10} more)")
+        for b in bookmarks[-5:]:
+            print(f"    {b['pdf_page']:>3} → {b['title'][:60]}")
+
+    return bookmarks
+
+
+def extract_merged(
+    pdf_path: str,
+    output_path: str | None = None,
+    offset: int = 0,
+    toc_dpi: int = 200,
+    index_dpi: int = 100,
+    toc_start: int = 1,
+    toc_end: int = 3,
+    gpu_mode: str = "auto",
+) -> list[dict[str, Any]]:
+    """Combine TOC bookmarks (clean titles) with per-page index bookmarks
+    (full coverage). TOC entries are kept as-is; index entries are added
+    only for PDF pages that don't already have a TOC bookmark."""
+    if output_path is None:
+        output_path = pdf_path.replace(".pdf", "-merged.pdf")
+
+    print("=== Phase 1: TOC extraction (clean titles) ===")
+    toc_entries = extract_toc(
+        pdf_path, offset=offset, dpi=toc_dpi,
+        toc_start=toc_start, toc_end=toc_end,
+        write_output=False,
+        gpu_mode=gpu_mode,
+    )
+    covered = {e["pdf_page"] for e in toc_entries}
+
+    print("\n=== Phase 2: Per-page index (full coverage) ===")
+    index_entries = extract_page_index(
+        pdf_path, dpi=index_dpi, write_output=False, gpu_mode=gpu_mode,
+    )
+
+    extras = [e for e in index_entries if e["pdf_page"] not in covered]
+    print(f"\n=== Merging: {len(toc_entries)} TOC + {len(extras)} index-only ===")
+    merged = toc_entries + extras
+    merged.sort(key=lambda e: e["pdf_page"])  # type: ignore[typeddict-item]
+
+    # Dedup by pdf_page: when multiple TOC entries share a page, we want
+    # the bookmark to land once. The set is already exclusive between TOC
+    # and index, but TOC itself may have multiple entries per page.
+    seen, deduped = set(), []
+    for e in merged:
+        if e["pdf_page"] in seen:
+            continue
+        seen.add(e["pdf_page"])
+        deduped.append(e)
+    merged = deduped
+
+    print(f"\nEmbedding {len(merged)} merged bookmarks...")
+    reader_pdf = PdfReader(pdf_path)
+    writer = PdfWriter()
+    writer.append(reader_pdf)
+    for e in merged:
+        pdf_idx = e["pdf_page"] - 1
+        if 0 <= pdf_idx < len(reader_pdf.pages):
+            writer.add_outline_item(
+                title=str(e["title"]),
+                page_number=pdf_idx,
+            )
+
+    with open(output_path, "wb") as f:
+        writer.write(f)
+
+    print(f"✓ Saved: {output_path}")
+    print(f"  Bookmarks: {len(writer.outline)}  PDF Pages: {len(reader_pdf.pages)}")
+    print(f"  TOC (clean): {len(toc_entries)}  Index-only: {len(extras)}")
+    return merged
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -402,21 +608,50 @@ def main(argv: list[str] | None = None) -> None:
         "--dpi", type=int, default=200,
         help="DPI for PDF-to-image conversion (default: 200)",
     )
+    parser.add_argument(
+        "--mode", choices=["toc", "index", "merged"], default="toc",
+        help="Extraction mode: 'toc' (default) parses TOC pages, "
+             "'index' OCRs every page individually, "
+             "'merged' combines TOC titles with per-page coverage",
+    )
+    parser.add_argument(
+        "--gpu", choices=["auto", "on", "off"], default="auto",
+        help="EasyOCR execution device: auto detects CUDA, on requires CUDA, off forces CPU",
+    )
     args = parser.parse_args(argv)
 
-    if args.offset == 0 and args.toc_start == 1 and args.toc_end == 3:
-        print("⚠ Using defaults: offset=0, toc_start=1, toc_end=3")
-        print("  For correct results, specify:")
-        print("    --offset N     PDF page index = printed_page + N")
-        print("    --toc-start M  First TOC page number")
-        print("    --toc-end K    Last TOC page number")
-        print()
+    if args.mode == "toc":
+        if args.offset == 0 and args.toc_start == 1 and args.toc_end == 3:
+            print("⚠ Using defaults: offset=0, toc_start=1, toc_end=3")
+            print("  For correct results, specify:")
+            print("    --offset N     PDF page index = printed_page + N")
+            print("    --toc-start M  First TOC page number")
+            print("    --toc-end K    Last TOC page number")
+            print()
 
-    extract_toc(
-        args.input_pdf, args.output_pdf,
-        offset=args.offset, dpi=args.dpi,
-        toc_start=args.toc_start, toc_end=args.toc_end,
-    )
+        extract_toc(
+            args.input_pdf, args.output_pdf,
+            offset=args.offset, dpi=args.dpi,
+            toc_start=args.toc_start, toc_end=args.toc_end,
+            gpu_mode=args.gpu,
+        )
+    elif args.mode == "index":
+        if args.output_pdf is None:
+            args.output_pdf = args.input_pdf.replace(".pdf", "-indexed.pdf")
+        extract_page_index(
+            args.input_pdf, args.output_pdf,
+            dpi=args.dpi,
+            gpu_mode=args.gpu,
+        )
+    else:
+        if args.output_pdf is None:
+            args.output_pdf = args.input_pdf.replace(".pdf", "-merged.pdf")
+        extract_merged(
+            args.input_pdf, args.output_pdf,
+            offset=args.offset, toc_dpi=args.dpi,
+            toc_start=args.toc_start, toc_end=args.toc_end,
+            gpu_mode=args.gpu,
+        )
 
 
 if __name__ == "__main__":

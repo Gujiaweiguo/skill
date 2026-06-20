@@ -1,15 +1,15 @@
 [project]
 name = "bid-doc-tools"
 version = "1.0.0"
-description = "Dependency declarations for bid-doc-master skill (no library code)"
+description = "Dependency declarations for bid-doc-master skill — 招标文件解析、内容包生成"
 requires-python = ">=3.10"
 dependencies = [
     "python-docx>=1.1.0",
+    "python-pptx>=0.6.21",
     "openpyxl>=3.1.0",
-    "markitdown>=0.1.0",
+    "pyyaml>=6.0",
 ]
 
 [build-system]
 requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
-

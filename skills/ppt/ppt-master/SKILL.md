@@ -61,6 +61,41 @@ P4: QA 验收 + 交付
 | **大纲/要点列表** → 新建 | 按要点规划页面，研究补充 |
 | **文稿/文章** → 提取转演示 | 提炼核心观点后新建 |
 | **纯主题/关键词** → 从0研究新建 | 先研究后规划 |
+| **结构化内容包 `*.content.md`** → 视觉设计 | 解析内容包，按页面类型+layout 自动生成（详见 0.4） |
+
+### 0.4 内容包输入模式
+
+当输入为结构化内容包（`*.content.md`）时，表示上游业务 Skill（如 project-proposal-generator、company-intro-generator）已完成内容编排，ppt-master 只负责视觉设计。
+
+内容包格式规范见 [reference/content-package-spec.md](reference/content-package-spec.md)。
+
+**处理流程：**
+1. 解析 frontmatter → 获取元数据（title/style/target_pages/colors）
+2. 解析页面大纲 → 获取每页 type + layout + 内容
+3. 根据 style 字段选择配色方案（如"咨询风格"→ 深蓝+灰）
+4. 逐页按 type + layout 选择版式生成
+5. 根据 sources 引用检查素材是否存在，存在则引用
+6. 按目标页数范围控制详细程度
+
+**页面类型 → 版式映射：**
+
+| content type | ppt-master 版式 |
+|-------------|----------------|
+| `cover` | 封面页（大标题+副标题+日期+品牌） |
+| `toc` | 目录页（章节列表） |
+| `section` | 章节过渡页（标题+装饰） |
+| `content` + `left-right` | 左右分栏 |
+| `content` + `comparison` | 多列对比 |
+| `content` + `feature-grid` | 功能网格 |
+| `content` + `data-table` | 数据表格 |
+| `content` + `timeline` | 时间轴 |
+| `content` + `big-number` | 大数字页 |
+| `content` + `bullet-list` | 列表页 |
+| `summary` | 总结页 |
+| `end` | 结尾页 |
+
+**无内容包时的后备行为：**
+如果未收到内容包，ppt-master 沿用原有流程——自己研究内容 + 自己设计生成。
 
 ### 0.3 方案选型
 
@@ -148,6 +183,7 @@ P4: QA 验收 + 交付
 | **英文字体** | Arial（默认） |
 | **中文字体** | Microsoft YaHei（微软雅黑） |
 | **页码位置** | 右下角，与边缘保持安全距离 |
+| **\n 换行符** | pptxgenjs v4 不支持 `\n` — 所有行渲染在同一 Y 位置 |
 
 ### 3.2 Theme 对象规范
 
@@ -199,9 +235,10 @@ module.exports = { createSlide };
 1. 创建 `slides/` 目录
 2. 每页一个 JS 文件，export `createSlide(pres, theme)` 同步函数
 3. 创建 `compile.js` 编排所有页
-4. 运行 `node compile.js`
-5. 输出 `slides/output/presentation.pptx`
-6. 如有需要，用 imageGen 补充视觉素材
+4. **引入渲染修复模块**：`var fix = require('./lib/pptx-render-fix')`，创建 `pres` 后立即调用 `fix.patchPresentation(pres)`
+5. 运行 `node compile.js`
+6. 输出 `slides/output/presentation.pptx`
+7. 如有需要，用 imageGen 补充视觉素材
 
 ### 3.6 PptxGenJS 关键陷阱
 
@@ -210,6 +247,94 @@ module.exports = { createSlide };
 - **颜色不带 #** — `"FF0000"` 不是 `"#FF0000"`
 - **正文不加粗** — bold 只用于标题和 heading
 - **只用 theme 里的颜色** — 不要自己发明颜色
+- **\n 换行符不生效** — pptxgenjs v4 把 `\n` 所有行渲染在同一 Y 位置，永远不要直接使用 `\n`
+
+### 3.7 渲染修复模块（必用）
+
+`lib/pptx-render-fix.js` 提供 pptxgenjs 渲染层修复，每次 compile.js **必须引入**：
+
+```javascript
+var fix = require('../../lib/pptx-render-fix');
+fix.patchPresentation(pres);
+```
+
+修复内容：
+1. **文本内边距**：OOXML 默认 L/R 0.1"、T/B 0.05" 过大，改为 2pt（25400 EMU）
+2. **\n 自动拆分**：自动检测 `addText` 中的 `\n`，拆分为独立 `addText` 调用
+
+### 3.8 布局组件库
+
+`lib/pptx-layouts.js` 提供可复用的布局组件，支持 LAYOUT_WIDE（13.333×7.5）：
+
+```javascript
+var layouts = require('../../lib/pptx-layouts');
+var L = layouts.createLayouts(pptx);
+
+L.addTopBand(slide, "标题", "徽章", 1);
+L.addCard(slide, { x, y, w, h, title, body, accent });
+L.addMetricCard(slide, x, y, w, h, tone, num, title, desc);
+L.addFlowDiagram(slide, { x, y, w, h, title, steps, tone, soft, footerTags });
+L.addThreeExplainCards(slide, { x, y, w, cardH, accent, cards });
+L.addBottomStatement(slide, "金句", "coral");
+```
+
+内置 20 色调色板（`L.C.deep/blue/teal/amber/coral/...`），详见 `reference/design-system.md` 核心闭环版式。
+
+### 3.9 模板库
+
+`templates/` 目录提供按场景的完整 PPT 模板：
+
+| 模板 | 位置 | 引擎 | 说明 |
+|------|------|------|------|
+| 立项报告 | `templates/proposal-template/compile.js` | PptxGenJS | 13页标准立项 PPT（含4个核心闭环场景） |
+| 方案介绍 | `templates/proposal-pptx/compile.py` | python-pptx | 基于参考PPT + YAML内容包，插入定制分析页 |
+
+**立项报告模板**（PptxGenJS）：复制模板目录 → 修改 CONFIG 和文本内容 → `node compile.js`
+
+**方案介绍模板**（python-pptx）：
+
+适用于「公司已有标准产品PPT（含产品截图/案例照片），需要为不同客户生成定制方案介绍」的场景。支持两种模式：
+
+| 模式 | YAML `mode` | 用途 | 输出页数 |
+|------|------------|------|---------|
+| 方案汇报 | `proposal`（默认） | 完整方案介绍（公司+需求理解+产品方案+实施服务） | ~59页 |
+| 公司介绍 | `intro` | 公司介绍（公司简介+案例+客户定制内容） | ~30页 |
+| 投标述标 | `tender` | 述标答辩（公司资质+需求理解+重点响应+实施服务） | ~17页 |
+
+架构：
+```
+参考 PPT (固定基底, 产品截图/案例) + YAML 内容包 (客户定制数据)
+    ↓ compile.py (python-pptx)
+完整方案 PPT (基底 + 定制页)
+```
+
+**proposal 模式**定制页型：
+1. `requirement-understanding` — 需求理解（分类卡片 + 核心洞察）
+2. `coverage-analysis` — 功能覆盖度（三大指标卡）
+3. `core-scenario` — 核心场景（双行闭环流, 核心闭环版式）
+4. `pricing-comparison` — 报价对比（双方案卡片）
+5. `implementation-plan` — 实施计划（阶段时间线）
+
+**intro 模式**定制页型：
+1. `text-bullets` — 标题+正文+要点列表
+2. `feature-cards` — 标题+卡片网格（columns: 2/3/4）
+
+**tender 模式**定制页型（与 intro 共用）：
+1. `text-bullets` — 标题+正文+要点列表
+2. `feature-cards` — 标题+卡片网格（columns: 2/3/4）
+
+3 母版约定：首尾页 → 标题幻灯片(0)，目录页 → 节标题(1)，内容页 → 标题和内容(2)
+
+使用方式：
+```bash
+cd templates/proposal-pptx && uv sync
+uv run python compile.py <content-package.yaml>
+```
+
+内容包 YAML 示例：
+- proposal 模式：`proposals/正祥会员系统/content-packages/正祥会员系统_proposal-pptx.yaml`
+- intro 模式：`proposals/广州海港地产/content-packages/广州海港地产_intro-pptx.yaml`
+- tender 模式：`bidding/果正商业会员营销系统采购服务/content-packages/sz_gz_tender_述标PPT.yaml`
 
 ---
 
