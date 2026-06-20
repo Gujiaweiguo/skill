@@ -131,6 +131,31 @@ src/
     uv run python -m src.main test/test.word-content.md -v
 ```
 
+### 0.5 内容包校验器
+
+渲染前用 `scripts/validate_package.py` 校验内容包，提前拦截格式错误：
+
+```bash
+cd /opt/code/skill/skills/word/word-master
+export LANLNK_BASE=/opt/code/docs/lanlnk
+
+# 校验单个文件
+uv run scripts/validate_package.py <内容包.word-content.md>
+
+# 校验目录下所有内容包
+uv run scripts/validate_package.py $LANLNK_BASE/proposals/
+
+# 详细输出（显示警告）
+uv run scripts/validate_package.py <路径> --verbose
+
+# JSON 输出（供程序调用）
+uv run scripts/validate_package.py <路径> --json
+```
+
+校验规则：
+- **P0 错误**（阻断渲染）：frontmatter 缺失/未闭合、YAML 解析失败、title 为空、type/template 枚举值无效、header/footer 非字典、table 缺少 table_data
+- **P1 警告**（不阻断）：date 格式不规范、cover.title 为空、toc.max_level 超范围、图片/素材路径不存在、表格列数不一致
+
 ---
 
 ## P1: 模板选择
