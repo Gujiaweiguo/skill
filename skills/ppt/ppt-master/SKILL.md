@@ -336,6 +336,13 @@ uv run python compile.py <content-package.yaml>
 - intro 模式：`proposals/广州海港地产/content-packages/广州海港地产_intro-pptx.yaml`
 - tender 模式：`bidding/果正商业会员营销系统采购服务/content-packages/sz_gz_tender_述标PPT.yaml`
 
+渲染前校验（可选）：
+```bash
+cd skills/ppt/ppt-master/templates/proposal-pptx
+uv run ../../scripts/validate_ppt_package.py <YAML配置> --verbose
+```
+校验项：mode 枚举、base_ppt 存在性、slide type 合法性（8 种）、TOC 标题数量（≤4）、theme 颜色格式、cover/theme 未知字段。
+
 ---
 
 ## P4: QA 验收
