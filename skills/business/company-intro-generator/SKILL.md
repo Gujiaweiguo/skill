@@ -228,8 +228,13 @@ for name in wb.sheetnames:
 - 详细版：保留所有匹配素材 + 保留所有产品细节 + 保留完整案例描述 + 团队介绍
 
 ### 1.3 案例智能选择
-使用 `$MATERIALS_DIR/04-cases/服务客户案例汇总.md` 做索引概览，
-根据业务线/行业/场景标签自动筛选匹配案例，按完整度排序（✅ > ⚠️ > 🔴）。
+使用 case_matcher 自动匹配案例：
+```bash
+cd skills/business/material-importer && uv run scripts/case_matcher.py \
+  --industry <客户行业> --scenarios <场景标签> --limit 5 --json
+```
+匹配维度：行业（×3）、场景（×2.5）、关键词（×1.5）、规模相近度（×1）、完整度（×0.5）。
+也可用 `--list-tags` 查看所有可选行业和场景标签。
 
 ---
 

@@ -277,7 +277,7 @@ uv run python -m src.main generate tender_info.json \
 | 资格证明文件 | `heading-1` + 资质引用列表 | 分页，逐项列明 |
 | 商务条款响应表 | `heading-1` + `table: comparison-table` | 招标条款→响应情况 |
 | 合同条款响应/偏离表 | `heading-1` + `table: comparison-table` | 条款→偏离说明 |
-| 类似项目业绩 | `heading-1` + `table: default-table` | 项目清单表 |
+| 类似项目业绩 | `heading-1` + `table: default-table` | 项目清单表，可用 case_matcher 自动筛选同类案例 |
 | 服务承诺 | `heading-1` + 承诺文本 | 分页 |
 | 其他商务材料 | `heading-1` + 按需 | 招标文件要求 |
 
