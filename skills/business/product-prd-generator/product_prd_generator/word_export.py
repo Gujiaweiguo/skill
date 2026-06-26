@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from datetime import date
@@ -9,6 +10,12 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+_CONTROL_CHARS = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
+
+
+def _sanitize(text: str) -> str:
+    return _CONTROL_CHARS.sub('', text)
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,7 +34,7 @@ def _yaml_block(data: dict[str, Any]) -> list[str]:
 
 
 def _stringify_table(rows: list[list[Any]]) -> list[list[str]]:
-    return [[str(cell) for cell in row] for row in rows]
+    return [[_sanitize(str(cell)) for cell in row] for row in rows]
 
 
 def _frontmatter_lines(reconcile: dict[str, Any], doc_map: dict[str, Any] | None) -> list[str]:
@@ -296,6 +303,55 @@ def _render_unmatched_section(capabilities: list[dict[str, Any]]) -> list[str]:
     return _chapter_with_lines("5. 客户需求未覆盖", lines, page_break=False)
 
 
+def _render_requirement_section(requirements: list[dict[str, Any]]) -> list[str]:
+    if not requirements:
+        return []
+    priority_order = {"高": 0, "中": 1, "低": 2}
+    reqs_sorted = sorted(
+        requirements,
+        key=lambda r: (
+            priority_order.get(str(r.get("priority", "低")), 3),
+            str(r.get("scenario", "")),
+            str(r.get("sub_scenario", "")),
+        ),
+    )
+    rows = []
+    for req in reqs_sorted:
+        nearby = _sanitize(str(req.get("nearby_text", "")) or "—")
+        if len(nearby) > 60:
+            nearby = nearby[:60] + "…"
+        rows.append([
+            _sanitize(str(req.get("scenario", "未分类"))),
+            _sanitize(str(req.get("sub_scenario", "")) or "—"),
+            _sanitize(str(req.get("function", ""))),
+            nearby,
+            _sanitize(str(req.get("source_customer", "")) or "—"),
+            _sanitize(str(req.get("priority", "低"))),
+            _sanitize(str(req.get("code_status", "unmatched"))),
+        ])
+    high = sum(1 for r in reqs_sorted if str(r.get("priority")) == "高")
+    med = sum(1 for r in reqs_sorted if str(r.get("priority")) == "中")
+    low = sum(1 for r in reqs_sorted if str(r.get("priority")) == "低")
+    return _chapter_with_lines(
+        "2.5 需求清单（六维框架）",
+        [
+            f"共 {len(reqs_sorted)} 条需求，优先级分布：高 {high} / 中 {med} / 低 {low}。",
+            "",
+            "```yaml",
+            *_yaml_block({
+                "style": "heading-1",
+                "table": "requirement-matrix",
+                "table_data": {
+                    "header": ["场景", "子场景", "功能", "痛点/描述", "来源", "优先级", "代码状态"],
+                    "rows": _stringify_table(rows),
+                },
+            }),
+            "```",
+        ],
+        page_break=False,
+    )
+
+
 def build_content_package(reconcile_path: str | Path, doc_map_path: str | Path | None, output_dir: str | Path) -> Path:
     reconcile = _load_json(reconcile_path)
     doc_map = _load_json(doc_map_path) if doc_map_path else None
@@ -312,6 +368,7 @@ def build_content_package(reconcile_path: str | Path, doc_map_path: str | Path |
         "",
         *_render_baseline_section(stats, capabilities),
         *_render_customer_section(doc_map),
+        *_render_requirement_section(list(reconcile.get("requirements", []))),
         *_render_feature_section(capabilities),
         *_render_unmatched_section(capabilities),
         *_render_gap_section(capabilities),
@@ -323,6 +380,7 @@ def build_content_package(reconcile_path: str | Path, doc_map_path: str | Path |
         "",
         "- 差距分析详见 [差距分析.md](差距分析.md)",
         "- 证据表详见 [需求证据表.md](需求证据表.md)",
+        "- 需求清单详见 [需求清单.md](需求清单.md)",
         "",
     ]
     content_path.write_text("\n".join(sections), encoding="utf-8")

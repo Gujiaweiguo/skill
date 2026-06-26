@@ -199,13 +199,91 @@ def _render_unmatched_requirements(capabilities: list[dict[str, Any]]) -> str:  
     return "\n".join(lines) + "\n"
 
 
+def _render_requirement_list(requirements: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
+    """Six-dimension requirement table with auto-suggested priority (Rule 3B)."""
+    if not requirements:
+        return ""
+    priority_order = {"高": 0, "中": 1, "低": 2}
+    reqs_sorted = sorted(
+        requirements,
+        key=lambda r: (
+            priority_order.get(r.get("priority", "低"), 3),
+            r.get("scenario", ""),
+            r.get("sub_scenario", ""),
+        ),
+    )
+    high = sum(1 for r in reqs_sorted if r.get("priority") == "高")
+    med = sum(1 for r in reqs_sorted if r.get("priority") == "中")
+    low = sum(1 for r in reqs_sorted if r.get("priority") == "低")
+    lines = [
+        "## 3.5 需求清单（六维框架）",
+        "",
+        f"共 {len(reqs_sorted)} 条需求。优先级分布：高 {high} / 中 {med} / 低 {low}。",
+        f"本节列出前 100 条（按优先级排序），完整清单见 [需求清单.md](需求清单.md)。",
+        "",
+        "| 场景 | 子场景 | 功能 | 痛点/描述 | 来源 | 优先级 | 代码状态 | 匹配能力 |",
+        "|------|--------|------|-----------|------|--------|---------|---------|",
+    ]
+    for req in reqs_sorted[:100]:
+        scenario = req.get("scenario", "未分类")
+        sub = req.get("sub_scenario", "") or "—"
+        func = req.get("function", "")
+        nearby = req.get("nearby_text", "") or "—"
+        if len(nearby) > 60:
+            nearby = nearby[:60] + "…"
+        customer = req.get("source_customer", "") or "—"
+        priority = req.get("priority", "低")
+        status = req.get("code_status", "unmatched")
+        matched = req.get("matched_capability", "") or "—"
+        lines.append(f"| {scenario} | {sub} | {func} | {nearby} | {customer} | {priority} | {status} | {matched} |")
+    return "\n".join(lines) + "\n"
+
+
+def _render_requirement_list_file(requirements: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
+    """Standalone 需求清单.md with groupable six-dimension table."""
+    if not requirements:
+        return "# 需求清单\n\n（暂无结构化需求）\n"
+    priority_order = {"高": 0, "中": 1, "低": 2}
+    reqs_sorted = sorted(
+        requirements,
+        key=lambda r: (
+            r.get("scenario", ""),
+            r.get("sub_scenario", ""),
+            priority_order.get(r.get("priority", "低"), 3),
+        ),
+    )
+    lines = [
+        "# 需求清单（六维框架）",
+        "",
+        f"共 {len(reqs_sorted)} 条需求。",
+        "",
+        "| 场景 | 子场景 | 功能 | 痛点/描述 | 来源 | 优先级 | 代码状态 | 匹配能力 |",
+        "|------|--------|------|-----------|------|--------|---------|---------|",
+    ]
+    for req in reqs_sorted:
+        scenario = req.get("scenario", "未分类")
+        sub = req.get("sub_scenario", "") or "—"
+        func = req.get("function", "")
+        nearby = req.get("nearby_text", "") or "—"
+        if len(nearby) > 80:
+            nearby = nearby[:80] + "…"
+        customer = req.get("source_customer", "") or "—"
+        priority = req.get("priority", "低")
+        status = req.get("code_status", "missing")
+        matched = req.get("matched_capability", "") or "—"
+        lines.append(f"| {scenario} | {sub} | {func} | {nearby} | {customer} | {priority} | {status} | {matched} |")
+    return "\n".join(lines) + "\n"
+
+
 def render_prd(inputs: RenderInputs) -> str:
     project = inputs.reconcile.get("project", "商管系统")
     capabilities = inputs.reconcile.get("capabilities", [])
+    requirements = inputs.reconcile.get("requirements", [])
     stats = _status_stats(capabilities)
     parts = [
         _render_header(project, stats),
         _render_customer_summary(inputs.doc_map),
+        _render_requirement_list(requirements),
         "## 4. 功能清单",
         "",
         f"共 {len(capabilities)} 项能力，详见 [功能清单.md](功能清单.md)。",
@@ -218,6 +296,7 @@ def render_prd(inputs: RenderInputs) -> str:
         "",
         "- 差距分析详见 [差距分析.md](差距分析.md)",
         "- 证据表详见 [需求证据表.md](需求证据表.md)",
+        "- 需求清单详见 [需求清单.md](需求清单.md)",
     ]
     return "\n".join(parts) + "\n"
 
@@ -232,6 +311,7 @@ def main() -> int:
     doc_map_path = args.doc_map if args.doc_map else None
     inputs = _load_inputs(args.reconcile, doc_map_path)
     capabilities = inputs.reconcile.get("capabilities", [])
+    requirements = inputs.reconcile.get("requirements", [])
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -240,8 +320,9 @@ def main() -> int:
     (output_dir / "功能清单.md").write_text(_render_feature_list(capabilities), encoding="utf-8")
     (output_dir / "差距分析.md").write_text(_render_gap_analysis(capabilities), encoding="utf-8")
     (output_dir / "需求证据表.md").write_text(_render_evidence_table(capabilities), encoding="utf-8")
+    (output_dir / "需求清单.md").write_text(_render_requirement_list_file(requirements), encoding="utf-8")
 
-    print(f"rendered 4 files to {output_dir}/")
+    print(f"rendered 5 files to {output_dir}/")
     return 0
 
 

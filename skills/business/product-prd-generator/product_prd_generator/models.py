@@ -91,10 +91,32 @@ class DocFeature:
 
 
 @dataclass(frozen=True, slots=True)
+class Requirement:
+    """Structured requirement from customer/product docs.
+
+    Only leaf headings (no sub-headings beneath) become Requirements.
+    Container headings provide scenario context. Six-dimension framework:
+    scenario/sub_scenario/function come from heading hierarchy,
+    nearby_text captures pain-point description, source_customer tracks origin.
+    """
+    source_file: str
+    source_type: str
+    source_customer: str
+    scenario: str
+    sub_scenario: str
+    function: str
+    depth: int
+    nearby_text: str
+    normalized_term: str
+    evidence: tuple[EvidenceRef, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class DocMap:
     project: str
     source_path: str
     features: tuple[DocFeature, ...]
+    requirements: tuple[Requirement, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +132,24 @@ class ReconciledCapability:
 
 
 @dataclass(frozen=True, slots=True)
+class RequirementRecord:
+    """A requirement matched against code capabilities, with priority."""
+    source_file: str
+    source_type: str
+    source_customer: str
+    scenario: str
+    sub_scenario: str
+    function: str
+    nearby_text: str
+    normalized_term: str
+    matched_capability: str
+    code_status: str
+    priority: str
+    evidence: tuple[EvidenceRef, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
 class ReconcileResult:
     project: str
     capabilities: tuple[ReconciledCapability, ...]
+    requirements: tuple[RequirementRecord, ...] = ()

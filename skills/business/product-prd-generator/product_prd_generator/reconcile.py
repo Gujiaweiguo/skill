@@ -8,6 +8,8 @@ from enum import Enum, unique
 from pathlib import Path
 from typing import Any
 
+from .models import RequirementRecord
+
 
 @unique
 class CapabilityStatus(str, Enum):
@@ -46,6 +48,7 @@ class ReconciledCapability:
 class ReconcileResult:
     project: str
     capabilities: tuple[ReconciledCapability, ...]
+    requirements: tuple[RequirementRecord, ...] = ()
 
 
 def _coerce_status(value: str) -> CapabilityStatus:
@@ -179,7 +182,13 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
 
     _add_unmatched_customer_requirements(by_id, doc_features)
 
-    return ReconcileResult(project=project, capabilities=tuple(by_id.values()))
+    requirements = _build_requirement_records(doc_map, by_id)
+
+    return ReconcileResult(
+        project=project,
+        capabilities=tuple(by_id.values()),
+        requirements=requirements,
+    )
 
 
 def _add_unmatched_customer_requirements(
@@ -307,6 +316,22 @@ def to_json(result: ReconcileResult) -> dict[str, object]:
             }
             for cap in result.capabilities
         ],
+        "requirements": [
+            {
+                "source_file": r.source_file,
+                "source_type": r.source_type,
+                "source_customer": r.source_customer,
+                "scenario": r.scenario,
+                "sub_scenario": r.sub_scenario,
+                "function": r.function,
+                "nearby_text": r.nearby_text,
+                "normalized_term": r.normalized_term,
+                "matched_capability": r.matched_capability,
+                "code_status": r.code_status,
+                "priority": r.priority,
+            }
+            for r in result.requirements
+        ],
     }
 
 
@@ -315,6 +340,75 @@ def _load_json(path: str) -> Mapping[str, object]:
     if not isinstance(data, Mapping):
         return {}
     return data
+
+
+_VALUE_KEYWORDS = ("效率", "降低", "提升", "减少", "提高", "自动", "优化", "避免", "防止", "加快", "简化")
+
+
+def _calculate_priority(customer_count: int, code_status: str, nearby_text: str) -> str:
+    """Rule 3B: auto-suggest priority based on customer count, code status, value keywords.
+    'unmatched' (can't match term) scores lower than 'missing' (confirmed absent)."""
+    score = min(customer_count, 3)
+    if code_status == "missing":
+        score += 2
+    elif code_status in ("partial", "unmatched"):
+        score += 1
+    if any(kw in nearby_text for kw in _VALUE_KEYWORDS):
+        score += 1
+    if score >= 4:
+        return "高"
+    if score >= 2:
+        return "中"
+    return "低"
+
+
+def _build_requirement_records(
+    doc_map: Mapping[str, object],
+    by_id: dict[str, ReconciledCapability],
+) -> tuple[RequirementRecord, ...]:
+    """Build RequirementRecords from doc_map requirements, matched against capabilities."""
+    raw_reqs = doc_map.get("requirements", [])
+    if not raw_reqs and isinstance(doc_map.get("features"), list):
+        raw_reqs = doc_map["features"]
+    if not isinstance(raw_reqs, list):
+        return ()
+
+    term_customers: dict[str, set[str]] = {}
+    for feat in raw_reqs:
+        if not isinstance(feat, Mapping):
+            continue
+        term = str(feat.get("normalized_term", ""))
+        customer = str(feat.get("source_customer", ""))
+        if term and customer:
+            term_customers.setdefault(term, set()).add(customer)
+
+    records: list[RequirementRecord] = []
+    for feat in raw_reqs:
+        if not isinstance(feat, Mapping):
+            continue
+        term = str(feat.get("normalized_term", ""))
+        if not term:
+            continue
+        matched = by_id.get(term)
+        matched_cap = matched.id if matched else ""
+        code_status = matched.reconciled_status if matched else "unmatched"
+        customers = term_customers.get(term, set())
+        nearby = str(feat.get("nearby_text", ""))
+        priority = _calculate_priority(len(customers), code_status, nearby)
+        records.append(RequirementRecord(
+            source_file=str(feat.get("source_file", "")),
+            source_type=str(feat.get("source_type", "")),
+            source_customer=str(feat.get("source_customer", "")),
+            scenario=str(feat.get("scenario", "未分类")),
+            sub_scenario=str(feat.get("sub_scenario", "")),
+            function=str(feat.get("function", feat.get("heading", ""))),
+            nearby_text=nearby,
+            normalized_term=term,
+            matched_capability=matched_cap,
+            code_status=code_status,
+            priority=priority,
+        ))
+    return tuple(records)
 
 
 def main() -> int:
