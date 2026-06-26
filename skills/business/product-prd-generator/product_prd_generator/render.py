@@ -684,6 +684,11 @@ def _render_field_spec_module(
                     lines.append(f"- {c}")
             lines.append("")
 
+        delete_rule = str(doc_data.get("delete_rule", spec.get("delete_rule", "")))
+        if delete_rule:
+            lines.append(f"**删除规则**：{delete_rule}")
+            lines.append("")
+
         if workflow:
             lines.append(f"**流程**：{workflow}")
             lines.append("")
