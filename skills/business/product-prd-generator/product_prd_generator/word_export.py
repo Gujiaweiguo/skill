@@ -4,6 +4,7 @@ import json
 import re
 import subprocess
 import sys
+from collections import defaultdict
 from datetime import date
 from dataclasses import dataclass
 from pathlib import Path
@@ -352,6 +353,166 @@ def _render_requirement_section(requirements: list[dict[str, Any]]) -> list[str]
     )
 
 
+_STATUS_ICON_W = {"existing": "✅", "partial": "⚠️", "missing": "❌", "unmatched": "🔍"}
+
+_ROLE_KW = [
+    "招商专员", "招商经理", "招商总监",
+    "财务专员", "财务经理", "财务总监",
+    "物业专员", "物业经理", "营运经理",
+    "工程部", "信息部", "项目总",
+    "专员", "经理", "总监", "主管",
+]
+
+
+def _extract_roles_w(text: str) -> str:
+    found = [r for r in _ROLE_KW if r in text]
+    return "、".join(found[:3]) if found else "—"
+
+
+def _load_ontology_w() -> dict[str, Any]:
+    import os
+    p = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "knowledge" / "business-ontology.yaml"
+    if not p.is_file():
+        return {}
+    return yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+
+
+def _classify_mod_w(req: dict[str, Any], ontology: dict[str, Any]) -> str:
+    modules = ontology.get("modules", {})
+    if not isinstance(modules, dict):
+        return "未分类"
+    combined = str(req.get("scenario", "")) + " " + str(req.get("function", ""))
+    best, best_score = "未分类", 0
+    for name, data in modules.items():
+        if not isinstance(data, dict):
+            continue
+        for alias in data.get("aliases", []):
+            if isinstance(alias, str) and alias in combined:
+                s = len(alias)
+                if s > best_score:
+                    best_score, best = s, name
+    return best
+
+
+def _render_blueprint_section(
+    requirements: list[dict[str, Any]],
+    capabilities: list[dict[str, Any]],
+) -> list[str]:
+    """Blueprint-style module breakdown for Word export."""
+    ontology = _load_ontology_w()
+    modules = ontology.get("modules", {})
+    if not isinstance(modules, dict) or not modules:
+        return _render_requirement_section(requirements)
+
+    cap_by_id = {str(c.get("id", "")): c for c in capabilities}
+    mod_reqs: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for req in requirements:
+        mod_reqs[_classify_mod_w(req, ontology)].append(req)
+
+    lines: list[str] = []
+    for idx, (mod_name, mod_data) in enumerate(modules.items()):
+        if not isinstance(mod_data, dict):
+            continue
+        reqs = mod_reqs.get(mod_name, [])
+        sub_funcs = mod_data.get("sub_functions", {})
+        desc = str(mod_data.get("description", ""))
+        aliases = mod_data.get("aliases", [])
+        kw_str = ", ".join(str(a) for a in aliases[:5]) if aliases else ""
+
+        mod_cap_ids: set[str] = set()
+        for sub in sub_funcs.values():
+            if isinstance(sub, dict):
+                mod_cap_ids.update(str(c) for c in sub.get("capabilities", []))
+        mod_caps = [cap_by_id[c] for c in mod_cap_ids if c in cap_by_id]
+        existing = sum(1 for c in mod_caps if c.get("reconciled_status") == "existing")
+        missing = sum(1 for c in mod_caps if c.get("reconciled_status") == "missing")
+
+        lines.append(f"### 3.{idx + 1} {mod_name}")
+        lines.append("")
+        if desc:
+            lines.append(f"> {desc}")
+            lines.append("")
+        if kw_str:
+            lines.append(f"**关键词**：{kw_str}")
+            lines.append("")
+        lines.append(f"需求 {len(reqs)} 条 | 能力 {len(mod_caps)} 项（✅{existing} / ❌{missing}）")
+        lines.append("")
+
+        # Group by sub_function
+        sub_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for req in reqs:
+            ft = str(req.get("function", "")) + " " + str(req.get("nearby_text", ""))
+            placed = False
+            for sn, sd in sub_funcs.items():
+                if not isinstance(sd, dict):
+                    continue
+                for term in sd.get("terms", []):
+                    if isinstance(term, str) and term in ft:
+                        sub_groups[sn].append(req)
+                        placed = True
+                        break
+                if placed:
+                    break
+
+        for sn, sd in sub_funcs.items():
+            if not isinstance(sd, dict):
+                continue
+            sr = sub_groups.get(sn, [])
+            lines.append(f"**{sn}**")
+            lines.append("")
+            if sr:
+                rows = []
+                seen: set[str] = set()
+                for req in sorted(sr, key=lambda r: r.get("priority", "低")):
+                    term = req.get("normalized_term", "")
+                    if term in seen:
+                        continue
+                    seen.add(term)
+                    func = _sanitize(str(req.get("function", ""))[:30])
+                    nearby = _sanitize(str(req.get("nearby_text", ""))[:45] or "—")
+                    roles = _extract_roles_w(str(req.get("nearby_text", "")) + str(req.get("function", "")))
+                    status = str(req.get("code_status", "unmatched"))
+                    icon = _STATUS_ICON_W.get(status, "🔍")
+                    customer = _sanitize(str(req.get("source_customer", "")) or "—")
+                    rows.append([func, nearby, roles, f"{icon} {status}", customer])
+                lines.append("```yaml")
+                lines.extend(_yaml_block({
+                    "style": "heading-2",
+                    "table": f"sub-{sn}",
+                    "table_data": {
+                        "header": ["功能", "描述", "角色", "状态", "来源"],
+                        "rows": _stringify_table(rows),
+                    },
+                }))
+                lines.append("```")
+                lines.append("")
+                # Scenarios
+                scenarios = [
+                    req for req in sr
+                    if len(str(req.get("nearby_text", ""))) > 30
+                    and any(rk in str(req.get("nearby_text", "")) for rk in _ROLE_KW)
+                ]
+                for sc in scenarios[:2]:
+                    nearby = _sanitize(str(sc.get("nearby_text", ""))[:120])
+                    func = sc.get("function", "")
+                    lines.append(f"> **{func}**: {nearby}")
+                    lines.append("")
+            else:
+                cap_ids = sd.get("capabilities", [])
+                if cap_ids:
+                    cap = cap_by_id.get(str(cap_ids[0]))
+                    if cap:
+                        status = str(cap.get("reconciled_status", "missing"))
+                        icon = _STATUS_ICON_W.get(status, "🔍")
+                        lines.append(f"- {icon} {cap.get('name', cap_ids[0])[:30]}")
+                        lines.append("")
+
+        lines.append("---")
+        lines.append("")
+
+    return _chapter_with_lines("3. 业务模块详细设计", lines, page_break=False)
+
+
 def build_content_package(reconcile_path: str | Path, doc_map_path: str | Path | None, output_dir: str | Path) -> Path:
     reconcile = _load_json(reconcile_path)
     doc_map = _load_json(doc_map_path) if doc_map_path else None
@@ -368,7 +529,7 @@ def build_content_package(reconcile_path: str | Path, doc_map_path: str | Path |
         "",
         *_render_baseline_section(stats, capabilities),
         *_render_customer_section(doc_map),
-        *_render_requirement_section(list(reconcile.get("requirements", []))),
+        *_render_blueprint_section(list(reconcile.get("requirements", [])), capabilities),
         *_render_feature_section(capabilities),
         *_render_unmatched_section(capabilities),
         *_render_gap_section(capabilities),
