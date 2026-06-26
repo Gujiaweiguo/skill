@@ -166,6 +166,7 @@ LSP reports many false errors in this repo:
 - **Generated artifacts** gitignored: `_analysis_report.json`, `test/*.docx`, `output/`
 - **Domain tags** shared between `material-importer/references/domain-tags.md` and `company-intro-generator` — update both if changing tags
 - **winshang-crawler** is self-contained (own `src/`, `pyproject.toml`, separate git history)
+- **YAML OrderedDict 陷阱**（跨 skill）：Python 代码中 **永远不要把 `OrderedDict` 直接 `yaml.dump` 到文件**。`yaml.dump(OrderedDict(...))` 会写入 `!!python/object/apply:collections.OrderedDict` tag，导致 `yaml.safe_load` 报 `ConstructorError`。Python 3.7+ 普通 `dict` 已保序，直接用 `dict`。如需恢复已被污染的文件，用 `yaml.unsafe_load` 读取→转 `dict`→重写。详见 product-prd-generator `references/troubleshooting.md`。
 
 ## Knowledge Persistence
 

@@ -222,3 +222,101 @@ cd skills/word/word-master && uv sync
 1. 检查环境变量：`echo $LANLNK_BASE`
 2. 检查文件存在：`ls $LANLNK_BASE/knowledge/business-ontology.yaml`
 3. doc_map 的 `_load_aliases` 会优雅退化到纯 term-aliases 匹配（不报错），但匹配率降低。
+
+---
+
+## YAML OrderedDict 序列化导致 yaml.safe_load 报错
+
+**症状**：`yaml.safe_load()` 报 `ConstructorError: could not determine a constructor for the tag 'tag:yaml.org,2002:python/object/apply:collections.OrderedDict'`。
+
+**根因**：Python 代码中用 `OrderedDict` 构建数据结构，然后 `yaml.dump()` 写入文件时序列化为 `!!python/object/apply:collections.OrderedDict` tag。`yaml.safe_load()` 不认识这个 Python 特有 tag。
+
+**修复（写入侧——预防）**：
+
+**永远不要把 OrderedDict 直接 yaml.dump 到文件**。先转普通 dict：
+
+```python
+# WRONG
+from collections import OrderedDict
+data = OrderedDict([("a", 1), ("b", 2)])
+yaml.dump(data, f)  # 写入 !!python/object/apply:collections.OrderedDict
+
+# CORRECT
+data = {"a": 1, "b": 2}  # Python 3.7+ dict 保序
+yaml.dump(data, f)
+```
+
+如果必须用 OrderedDict 构建逻辑，dump 前递归转换：
+
+```python
+def to_plain(obj):
+    if hasattr(obj, 'items'):
+        return {k: to_plain(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [to_plain(i) for i in obj]
+    return obj
+
+yaml.dump(to_plain(data), f)
+```
+
+**修复（读取侧——恢复）**：
+
+如果文件已经被污染，用 `yaml.unsafe_load()` 读取，转 dict 后重写：
+
+```python
+data = yaml.unsafe_load(open(path, encoding='utf-8'))
+data = to_plain(data)  # 递归转普通 dict
+yaml.dump(data, open(path, 'w', encoding='utf-8'), ...)
+```
+
+---
+
+## YAML 重命名后正文残留旧名称
+
+**症状**：YAML 中 entity key 已改（如 `租赁条件 → 条件报批`），但 PRD 正文里多处仍显示旧名称。
+
+**根因**：`dict[new_key] = dict.pop(old_key)` 只改了 key，**不改 value 中的字符串引用**。旧名称出现在：document name、field desc、constraints、sources、scenario、workflow 等 string 字段中。
+
+**修复**：
+
+重命名时必须递归替换所有 string value：
+
+```python
+def replace_in_dict(d, old, new):
+    if isinstance(d, dict):
+        return {k.replace(old, new) if isinstance(k, str) else k: replace_in_dict(v, old, new)
+                for k, v in d.items()}
+    elif isinstance(d, list):
+        return [replace_in_dict(i, old, new) for i in d]
+    elif isinstance(d, str):
+        return d.replace(old, new)
+    return d
+
+mfs = replace_in_dict(mfs, "租赁条件", "条件报批")
+```
+
+**验证**：替换后全文搜索确认零残留（排除 codebase-features.json，那是代码扫描结果反映实际代码用词）。
+
+---
+
+## field-specs YAML 丢失实体
+
+**症状**：PRD 渲染后某些 entity 变成空壳（只有 `- ✅ capability` 一行），之前有完整字段定义。
+
+**根因**：
+1. OrderedDict 序列化失败（见上条）导致 yaml.safe_load 无法读取文件→部分数据丢失
+2. Python 脚本中 `mfs["招商管理"] = dict(new_zs)` 覆盖时遗漏了某些 key
+
+**诊断步骤**：
+
+```python
+import yaml
+mfs = yaml.safe_load(open('module-field-specs.yaml', encoding='utf-8'))
+for mod in mfs:
+    for k, v in mfs[mod].items():
+        docs = v.get('documents', {}) if isinstance(v, dict) else {}
+        if not docs:
+            print(f"  ❌ {mod}/{k}: 空")
+```
+
+**预防**：每次大改 YAML 后运行此检查。entity 有 sub_function 但无 documents = 空 = 误导用户。

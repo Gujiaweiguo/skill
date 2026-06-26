@@ -283,8 +283,10 @@ uv run product-prd-generator --project 商管系统 \
 ## 已知限制
 
 - **PDF 转换需要 poppler-utils**：`apt install poppler-utils`。无 sudo 权限时，PDF 无法用 markitdown 转换，需要 LibreOffice 预转换或手动转 md。当前项目有 6 个竞品 PDF 受此影响（政策文件，影响小）。
-- **匹配率 ~17%**：瓶颈是**术语覆盖率**（ontology 482 术语），不是匹配策略。两阶段匹配提升精确度但不提升召回率。继续扩 ontology 术语是唯一提升路径。
+- **匹配率 ~19%**：瓶颈是**术语覆盖率**（ontology 572+ 术语），不是匹配策略。两阶段匹配提升精确度但不提升召回率。继续扩 ontology 术语是唯一提升路径。
 - **business-ontology.yaml 运行时依赖**：doc_map 从 `$LANLNK_BASE/knowledge/business-ontology.yaml` 加载。文件缺失时退化为纯 term-aliases 匹配（匹配率回到 ~12%）。
+- **YAML OrderedDict 序列化陷阱**：在 ontology/specs 中使用 `OrderedDict` 后 `yaml.dump` 会写入 Python 特有的 tag（`!!python/object/apply:collections.OrderedDict`），导致 `yaml.safe_load` 报 ConstructorError。**必须用普通 dict**。详见 troubleshooting.md。
+- **field-specs YAML 完整性**：`module-field-specs.yaml` 在多次编辑后可能丢失实体（如 OrderedDict 序列化失败导致 yaml.safe_load 无法读取→数据丢失）。每次大改后应验证实体数量：`len(mfs['招商管理'])` 等。
 - **噪音过滤可能误判**：`_is_noise_text` 过滤编号、元数据、表格残留、图片路径、JSON 块、句子型文本。极端情况下可能误杀合法标题。
 - **word-master .venv 依赖**：word_export 调用 word-master 时依赖其目录下的 `.venv`。如果 word-master 目录未 `uv sync`，会报 `ModuleNotFoundError: docx`。
 
@@ -359,6 +361,66 @@ doc feature 匹配到 spec capability 后，移除 `"spec has no doc evidence ye
 ### word_export 跨 skill 调用
 
 **不用 `python3` 直接调用 word-master**，而是在 word-master 目录下用 `uv run python -m src.main`。内容包路径必须 `.resolve()` 转绝对路径。`nearby_text` 可能含控制字符（\x00-\x1f），必须 `_sanitize` 后才能写入 docx。
+
+### 单据驱动渲染：来源参考 + 空实体检测
+
+**来源参考（sources）是强制性的**。每个 document spec 必须有 `sources` 字段，标注具体文档+章节（如 `"海鼎合同管理手册 §新合同申请单"`）。render.py 的 `_render_field_spec_module` 会渲染 `**来源参考**` section。
+
+**没有 sources 的 document = 主观臆想，不是 PRD**。用户明确要求："每个场景都要在客户需求或竞品处找到参考，而不是你主观的想法"。
+
+**空实体检测**：ontology 中有 sub_function 但 module-field-specs 中无对应 documents 时，render 输出 `"- ✅ capability"` 一行——这看起来"已处理"但实际无内容。**要么给它 documents with fields，要么不要创建 sub_function**。
+
+### 实体命名三原则
+
+PRD 中的实体/单据名称必须满足：
+
+1. **短**（≤4-5字）：`条件报批` 优于 `租赁条件报批`
+2. **可搜**：在模块上下文中是高辨识词。`条件报批` 搜一次命中；`租赁报批` 和 `租赁政策`/`租赁期限`/`租赁合同` 混在一起难区分
+3. **不撞**：不与同模块其他实体共用前缀。`招商` 模块里避免多个 `租赁xxx`
+
+**实际案例**：`租赁条件 → 租赁报批 → 条件报批`，迭代 3 次才找到最优名称。
+
+### 台账/预警/报表：不创建实体
+
+以下三类内容**不应作为业务模块的 sub_function**：
+
+- **台账** = 报表视图，不是数据实体。合同台账就是合同列表+状态筛选，不需要单独定义
+- **预警** = 跨模块通用功能（合同到期/资源空置/证照到期/零销售/坪效/租售比），放在**系统管理/预警配置**
+- **自定义报表** = 系统功能，放在**系统管理/自定义报表**
+
+**参考**：中旅需求清单将预警配置/自定义报表/模板配置/工作流程配置统一放在「系统管理」下。
+
+### 业务单据流：上游导入支持
+
+业务流程中的单据不是孤岛——每个单据应支持从前序单据导入数据：
+
+```
+招商洽谈 → 报价单 → 意向合同 → 条件报批 → 合同生成 → 应收生成
+```
+
+**实现模式**：合同生成单据有 `合同来源` 字段（直接新建/从意向合同转入/从条件报批转入），选择后联动 `来源单号`。被导入的字段标注"自动带出（来源单号→xxx）"，且可修改覆盖。
+
+### 招商计划：节点里程碑模型
+
+招商计划不是扁平的任务分派，而是**每个铺位按节点跟踪里程碑**：
+
+- 9 个标准节点：待招商→目标客户接洽→洽谈中→方案评审→意向签订→合同评审→合同签订→交铺装修→开业
+- 每个节点有：节点名称/类型(手工|自动)/计划完成日/实际完成日/状态/关联单据
+- **手工节点**：用户录入完成时间+附件（如技术对接）
+- **自动节点**：系统随业务单据联动（意向书审核→意向签订完成，合同生效→合同签订完成）
+- **预警**：即将逾期/已逾期/长期无进度
+
+**来源**：万达技术标准 §6 铺位级招商计划管理。
+
+### 模块结构遵循客户心智模型
+
+当客户需求文档已有清晰的模块归类时，**遵循客户的结构**，不要自创分类：
+
+- 中旅将预警配置放在系统管理 → 我们也放系统管理，不放在合同管理
+- 海鼎将企划(推广)独立成模块 → 我们也独立，不合并到运营管理
+- 华侨城将物料管理(14个子项)放在物业管理 → 我们也放物业，不放运营
+
+**原则**：source documents 的结构 IS the requirements。
 
 ## 维护规则
 
