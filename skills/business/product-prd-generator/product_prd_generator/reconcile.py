@@ -182,6 +182,8 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
 
     _add_unmatched_customer_requirements(by_id, doc_features)
 
+    _add_codebase_features(by_id)
+
     requirements = _build_requirement_records(doc_map, by_id)
 
     return ReconcileResult(
@@ -298,6 +300,48 @@ def _add_unmatched_customer_requirements(
             gaps=(f"客户提出但代码无对应能力 ({len(unique_clients)} 个客户: {', '.join(unique_clients[:3])})",),
             evidence=evidence,
         )
+
+
+def _add_codebase_features(by_id: dict[str, ReconciledCapability]) -> None:
+    """Load actual codebase features and add as existing. Overwrites false missing."""
+    import os
+    features_path = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "prd" / "projects" / "商管系统" / "parsed" / "codebase-features.json"
+    if not features_path.is_file():
+        return
+    data = json.loads(features_path.read_text(encoding="utf-8"))
+    added = 0
+    for section in ("pc", "staff_mobile", "tenant_mobile"):
+        for feat in data.get(section, []):
+            cn = str(feat.get("cn", "")).strip()
+            if not cn or len(cn) < 2:
+                continue
+            if cn in by_id:
+                existing = by_id[cn]
+                if existing.reconciled_status == CapabilityStatus.MISSING.value:
+                    by_id[cn] = ReconciledCapability(
+                        id=cn, name=cn,
+                        code_status=CapabilityStatus.EXISTING.value,
+                        doc_status=existing.doc_status,
+                        reconciled_status=CapabilityStatus.EXISTING.value,
+                        confidence=Confidence.HIGH.value,
+                        gaps=(),
+                        evidence=existing.evidence,
+                    )
+                    added += 1
+                continue
+            by_id[cn] = ReconciledCapability(
+                id=cn,
+                name=cn,
+                code_status=CapabilityStatus.EXISTING.value,
+                doc_status=CapabilityStatus.MISSING.value,
+                reconciled_status=CapabilityStatus.EXISTING.value,
+                confidence=Confidence.HIGH.value,
+                gaps=(),
+                evidence=(),
+            )
+            added += 1
+    if added:
+        print(f"  codebase features: +{added} existing (added or corrected from missing)")
 
 
 def to_json(result: ReconcileResult) -> dict[str, object]:
