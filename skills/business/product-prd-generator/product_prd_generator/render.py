@@ -507,9 +507,41 @@ def _render_blueprint_modules(
             if not isinstance(sub_data, dict):
                 continue
             sub_r = sub_groups.get(sub_name, [])
-            lines.append(f"#### {sub_name}")
+            sub_role = str(sub_data.get("role", "—"))
+            curated = sub_data.get("scenarios", [])
+            lines.append(f"#### {sub_name}" + (f"（{sub_role}）" if sub_role != "—" else ""))
             lines.append("")
-            if sub_r:
+
+            if curated and isinstance(curated, list):
+                for sc in curated:
+                    if not isinstance(sc, dict):
+                        continue
+                    sc_name = str(sc.get("name", ""))
+                    sc_desc = str(sc.get("description", ""))
+                    sc_source = str(sc.get("source", ""))
+                    cap_ids = sub_data.get("capabilities", [])
+                    cap = cap_by_id.get(str(cap_ids[0])) if cap_ids else None
+                    status = str(cap.get("reconciled_status", "existing")) if cap else "existing"
+                    icon = _STATUS_ICON.get(status, "✅")
+                    lines.append(f"> **{sc_name}**")
+                    lines.append(f"> {sc_desc}")
+                    if sc_source:
+                        lines.append(f"> — 来源：{sc_source} | 状态：{icon} {status}")
+                    lines.append("")
+                # Also show extracted evidence if available
+                if sub_r:
+                    lines.append("*客户需求证据*：")
+                    seen_t: set[str] = set()
+                    for req in sorted(sub_r, key=lambda r: r.get("priority", "低"))[:5]:
+                        term = req.get("normalized_term", "")
+                        if term in seen_t:
+                            continue
+                        seen_t.add(term)
+                        func = str(req.get("function", ""))[:30]
+                        customer = str(req.get("source_customer", "")) or "—"
+                        lines.append(f"- {func}（{customer}）")
+                    lines.append("")
+            elif sub_r:
                 lines.append("| 角色 | 场景 | 场景描述 | 状态 | 来源 | 端点 |")
                 lines.append("|------|------|---------|------|------|------|")
                 seen_t: set[str] = set()
