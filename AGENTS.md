@@ -167,6 +167,85 @@ LSP reports many false errors in this repo:
 - **Domain tags** shared between `material-importer/references/domain-tags.md` and `company-intro-generator` — update both if changing tags
 - **winshang-crawler** is self-contained (own `src/`, `pyproject.toml`, separate git history)
 
+## Knowledge Persistence
+
+AI agents don't have cross-session memory. All "memory" lives in files that are read at session start. Convention: **persist non-obvious behavior into files so future sessions don't re-derive or re-break**.
+
+### What to record
+
+- A behavior that reading the code alone wouldn't explain **why** (not what)
+- A bug fix that was non-obvious (regex flag, path resolution, venv mismatch)
+- A design decision with a rejected alternative that looks tempting
+
+### What NOT to record
+
+- Standard library/framework usage
+- Self-explanatory code
+- One-off issues unlikely to recur
+
+### Tiered requirements by skill complexity
+
+| Complexity | Examples | SKILL.md sections | `references/troubleshooting.md` |
+|---|---|---|---|
+| **Complex** (multi-module package) | product-prd-generator, bid-doc-master, doc-generator | 「已知限制」+「设计决策」+「维护规则」 | Required |
+| **Medium** (single script / template engine) | material-importer, word-master, ppt-master, company-intro-generator | 「已知限制」 | Optional |
+| **Simple** (thin wrapper) | winshang-crawler, crela-daily-skill | — | — |
+
+### Layering — where knowledge goes
+
+| Layer | Location | Read when | Examples |
+|---|---|---|---|
+| **Cross-cutting** (applies to all skills) | This file (`AGENTS.md`) | Every session start | uv mandatory, word-master calling pattern |
+| **Skill-specific** (only relevant to one skill) | Skill's `SKILL.md` + `references/` | Skill triggered | doc_map regex choices, reconcile stale cleanup |
+| **Shared files** (used by multiple skills) | Each skill keeps a copy + note here | Either skill triggered | domain-tags, term-aliases |
+
+**Promote up, don't duplicate.** If a lesson applies to 2+ skills, move it to `AGENTS.md`. If it only matters to one skill, keep it local.
+
+## Skill Dependencies & Integration Patterns
+
+### Dependency graph
+
+```
+material-importer ─┬─← product-prd-generator  (doc→md conversion, image extraction)
+                   └─← company-intro-generator (case retrieval, cert check)
+
+word-master ───────┬─← product-prd-generator  (.docx export)
+                   ├─← company-intro-generator (.docx export)
+                   └─← bid-doc-master          (technical/commercial bid .docx)
+
+ppt-master ────────┬─← company-intro-generator (PPT generation)
+/proposal-pptx     └─← bid-doc-master          (slide content .pptx)
+
+doc-generator ─────← playwright skill          (runtime screenshots)
+
+product-prd-generator ─← word-master + material-importer
+```
+
+### word-master calling pattern (3 consumers)
+
+```python
+# MUST run in word-master dir with uv — NOT python3 (venv mismatch)
+subprocess.run(
+    ["uv", "run", "python", "-m", "src.main", str(content_path.resolve()), "--output", str(output)],
+    cwd=str(word_master_dir),  # skills/word/word-master
+)
+# content_path MUST be absolute — subprocess cwd changes, relative paths break
+# Content package format: .word-content.md (see word-master/src/parser.py)
+```
+
+### material-importer reuse (2 consumers)
+
+- **doc→md conversion**: markitdown + LibreOffice (.doc/.xls pre-conversion) → `raw/*.md` + `raw/*_media/` image dirs
+- **Case retrieval**: `scripts/case_matcher.py` — scoring weights: industry ×3.0, scenario ×2.5, keyword ×1.5, scale ×1.0, completeness ×0.5
+- **Cert check**: `scripts/check_cert.py` — expiry date extraction
+
+### Shared files (update both sides when changing)
+
+| File | Skills sharing it |
+|---|---|
+| `material-importer/references/domain-tags.md` | material-importer, company-intro-generator |
+| `product-prd-generator/references/term-aliases.yaml` | product-prd-generator (currently solo, but structure ready for sharing) |
+
 ## OpenSpec Workflow
 
 CLI v1.1.1 on PATH. Each change = `openspec/changes/<name>/`.
