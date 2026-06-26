@@ -283,18 +283,58 @@ uv run product-prd-generator --project 商管系统 \
 ## 已知限制
 
 - **PDF 转换需要 poppler-utils**：`apt install poppler-utils`。无 sudo 权限时，PDF 无法用 markitdown 转换，需要 LibreOffice 预转换或手动转 md。当前项目有 6 个竞品 PDF 受此影响（政策文件，影响小）。
-- **未匹配需求封顶 80 条**：`_add_unmatched_customer_requirements` 取深度排序前 80 条。如果客户需求超过 80 个不同功能点，多余的会被截断。
-- **噪音过滤可能误判**：`_is_noise_heading` 和 unmatched 的 noise 正则会过滤编号、元数据、通用描述。极端情况下可能误杀合法标题（如以"管理"结尾的功能名被过滤）。
-- **term-aliases 覆盖不全**：当前只覆盖 40+ spec capabilities 和 33 matrix rows。新加的 spec 或客户用的新术语需要手动补充。
+- **匹配率 ~17%**：瓶颈是**术语覆盖率**（ontology 482 术语），不是匹配策略。两阶段匹配提升精确度但不提升召回率。继续扩 ontology 术语是唯一提升路径。
+- **business-ontology.yaml 运行时依赖**：doc_map 从 `$LANLNK_BASE/knowledge/business-ontology.yaml` 加载。文件缺失时退化为纯 term-aliases 匹配（匹配率回到 ~12%）。
+- **噪音过滤可能误判**：`_is_noise_text` 过滤编号、元数据、表格残留、图片路径、JSON 块、句子型文本。极端情况下可能误杀合法标题。
 - **word-master .venv 依赖**：word_export 调用 word-master 时依赖其目录下的 `.venv`。如果 word-master 目录未 `uv sync`，会报 `ModuleNotFoundError: docx`。
 
 ## 设计决策
 
-### term-aliases.yaml 用英文 spec capability ID 做 key
+### 六维需求框架（Rule 1C + 2B + 3B）
 
-**原因**：reconcile 的 `by_id` 字典用 spec ID 做 key（如 `CONTRACT_MANAGEMENT`）。aliases 必须把中文 heading 映射到这些英文 ID，否则 normalized_term（中文）和 spec ID（英文）无法匹配。
+需求提取采用 leaf-only（只有叶子标题成为需求），heading 层级提供场景上下文：
 
-**L01-L33** 是 product-definition-matrix 的行 ID，不是随机编号。
+```
+depth 1 → scenario（场景，不单独成需求）
+depth 2 → sub_scenario（子场景，不单独成需求）
+depth 3+ → function（叶子标题 = 需求）
+```
+
+每条需求携带六维：`scenario | sub_scenario | function | nearby_text(首段) | source_customer | priority`
+
+**nearby_text（Rule 2B）**：heading 后第一段（≤200字），用于提取痛点/描述。
+**优先级（Rule 3B）**：`min(customers,3) + status_score + value_keyword_score`。unmatched ≠ missing（unmatched 得 1 分，missing 得 2 分）。
+
+### 两阶段匹配
+
+```
+Phase 1: scenario + function → 加权分类到 ontology 模块
+         scenario match ×3, sub_scenario ×2, function ×1, term ×0.5
+Phase 2: 只在模块的 sub_functions 术语里匹配（longest first）
+Fallback: Phase 2 无匹配 → flat alias matching（现有行为）
+```
+
+**效果**：精确度提升（匹配到正确业务域），召回率持平（瓶颈是术语覆盖不是策略）。
+
+### Alias 长度排序
+
+`_normalize_term` 按 alias 长度**降序**匹配。确保 "合同模板"（4字）优先于 "合同"（2字）。**不排序会导致宽泛 alias 抢匹配。**
+
+### Dedup key: (normalized_term, source_file)
+
+**不用 `normalized_term` 单独做 key**。宽泛 alias 会把不同 heading 归一化到同一 term，跨文件 dedup 会坍缩它们。用 `(normalized_term, source_file)` 保留不同文档的独立需求。
+
+### 章节号清除
+
+`_strip_section_prefix` 去除 heading 前的编号（"2.3.3 合同台账" → "合同台账"）。不清除会导致 "2.3.3" 开头的 heading 无法匹配。
+
+### reconcile stale gap 清理
+
+doc feature 匹配到 spec capability 后，移除 `"spec has no doc evidence yet"` 等过时 gap。**不清理会导致每个已匹配 capability 都带着过时 gap，污染输出。**
+
+### unmatched 需求排序策略
+
+深度优先（depth 1-2 的核心模块优先）+ 客户数倒序（多客户共同需求优先），封顶 80 条。
 
 ### doc_map.py 三种提取方式
 
@@ -312,19 +352,13 @@ uv run product-prd-generator --project 商管系统 \
 - **区段限制**：`_nearby_image_refs` 只挂标题所在区段内的图片（从当前标题到下一个 `#` 标题之间），避免所有图片挂到第一个标题。
 - **media_dir stem 双候选**：`foo.docx.md` 的 stem 是 `foo.docx`，但 media_dir 可能叫 `foo_media`。双候选 `[md_path.stem, md_path.stem.rsplit(".",1)[0]]` 解决此问题。
 
-### reconcile stale gap 清理
+### term-aliases.yaml 用英文 spec capability ID 做 key
 
-doc feature 匹配到 spec capability 后，移除 `"spec has no doc evidence yet"` 和 `"doc gap: code has it but doc does not mention it"` 等过时 gap。**不清理会导致每个已匹配 capability 都带着过时 gap，污染输出。**
-
-### unmatched 需求排序策略
-
-深度优先（depth 1-2 的核心模块优先）+ 客户数倒序（多客户共同需求优先），封顶 80 条。
+**原因**：reconcile 的 `by_id` 字典用 spec ID 做 key。aliases 必须把中文 heading 映射到这些英文 ID，否则匹配失败。
 
 ### word_export 跨 skill 调用
 
-**不用 `python3` 直接调用 word-master**，而是在 word-master 目录下用 `uv run python -m src.main`。原因：word-master 有自己的 `.venv`，直接调用会因为 venv 不匹配报 `ModuleNotFoundError`。
-
-内容包路径必须 `.resolve()` 转绝对路径再传给 subprocess，否则 word-master 的 cwd 变化后相对路径失效。
+**不用 `python3` 直接调用 word-master**，而是在 word-master 目录下用 `uv run python -m src.main`。内容包路径必须 `.resolve()` 转绝对路径。`nearby_text` 可能含控制字符（\x00-\x1f），必须 `_sanitize` 后才能写入 docx。
 
 ## 维护规则
 
@@ -333,5 +367,6 @@ doc feature 匹配到 spec capability 后，移除 `"spec has no doc evidence ye
 1. **更新本文件**的「已知限制」和「设计决策」章节
 2. **如是诊断流程**，更新 `references/troubleshooting.md`
 3. **修改 term-aliases.yaml 时**，同时检查 `material-importer/references/domain-tags.md` 是否需要同步（如涉及共享术语）
+4. **修改 business-ontology.yaml 时**，它是共享文件（`$LANLNK_BASE/knowledge/`），其他 skill 也依赖
 
 **判断标准**：如果一个行为或坑"下次的我"读到代码不一定能立刻理解为什么这么做，就应该记录。

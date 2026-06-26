@@ -235,7 +235,9 @@ ppt-master ────────┬─← company-intro-generator (PPT genera
 
 doc-generator ─────← playwright skill          (runtime screenshots)
 
-product-prd-generator ─← word-master + material-importer
+knowledge/cre ─────← product-prd-generator     (business-ontology.yaml: 8 modules, 482 terms)
+
+product-prd-generator ─← word-master + material-importer + knowledge/business-ontology.yaml
 ```
 
 ### word-master calling pattern (3 consumers)
@@ -262,6 +264,7 @@ subprocess.run(
 |---|---|
 | `material-importer/references/domain-tags.md` | material-importer, company-intro-generator |
 | `product-prd-generator/references/term-aliases.yaml` | product-prd-generator (currently solo, but structure ready for sharing) |
+| `$LANLNK_BASE/knowledge/business-ontology.yaml` | product-prd-generator (runtime dependency; ready for company-intro-generator, bid-doc-master) |
 
 ## OpenSpec Workflow
 

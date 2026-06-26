@@ -169,3 +169,56 @@ cd skills/word/word-master && uv sync
 ```
 
 添加新依赖：`uv add xxx`（不要 `pip install`）。
+
+---
+
+## 需求提取：总需求数突然暴增或暴跌
+
+**症状**：重跑后需求数从 ~5000 变成 ~50 或从 ~50 变成 ~5000。
+
+**诊断步骤**：
+
+1. **检查 dedup key**：`extract()` 中 requirements 的 dedup key 必须是 `(normalized_term, source_file)`，**不是 `normalized_term` 单独**。宽泛 alias 会把不同 heading 归一化到同一 term，单 key dedup 会坍缩到只剩 ~1 条/能力。
+
+2. **检查 alias 长度排序**：`_normalize_term` 必须按 alias 长度降序匹配。不排序会导致 "合同"（2字）抢匹配 "合同模板"（4字）。
+
+---
+
+## 需求提取：噪音太多（图片路径、table 残留、JSON 块）
+
+**症状**：需求清单里出现 `| ---`、`![image](data:image/png;base64,...)`、`{"data": {...}}` 等。
+
+**诊断步骤**：
+
+1. **检查 `_is_noise_text`**：这个函数过滤 table artifacts（`^\|`）、image paths（`!\[`）、JSON blocks（`^\{`）、sentence-like text（含 `。！？`）。如果遗漏新噪音类型，在这里加 pattern。
+
+---
+
+## Word 导出：`ValueError: All strings must be XML compatible`
+
+**症状**：word-master 报 control character 错误。
+
+**根因**：`nearby_text` 从 markdown 提取，可能含 `\x00-\x1f` 控制字符。
+
+**修复**：`word_export.py` 的 `_sanitize` 函数用 `re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)` 清除。所有写入 docx 的文本都必须过 `_sanitize`。
+
+---
+
+## 匹配率：两阶段匹配没有提升
+
+**症状**：实现两阶段匹配后，匹配率持平或微降。
+
+**这是正常的。** 两阶段匹配提升**精确度**（匹配到正确业务域），不提升**召回率**。召回率瓶颈在 ontology 术语覆盖率（当前 482 术语）。提升匹配率的唯一路径是扩 ontology 术语。
+
+---
+
+## Ontology 文件缺失：匹配率从 17% 降到 12%
+
+**症状**：匹配率突然从 17% 降到 ~12%。
+
+**根因**：`$LANLNK_BASE/knowledge/business-ontology.yaml` 文件缺失或路径错误。
+
+**诊断步骤**：
+1. 检查环境变量：`echo $LANLNK_BASE`
+2. 检查文件存在：`ls $LANLNK_BASE/knowledge/business-ontology.yaml`
+3. doc_map 的 `_load_aliases` 会优雅退化到纯 term-aliases 匹配（不报错），但匹配率降低。
