@@ -417,6 +417,30 @@ def _extract_roles(text: str) -> list[str]:
 
 _STATUS_ICON = {"existing": "✅", "partial": "⚠️", "missing": "❌", "unmatched": "🔍"}
 
+_DEPT_MAP: dict[str, list[str]] = {
+    "招商": ["招商", "招商专员", "招商经理", "招商总监", "招商中心", "租赁部"],
+    "营运": ["营运", "营运专员", "营运经理", "营运总监", "运营", "经营"],
+    "物业": ["物业", "物业专员", "物业经理", "物业总监", "物管", "工程部"],
+    "财务": ["财务", "财务专员", "财务经理", "财务总监", "财务管理部"],
+    "推广": ["推广", "企划", "市场推广", "策划"],
+    "信息": ["信息", "信息部", "IT", "系统管理员"],
+    "项目": ["项目总", "副总", "项目管理"],
+}
+
+
+def _extract_depts(text: str) -> str:
+    found: list[str] = []
+    for dept, keywords in _DEPT_MAP.items():
+        if any(kw in text for kw in keywords) and dept not in found:
+            found.append(dept)
+    return "、".join(found) if found else "—"
+
+
+def _infer_platform(text: str) -> str:
+    if any(kw in text for kw in ["移动", "APP", "手机", "微信", "小程序", "移动端", "租户服务平台"]):
+        return "移动端"
+    return "PC端"
+
 
 def _render_blueprint_modules(
     requirements: list[dict[str, Any]],  # noqa: ANY_OK
@@ -486,8 +510,8 @@ def _render_blueprint_modules(
             lines.append(f"#### {sub_name}")
             lines.append("")
             if sub_r:
-                lines.append("| 功能 | 描述 | 角色 | 状态 | 来源 |")
-                lines.append("|------|------|------|------|------|")
+                lines.append("| 角色 | 场景 | 场景描述 | 状态 | 来源 | 端点 |")
+                lines.append("|------|------|---------|------|------|------|")
                 seen_t: set[str] = set()
                 for req in sorted(sub_r, key=lambda r: r.get("priority", "低")):
                     term = req.get("normalized_term", "")
@@ -496,12 +520,14 @@ def _render_blueprint_modules(
                     seen_t.add(term)
                     func = str(req.get("function", ""))[:30].replace("|", "／")
                     nearby = str(req.get("nearby_text", ""))[:50].replace("|", "／").replace("\n", " ") or "—"
-                    roles = _extract_roles(str(req.get("nearby_text", "")) + " " + str(req.get("function", "")))
-                    role_str = "、".join(roles) if roles else "—"
+                    combined_text = str(req.get("nearby_text", "")) + " " + str(req.get("function", ""))
+                    depts = _extract_depts(combined_text)
+                    desc = f"{func}：{nearby[:40]}" if nearby != "—" else func
                     status = str(req.get("code_status", "unmatched"))
                     icon = _STATUS_ICON.get(status, "🔍")
                     customer = str(req.get("source_customer", "")) or "—"
-                    lines.append(f"| {func} | {nearby} | {role_str} | {icon} {status} | {customer} |")
+                    platform = _infer_platform(combined_text)
+                    lines.append(f"| {depts} | {sub_name} | {desc} | {icon} {status} | {customer} | {platform} |")
                 lines.append("")
                 # Scenarios
                 scenarios = [

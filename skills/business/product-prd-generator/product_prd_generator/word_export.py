@@ -355,6 +355,26 @@ def _render_requirement_section(requirements: list[dict[str, Any]]) -> list[str]
 
 _STATUS_ICON_W = {"existing": "✅", "partial": "⚠️", "missing": "❌", "unmatched": "🔍"}
 
+_DEPT_KW: dict[str, list[str]] = {
+    "招商": ["招商", "招商专员", "招商经理", "招商总监", "租赁部"],
+    "营运": ["营运", "营运经理", "营运总监", "运营"],
+    "物业": ["物业", "物业经理", "物管", "工程部"],
+    "财务": ["财务", "财务经理", "财务管理部"],
+    "推广": ["推广", "企划", "策划"],
+    "信息": ["信息部", "IT"],
+}
+
+
+def _extract_depts_w(text: str) -> str:
+    found = [d for d, kws in _DEPT_KW.items() if any(k in text for k in kws)]
+    return "、".join(found) if found else "—"
+
+
+def _infer_platform_w(text: str) -> str:
+    if any(kw in text for kw in ["移动", "APP", "手机", "微信", "小程序", "租户服务平台"]):
+        return "移动端"
+    return "PC端"
+
 _ROLE_KW = [
     "招商专员", "招商经理", "招商总监",
     "财务专员", "财务经理", "财务总监",
@@ -469,18 +489,21 @@ def _render_blueprint_section(
                         continue
                     seen.add(term)
                     func = _sanitize(str(req.get("function", ""))[:30])
-                    nearby = _sanitize(str(req.get("nearby_text", ""))[:45] or "—")
-                    roles = _extract_roles_w(str(req.get("nearby_text", "")) + str(req.get("function", "")))
+                    nearby = _sanitize(str(req.get("nearby_text", ""))[:40] or "—")
+                    combined = _sanitize(str(req.get("nearby_text", "")) + " " + str(req.get("function", "")))
+                    depts = _extract_depts_w(combined)
+                    desc = _sanitize(f"{func}：{nearby}" if nearby != "—" else func)
                     status = str(req.get("code_status", "unmatched"))
                     icon = _STATUS_ICON_W.get(status, "🔍")
                     customer = _sanitize(str(req.get("source_customer", "")) or "—")
-                    rows.append([func, nearby, roles, f"{icon} {status}", customer])
+                    platform = _infer_platform_w(combined)
+                    rows.append([depts, _sanitize(sn), desc, f"{icon} {status}", customer, platform])
                 lines.append("```yaml")
                 lines.extend(_yaml_block({
                     "style": "heading-2",
                     "table": f"sub-{sn}",
                     "table_data": {
-                        "header": ["功能", "描述", "角色", "状态", "来源"],
+                        "header": ["角色", "场景", "场景描述", "状态", "来源", "端点"],
                         "rows": _stringify_table(rows),
                     },
                 }))
