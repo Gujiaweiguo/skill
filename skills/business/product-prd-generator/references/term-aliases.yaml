@@ -1,424 +1,388 @@
 # term-aliases.yaml
 #
 # DESIGN: key must be the same identifier used in reconcile's by_id dict —
-# i.e. English spec capability IDs (e.g. lease-contract-management) or
-# product-definition-matrix row IDs (L01-L33). Chinese terms MUST NOT be
-# keys, because reconcile matches doc features by normalized_term → by_id,
-# and by_id keys come from code_map (English IDs). If keys were Chinese,
-# the match would silently fail and every capability would carry a false
-# "no doc evidence" gap.
+# i.e. English spec capability IDs or matrix row IDs (L01-L33).
+# _normalize_term sorts aliases by length DESC — specific aliases
+# (e.g. "合同模板") always match before broad ones (e.g. "合同").
 #
-# key   = 标准术语（英文 capability ID 或 matrix row ID）
-# value = 别名列表（中文功能名、章节标题中的常见词）
-#
-# doc_map._normalize_term 用 substring 匹配，所以别名越具体越好，避免误匹配。
-# 匹配后 normalized_term = key，reconcile 用它直接对 by_id[cap_id] 查找。
-
-# ── Spec capabilities (英文 ID) ──
+# key   = capability ID
+# value = alias list (Chinese terms, substring-matched against headings)
 
 lease-contract-management:
-  - 合同管理
-  - 合同签约
-  - 合同生效
-  - 合同续租
-  - 租赁管理
-  - 租约管理
-  - 返租合同
-  - 合同归档
-  - 租赁意向
-  - 租赁合同
-
+- 合同管理
+- 合同签约
+- 合同生效
+- 合同续租
+- 租赁管理
+- 租约管理
+- 返租合同
+- 合同归档
+- 租赁意向
+- 租赁合同
+- 合同
+- 签约
+- 租约
 contract-template-management:
-  - 合同模板
-  - 合同生成
-
+- 合同模板
+- 合同生成
 brand-merchant-management:
-  - 品牌及商家管理
-  - 品牌管理
-  - 品牌库
-  - 商家管理
-  - 品牌分类
-  - 品牌落位
-  - 品牌资源
-  - 合格供方品牌库
-
+- 品牌及商家管理
+- 品牌管理
+- 品牌库
+- 商家管理
+- 品牌分类
+- 品牌落位
+- 品牌资源
+- 合格供方品牌库
+- 品牌
+- 商户
+- 业态
 leasing-plan-management:
-  - 招商计划
-  - 招商管理
-  - 招商意向
-  - 招商审批
-  - 招商运营
-  - 招商政策
-  - 商务洽谈
-  - 品牌落位管理
-  - 意向客户管理
-  - 招商过程管理
-
+- 招商计划
+- 招商管理
+- 招商意向
+- 招商审批
+- 招商运营
+- 招商政策
+- 商务洽谈
+- 品牌落位管理
+- 意向客户管理
+- 招商过程管理
+- 租赁
+- 招商
+- 意向
 asset-budget-planning:
-  - 预算管理
-  - 收入预算
-  - 预算编制
-  - 预算铺排
-  - 预算执行
-  - 经营收入预算
-
+- 预算管理
+- 收入预算
+- 预算编制
+- 预算铺排
+- 预算执行
+- 经营收入预算
 asset-finance:
-  - 资产财务
-  - 收入确认
-  - 资产财务管理
-
+- 资产财务
+- 收入确认
+- 资产财务管理
+- 资产
+- 台账
+- 档案
 finance-reconciliation:
-  - 对账
-  - 核销
-  - 财务对账
-  - 收缴核销
-
+- 对账
+- 核销
+- 财务对账
+- 收缴核销
 finance-deep-integration:
-  - 财务接口
-  - 财务集成
-  - 财务系统对接
-  - 财务做账
-  - 财务共享
-
+- 财务接口
+- 财务集成
+- 财务系统对接
+- 财务做账
+- 财务共享
+- 财务
+- 凭证
+- 科目
+- 发票
+- 税务
+- 预算
 billing-and-invoicing:
-  - 费用管理
-  - 账单
-  - 账单管理
-  - 催缴
-  - 减免
-  - 退款
-  - 滞纳金
-  - 保证金
-  - 收据
-  - 费用调整
-  - 账单推送
-  - 账单查询
-  - 发票管理
-  - 发票
-  - 账单收缴
-  - 款项催缴
-  - 人天服务报价
-  - 合同税率调整
-  - 租费管理
-  - 物业费
-
+- 费用管理
+- 账单
+- 账单管理
+- 催缴
+- 减免
+- 退款
+- 滞纳金
+- 保证金
+- 收据
+- 费用调整
+- 账单推送
+- 账单查询
+- 发票管理
+- 发票
+- 账单收缴
+- 款项催缴
+- 人天服务报价
+- 合同税率调整
+- 租费管理
+- 物业费
+- 费用
+- 缴费
+- 收租
+- 缴款
+- 应收
+- 实收
+- 欠款
 channel-management:
-  - 渠道管理
-
+- 渠道管理
 channel-adapter:
-  - 渠道适配
-  - 渠道对接
-
+- 渠道适配
+- 渠道对接
 engineering-condition-archive:
-  - 工程管理
-  - 工程条件
-
+- 工程管理
+- 工程条件
 excel-import-export:
-  - Excel导入
-  - Excel导出
-  - 表格导入导出
-  - 数据导入导出
-  - 批量导入
-
+- Excel导入
+- Excel导出
+- 表格导入导出
+- 数据导入导出
+- 批量导入
+- 导入
+- 导出
 external-integration-providers:
-  - 异构系统对接
-  - 第三方系统
-  - 集成对接
-  - 外部集成
-  - 系统集成
-
+- 异构系统对接
+- 第三方系统
+- 集成对接
+- 外部集成
+- 系统集成
 asset-integration:
-  - 资产集成
-  - 资产对接
-
+- 资产集成
+- 资产对接
 sales-management-ui:
-  - 销售额管理
-  - 销售管理
-  - 商户销售数据采集
-  - 营业额管理
-  - 营业额
-
+- 销售额管理
+- 销售管理
+- 商户销售数据采集
+- 营业额管理
+- 营业额
 footfall-reporting:
-  - 客流统计
-  - 客流分析
-  - 客流
-
+- 客流统计
+- 客流分析
+- 客流
 marketing-campaign:
-  - 营销活动
-  - 营销管理
-  - 活动管理
-  - 推广管理
-
+- 营销活动
+- 营销管理
+- 活动管理
+- 推广管理
+- 会员
+- 积分
+- 卡券
+- 推送
+- 公告
 report-manager:
-  - 报表分析
-  - 报表管理
-  - 报表
-  - 经营分析
-  - 运营分析
-
+- 报表分析
+- 报表管理
+- 报表
+- 经营分析
+- 运营分析
+- 统计
+- 分析
 governed-report-designer:
-  - 报表设计
-  - 报表设计器
-  - 自定义报表
-
+- 报表设计
+- 报表设计器
+- 自定义报表
 workbench-dashboard:
-  - 工作台
-  - 看板
-  - 经营看板
-  - 经营数据指标
-
+- 工作台
+- 看板
+- 经营看板
+- 经营数据指标
 workflow-approvals:
-  - 流程审批
-  - 审批流程
-  - 审批表单
-  - BPM流程
-  - BPM对接
-
+- 流程审批
+- 审批流程
+- 审批表单
+- BPM流程
+- BPM对接
+- 审批
+- 流程
+- 工单
 workflow-definition-administration:
-  - 流程管理
-  - 流程定义
-
+- 流程管理
+- 流程定义
 workflow-visual-editor:
-  - 流程编辑器
-  - 流程自定义
-  - 自定义表单
-
+- 流程编辑器
+- 流程自定义
+- 自定义表单
 organization-access-control:
-  - 权限管理
-  - 用户管理
-  - 角色管理
-  - 菜单权限
-  - 数据权限
-  - 访问控制
-
+- 权限管理
+- 用户管理
+- 角色管理
+- 菜单权限
+- 数据权限
+- 访问控制
+- 权限
+- 角色
+- 岗位
 org-hierarchy:
-  - 组织架构
-  - 组织管理
-  - 区域管理
-  - 项目群管理
-  - 公司管理
-
+- 组织架构
+- 组织管理
+- 区域管理
+- 项目群管理
+- 公司管理
+- 租户
+- 商家
 parking-space:
-  - 车位管理
-  - 停车管理
-  - 停车服务
-
+- 车位管理
+- 停车管理
+- 停车服务
+- 车位
+- 停车
 multi-business-point:
-  - 多经点位
-  - 多种经营
-  - 多经管理
-
+- 多经点位
+- 多种经营
+- 多经管理
 print-output:
-  - 打印
-  - 打印输出
-
+- 打印
+- 打印输出
 print-template-cutover:
-  - 打印模板
-
+- 打印模板
 tax-export:
-  - 税务导出
-  - 税务
-
+- 税务导出
+- 税务
 tax-document-and-excel-output:
-  - 税务文档
-
+- 税务文档
 email-notification:
-  - 邮件通知
-  - 消息推送
-  - 短信通知
-  - 通知公告
-
+- 邮件通知
+- 消息推送
+- 短信通知
+- 通知公告
+- 通知
+- 消息
 mobile-tenant-experience:
-  - 商家管理移动端
-  - 租户移动端
-  - 租户端
-  - 租户体验
-  - 商户体验
-  - 商户端
-  - 商户小程序
-
+- 商家管理移动端
+- 租户移动端
+- 租户端
+- 租户体验
+- 商户体验
+- 商户端
+- 商户小程序
 mobile-staff-workflows:
-  - 移动端
-  - 移动办公
-  - 移动经营管理
-
+- 移动端
+- 移动办公
+- 移动经营管理
 mobile-notification-hub:
-  - 移动通知
-  - 消息功能
-
+- 移动通知
+- 消息功能
 mobile-backend-service:
-  - 移动后端
-  - 移动服务
-
+- 移动后端
+- 移动服务
 mobile-identity:
-  - 移动身份
-  - 移动认证
-
+- 移动身份
+- 移动认证
 mobile-portal-strategy:
-  - 移动门户
-  - 移动入口
-
+- 移动门户
+- 移动入口
 physical-asset-operations-ui:
-  - 资产运营
-  - 资产操作
-  - 物业变更
-
+- 资产运营
+- 资产操作
+- 物业变更
+- 设备
+- 仪表
+- 巡检
+- 维保
+- 报修
+- 能耗
 rent-decision-comparison:
-  - 租金决策
-  - 租金比较
-  - 租金评估
-  - 租金价格评估
-  - 租金指标
-  - 租赁决策
-
+- 租金决策
+- 租金比较
+- 租金评估
+- 租金价格评估
+- 租金指标
+- 租赁决策
 supporting-domain-management:
-  - 支撑域管理
-  - 辅助域
-
+- 支撑域管理
+- 辅助域
 tenant-service-workflows-ui:
-  - 租户服务
-  - 商户服务
-  - 商户服务应用
-
+- 租户服务
+- 商户服务
+- 商户服务应用
 asset-resource-rent-control-ui:
-  - 项目资源管理
-  - 资源管理
-  - 楼栋管理
-  - 铺位管理
-  - 房源管理
-  - 控租
-  - 基础数据管理
-  - 楼宇
-  - 楼层
-  - 单元
-  - 资产信息录入
-  - 资产拆合铺
-  - 资产分类型管理
-  - 资产面积划分
-  - 资产使用状态管理
-  - 资产可视化
-  - 编码规则管理
-
+- 项目资源管理
+- 资源管理
+- 楼栋管理
+- 铺位管理
+- 房源管理
+- 控租
+- 基础数据管理
+- 楼宇
+- 楼层
+- 单元
+- 资产信息录入
+- 资产拆合铺
+- 资产分类型管理
+- 资产面积划分
+- 资产使用状态管理
+- 资产可视化
+- 编码规则管理
 asset-requirement-realignment:
-  - 需求对齐
-  - 需求规格确认
-
+- 需求对齐
+- 需求规格确认
 deployment-and-cutover-operations:
-  - 实施要求
-  - 部署上线
-  - 测试与上线
-
+- 实施要求
+- 部署上线
+- 测试与上线
 platform-foundation:
-  - 系统配置
-  - 平台基础
-  - 系统设置
-
-# ── Matrix row capabilities (L01-L33) ──
-# by_id 键是 L 系列编号，不是中文功能点全名
-
+- 系统配置
+- 平台基础
+- 系统设置
 L01:
-  - 新增品牌
-  - 品牌库-新增品牌
-
+- 新增品牌
+- 品牌库-新增品牌
 L02:
-  - 品牌唯一性校验
-
+- 品牌唯一性校验
 L03:
-  - 品牌入库审批
-  - 品牌入库K2
-
+- 品牌入库审批
+- 品牌入库K2
 L04:
-  - 品牌信息维护
-
+- 品牌信息维护
 L05:
-  - 租户新增
-  - 新增租户
-
+- 租户新增
+- 新增租户
 L06:
-  - 品牌授权关联
-
+- 品牌授权关联
 L07:
-  - 证照管理
-
+- 证照管理
 L08:
-  - 开票信息同步
-
+- 开票信息同步
 L09:
-  - 铺位新增
-
+- 铺位新增
+- 铺位
+- 商铺
 L10:
-  - 铺位资产新增
-
+- 铺位资产新增
 L11:
-  - 铺位修改
-
+- 铺位修改
 L12:
-  - 商家信息录入
-
+- 商家信息录入
 L13:
-  - 租约基本信息
-  - 租约
-
+- 租约基本信息
+- 租约
 L14:
-  - 固定租金
-
+- 固定租金
 L15:
-  - 提成租金
-
+- 提成租金
 L16:
-  - 物业管理费
-
+- 物业管理费
 L17:
-  - 宣传推广费
-
+- 宣传推广费
 L18:
-  - 租赁保证金
-
+- 租赁保证金
 L19:
-  - 最低营业额
-
+- 最低营业额
 L20:
-  - 滞纳金规则
-
+- 滞纳金规则
 L21:
-  - 含税设置
-
+- 含税设置
 L22:
-  - 协议类型
-
+- 协议类型
 L23:
-  - 统收
-
+- 统收
 L24:
-  - 新建电子合同
-  - 新建合同
-
+- 新建电子合同
+- 新建合同
 L25:
-  - 合同模板选择
-
+- 合同模板选择
 L26:
-  - 合同附件管理
-
+- 合同附件管理
 L27:
-  - 合同打印预览
-
+- 合同打印预览
 L28:
-  - 合同审批
-  - K2审批
-
+- 合同审批
+- K2审批
 L29:
-  - 合同变更
-
+- 合同变更
 L30:
-  - 租约解除
-  - 合同终止
-
+- 租约解除
+- 合同终止
 L31:
-  - 终止合同模板
-
+- 终止合同模板
 L32:
-  - 清算表单
-  - 合同清算
-
+- 清算表单
+- 合同清算
 L33:
-  - 清算联动
+- 清算联动
