@@ -232,6 +232,8 @@ _NOISE_TEXT_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r'(根据.*更新|根据.*新增|根据.*沟通|根据.*反馈|根据.*调研)'),  # version history
     re.compile(r'(开发和运行要求|运行要求|操作系统|数据库.*要求)'),  # IT infrastructure
     re.compile(r'^实施范围'),  # project scope
+    re.compile(r'^(修改原因|关联业务说明|名词解释|功能操作注意|要点说明|文档目的|操作菜单|操作界面|参考文档|模块说明|功能手册|功能介绍|概要信息|步骤名称|业务要点|目录表|适用范围|文档名)$'),  # doc metadata
+    re.compile(r'^(简介|说明|附表|基本信息|其他|链接|按钮|附件|姓名|合计|描述|金额|日期|时间|名称|单位)$'),  # generic labels
 ]
 
 

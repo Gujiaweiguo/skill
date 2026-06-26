@@ -1,7 +1,6 @@
 # term-aliases.yaml
 #
-# DESIGN: key must be the same identifier used in reconcile's by_id dict.
-# _normalize_term sorts aliases by length DESC.
+# DESIGN: key = capability ID. Sorted by length DESC.
 
 lease-contract-management:
 - 合同管理
@@ -17,6 +16,8 @@ lease-contract-management:
 - 合同
 - 签约
 - 租约
+- 进场条款
+- 自定义条款
 contract-template-management:
 - 合同模板
 - 合同生成
@@ -58,6 +59,9 @@ leasing-plan-management:
 - 落位管理
 - 租金底价
 - 底价审批
+- 免租条款
+- 调租条款
+- 条件免租条款
 asset-budget-planning:
 - 预算管理
 - 收入预算
@@ -89,6 +93,9 @@ finance-deep-integration:
 - 发票
 - 税务
 - 预算
+- 营业税金
+- 税金及附加
+- 账务综述
 billing-and-invoicing:
 - 费用管理
 - 账单
@@ -117,6 +124,14 @@ billing-and-invoicing:
 - 应收
 - 实收
 - 欠款
+- 入账
+- 账款明细
+- 账款
+- 代收明细
+- 收款方式
+- 收款信息
+- 支付
+- 销售付款扣率
 channel-management:
 - 渠道管理
 channel-adapter:
@@ -274,6 +289,7 @@ physical-asset-operations-ui:
 - 维保
 - 报修
 - 能耗
+- 物业管理综述
 rent-decision-comparison:
 - 租金决策
 - 租金比较
@@ -288,6 +304,9 @@ tenant-service-workflows-ui:
 - 租户服务
 - 商户服务
 - 商户服务应用
+- 营运管理
+- 营运
+- 零售
 asset-resource-rent-control-ui:
 - 项目资源管理
 - 资源管理
@@ -389,6 +408,8 @@ L29:
 L30:
 - 租约解除
 - 合同终止
+- 结束申请
+- 合同结束
 L31:
 - 终止合同模板
 L32:
