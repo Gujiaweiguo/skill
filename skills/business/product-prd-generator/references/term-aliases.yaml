@@ -1,12 +1,7 @@
 # term-aliases.yaml
 #
-# DESIGN: key must be the same identifier used in reconcile's by_id dict —
-# i.e. English spec capability IDs or matrix row IDs (L01-L33).
-# _normalize_term sorts aliases by length DESC — specific aliases
-# (e.g. "合同模板") always match before broad ones (e.g. "合同").
-#
-# key   = capability ID
-# value = alias list (Chinese terms, substring-matched against headings)
+# DESIGN: key must be the same identifier used in reconcile's by_id dict.
+# _normalize_term sorts aliases by length DESC.
 
 lease-contract-management:
 - 合同管理
@@ -55,6 +50,14 @@ leasing-plan-management:
 - 租赁
 - 招商
 - 意向
+- 租赁意向管理
+- 意向管理
+- 中介管理
+- 中介信息
+- 品牌落位
+- 落位管理
+- 租金底价
+- 底价审批
 asset-budget-planning:
 - 预算管理
 - 收入预算
@@ -303,6 +306,9 @@ asset-resource-rent-control-ui:
 - 资产使用状态管理
 - 资产可视化
 - 编码规则管理
+- 可出租
+- 可出租单元
+- 出租单元
 asset-requirement-realignment:
 - 需求对齐
 - 需求规格确认

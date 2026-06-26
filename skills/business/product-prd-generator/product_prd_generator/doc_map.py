@@ -229,6 +229,9 @@ _NOISE_TEXT_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r'(人天|报价|乙方应|甲方应|投标|招标|中标|供应商应)'),  # commercial terms
     re.compile(r'(平衡计分卡|考核表|考核目标|绩效考核|目标管理责任)'),  # performance assessment
     re.compile(r'(安全生产|综合治理|隐患整改率|应急演练执行率)'),  # safety management policy
+    re.compile(r'(根据.*更新|根据.*新增|根据.*沟通|根据.*反馈|根据.*调研)'),  # version history
+    re.compile(r'(开发和运行要求|运行要求|操作系统|数据库.*要求)'),  # IT infrastructure
+    re.compile(r'^实施范围'),  # project scope
 ]
 
 
