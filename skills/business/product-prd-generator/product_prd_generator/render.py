@@ -631,42 +631,68 @@ def _render_field_spec_module(
     spec: dict[str, Any],  # noqa: ANY_OK
     cap_by_id: dict[str, dict[str, Any]],  # noqa: ANY_OK
 ) -> list[str]:
-    """Render field-level specification tables for a resource type."""
+    """Render document-driven field specs: 实体→部门→单据→字段→约束→流程."""
     lines: list[str] = []
     role = str(spec.get("role", "—"))
-    scenario = str(spec.get("scenario", ""))
-    fields = spec.get("fields", [])
-    rules = spec.get("rules", [])
+    documents = spec.get("documents", {})
 
-    lines.append(f"#### {resource_name}" + (f"（{role}）" if role != "—" else ""))
+    lines.append(f"#### {resource_name}")
+    lines.append(f"相关部门：{role}")
     lines.append("")
 
-    if scenario:
-        lines.append(f"**业务场景**：{scenario}")
-        lines.append("")
+    if not documents:
+        fields = spec.get("fields", [])
+        if fields:
+            lines.extend(_render_field_table(fields))
+        return lines
 
-    if fields:
-        lines.append("| 字段 | 类型 | 必填 | 可修改 | 用途 |")
-        lines.append("|------|------|------|--------|------|")
-        for f in fields:
-            if not isinstance(f, dict):
-                continue
-            fname = str(f.get("name", ""))
-            ftype = str(f.get("type", ""))
-            req = "✅" if f.get("required") else "选填"
-            edit = "✅" if f.get("editable") else "❌"
-            fdesc = str(f.get("desc", ""))[:50]
-            lines.append(f"| {fname} | {ftype} | {req} | {edit} | {fdesc} |")
-        lines.append("")
+    for doc_name, doc_data in documents.items():
+        if not isinstance(doc_data, dict):
+            continue
+        scenario = str(doc_data.get("scenario", ""))
+        fields = doc_data.get("fields", [])
+        constraints = doc_data.get("constraints", [])
+        workflow = str(doc_data.get("workflow", ""))
 
-    if rules:
-        lines.append("**业务规则**：")
+        lines.append(f"**单据**：{doc_name}")
         lines.append("")
-        for rule in rules:
-            if isinstance(rule, str):
-                lines.append(f"- {rule}")
-        lines.append("")
+        if scenario:
+            lines.append(f"**场景**：{scenario}")
+            lines.append("")
 
+        if fields:
+            lines.extend(_render_field_table(fields))
+
+        if constraints:
+            lines.append("**约束**：")
+            lines.append("")
+            for c in constraints:
+                if isinstance(c, str):
+                    lines.append(f"- {c}")
+            lines.append("")
+
+        if workflow:
+            lines.append(f"**流程**：{workflow}")
+            lines.append("")
+
+    return lines
+
+
+def _render_field_table(fields: list[dict[str, Any]]) -> list[str]:  # noqa: ANY_OK
+    lines = [
+        "| 字段 | 类型 | 必填 | 可修改 | 用途 |",
+        "|------|------|------|--------|------|",
+    ]
+    for f in fields:
+        if not isinstance(f, dict):
+            continue
+        fname = str(f.get("name", ""))
+        ftype = str(f.get("type", ""))
+        req = "✅" if f.get("required") else "选填"
+        edit = "✅" if f.get("editable") else "❌"
+        fdesc = str(f.get("desc", ""))[:55]
+        lines.append(f"| {fname} | {ftype} | {req} | {edit} | {fdesc} |")
+    lines.append("")
     return lines
     for idx, (mod_name, mod_data) in enumerate(modules.items()):
         if not isinstance(mod_data, dict):
