@@ -620,10 +620,23 @@ def _render_blueprint_modules(
 
 def _load_field_specs() -> dict[str, Any]:  # noqa: ANY_OK
     import os
-    p = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "knowledge" / "resource-field-specs.yaml"
-    if not p.is_file():
-        return {}
-    return yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    base = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "knowledge"
+    specs: dict[str, Any] = {}  # noqa: ANY_OK
+    # Source 1: resource-field-specs.yaml (flat entity keys)
+    p1 = base / "resource-field-specs.yaml"
+    if p1.is_file():
+        data = yaml.safe_load(p1.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            specs.update(data)
+    # Source 2: module-field-specs.yaml (nested module→entity, flatten)
+    p2 = base / "module-field-specs.yaml"
+    if p2.is_file():
+        data = yaml.safe_load(p2.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            for entities in data.values():
+                if isinstance(entities, dict):
+                    specs.update(entities)
+    return specs
 
 
 def _render_field_spec_module(
