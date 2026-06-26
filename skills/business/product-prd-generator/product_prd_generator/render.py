@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 
 VERSION_BY_STATUS = {
@@ -269,9 +272,103 @@ def _render_requirement_list_file(requirements: list[dict[str, Any]]) -> str:  #
             nearby = nearby[:80] + "…"
         customer = req.get("source_customer", "") or "—"
         priority = req.get("priority", "低")
-        status = req.get("code_status", "missing")
+        status = req.get("code_status", "unmatched")
         matched = req.get("matched_capability", "") or "—"
         lines.append(f"| {scenario} | {sub} | {func} | {nearby} | {customer} | {priority} | {status} | {matched} |")
+    return "\n".join(lines) + "\n"
+
+
+def _load_ontology() -> dict[str, Any]:  # noqa: ANY_OK
+    ontology_path = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "knowledge" / "business-ontology.yaml"
+    if not ontology_path.is_file():
+        return {}
+    return yaml.safe_load(ontology_path.read_text(encoding="utf-8")) or {}
+
+
+def _classify_module(req: dict[str, Any], ontology: dict[str, Any]) -> str:  # noqa: ANY_OK
+    modules = ontology.get("modules", {})
+    if not isinstance(modules, dict):
+        return "未分类"
+    scenario = str(req.get("scenario", ""))
+    function = str(req.get("function", ""))
+    combined = scenario + " " + function
+    best_module = "未分类"
+    best_score = 0
+    for mod_name, mod_data in modules.items():
+        if not isinstance(mod_data, dict):
+            continue
+        for alias in mod_data.get("aliases", []):
+            if isinstance(alias, str) and alias in combined:
+                score = len(alias)
+                if score > best_score:
+                    best_score = score
+                    best_module = mod_name
+    return best_module
+
+
+def _render_module_summary(requirements: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
+    ontology = _load_ontology()
+    if not ontology:
+        return ""
+    module_stats: dict[str, dict[str, int]] = defaultdict(
+        lambda: {"total": 0, "matched": 0, "unmatched": 0, "高": 0, "中": 0, "低": 0}
+    )
+    for req in requirements:
+        module = _classify_module(req, ontology)
+        stats = module_stats[module]
+        stats["total"] += 1
+        if req.get("matched_capability"):
+            stats["matched"] += 1
+        else:
+            stats["unmatched"] += 1
+        stats[req.get("priority", "低")] += 1
+    lines = [
+        "## 3.6 需求模块汇总",
+        "",
+        f"按业务模块聚合 {len(requirements)} 条需求：",
+        "",
+        "| 模块 | 需求数 | 已匹配 | 未匹配 | 高 | 中 | 低 |",
+        "|------|--------|--------|--------|---|---|---|",
+    ]
+    for module in sorted(module_stats, key=lambda m: -module_stats[m]["total"]):
+        s = module_stats[module]
+        lines.append(f"| {module} | {s['total']} | {s['matched']} | {s['unmatched']} | {s['高']} | {s['中']} | {s['低']} |")
+    return "\n".join(lines) + "\n"
+
+
+def _render_priority_review(requirements: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
+    """高优先级需求 review 清单 — standalone file for human review."""
+    high_reqs = sorted(
+        [r for r in requirements if r.get("priority") == "高"],
+        key=lambda r: (r.get("scenario", ""), r.get("source_customer", "")),
+    )
+    if not high_reqs:
+        return "# 高优先级需求 review 清单\n\n当前无高优先级需求。\n"
+    lines = [
+        "# 高优先级需求 review 清单",
+        "",
+        f"共 {len(high_reqs)} 条高优先级需求，请逐条确认：",
+        "",
+    ]
+    for i, req in enumerate(high_reqs, 1):
+        func = req.get("function", "")
+        scenario = req.get("scenario", "未分类")
+        sub = req.get("sub_scenario", "")
+        nearby = req.get("nearby_text", "")
+        customer = req.get("source_customer", "") or "未知"
+        status = req.get("code_status", "unmatched")
+        matched = req.get("matched_capability", "") or "未匹配"
+        lines.append(f"## {i}. {func}")
+        lines.append(f"- 场景：{scenario}" + (f" > {sub}" if sub else ""))
+        lines.append(f"- 来源：{customer}")
+        lines.append(f"- 代码状态：{status}")
+        lines.append(f"- 匹配能力：{matched}")
+        if nearby:
+            lines.append(f"- 描述：{nearby[:120]}")
+        lines.append("- [ ] 确认为真实需求")
+        lines.append("- [ ] 优先级合理")
+        lines.append("- [ ] 备注：")
+        lines.append("")
     return "\n".join(lines) + "\n"
 
 
@@ -284,6 +381,7 @@ def render_prd(inputs: RenderInputs) -> str:
         _render_header(project, stats),
         _render_customer_summary(inputs.doc_map),
         _render_requirement_list(requirements),
+        _render_module_summary(requirements),
         "## 4. 功能清单",
         "",
         f"共 {len(capabilities)} 项能力，详见 [功能清单.md](功能清单.md)。",
@@ -321,8 +419,9 @@ def main() -> int:
     (output_dir / "差距分析.md").write_text(_render_gap_analysis(capabilities), encoding="utf-8")
     (output_dir / "需求证据表.md").write_text(_render_evidence_table(capabilities), encoding="utf-8")
     (output_dir / "需求清单.md").write_text(_render_requirement_list_file(requirements), encoding="utf-8")
+    (output_dir / "高优先级需求review清单.md").write_text(_render_priority_review(requirements), encoding="utf-8")
 
-    print(f"rendered 5 files to {output_dir}/")
+    print(f"rendered 6 files to {output_dir}/")
     return 0
 
 

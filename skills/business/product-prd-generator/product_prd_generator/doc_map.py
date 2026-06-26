@@ -214,6 +214,36 @@ def _is_noise_heading(heading: str) -> bool:
     return bool(_NOISE_HEADING.match(heading.strip()))
 
 
+_NOISE_TEXT_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r'^\|'),           # table artifacts
+    re.compile(r'^\s*---'),       # table separators
+    re.compile(r'!\['),            # image markdown
+    re.compile(r'data:image'),     # base64 images
+    re.compile(r'_media/'),        # image paths
+    re.compile(r'^[A-Z][A-Z\s]{1,10}$'),  # all-caps English (EBITDA, NOI, SAP)
+    re.compile(r'^[\d\.,\-\s]+$'), # numbers only
+    re.compile(r'^\s*\{.*\}\s*$'), # JSON blocks
+    re.compile(r'^\s*"data"'),     # JSON data fragments
+]
+
+
+def _is_noise_text(text: str) -> bool:
+    """Comprehensive noise filter for requirement function text."""
+    stripped = text.strip()
+    if len(stripped) < 2 or len(stripped) > 80:
+        return True
+    if _is_noise_heading(stripped):
+        return True
+    for pattern in _NOISE_TEXT_PATTERNS:
+        if pattern.search(stripped):
+            return True
+    if any(c in stripped for c in '。！？'):
+        return True
+    if stripped.count('，') > 2 or stripped.count(',') > 2:
+        return True
+    return False
+
+
 def _parse_markdown(md_path: Path, docs_root: Path, aliases: dict[str, str]) -> tuple[DocFeature, ...]:
     text = md_path.read_text(encoding="utf-8", errors="replace")
     rel_path = md_path.relative_to(docs_root)
@@ -310,7 +340,7 @@ def _collect_heading_candidates(text: str) -> list[_HeadingCandidate]:
     candidates: list[_HeadingCandidate] = []
     for match in _HEADING.finditer(text):
         heading = _strip_section_prefix(match.group(2).strip())
-        if not heading or len(heading) < 2 or _is_noise_heading(heading):
+        if not heading or _is_noise_text(heading):
             continue
         candidates.append(_HeadingCandidate(
             pos=match.start(), end=match.end(),
@@ -318,7 +348,7 @@ def _collect_heading_candidates(text: str) -> list[_HeadingCandidate]:
         ))
     for match in _BOLD_HEADING.finditer(text):
         heading = _strip_section_prefix(match.group(1).strip())
-        if len(heading) < 3 or len(heading) > 80 or _is_noise_heading(heading):
+        if len(heading) < 3 or len(heading) > 80 or _is_noise_text(heading):
             continue
         depth = 2 if re.match(r"^\d+[\.\、]", heading) else 3
         candidates.append(_HeadingCandidate(
@@ -330,11 +360,11 @@ def _collect_heading_candidates(text: str) -> list[_HeadingCandidate]:
         col2 = _strip_section_prefix(match.group(2).strip())
         if col1 in ("---", "", "NaN") or col2 in ("---", "", "NaN") or col1.startswith("--"):
             continue
-        if 2 <= len(col1) <= 60 and not _is_noise_heading(col1):
+        if 2 <= len(col1) <= 60 and not _is_noise_text(col1):
             candidates.append(_HeadingCandidate(
                 pos=match.start(), end=match.end(), depth=1, text=col1,
             ))
-        if 2 <= len(col2) <= 60 and not _is_noise_heading(col2):
+        if 2 <= len(col2) <= 60 and not _is_noise_text(col2):
             candidates.append(_HeadingCandidate(
                 pos=match.start(), end=match.end(), depth=2, text=col2,
             ))
