@@ -33,3 +33,7 @@ skills/word/word-master/templates/_analysis_report.json
 skills/word/word-master/test/*.docx
 skills/word/word-master/output/
 skills/ppt/ppt-master/output/
+# Generated artifacts
+skills/business/product-prd-generator/output/
+skills/business/product-prd-generator/parsed/
+skills/business/product-prd-generator/review/
