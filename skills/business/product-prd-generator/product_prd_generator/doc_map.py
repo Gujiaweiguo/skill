@@ -7,6 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum, unique
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -36,8 +37,12 @@ class SourceType(str, Enum):
     UNKNOWN = "unknown"
 
 
-def _load_aliases(skill_root: Path) -> dict[str, str]:
+def _load_aliases(skill_root: Path) -> tuple[dict[str, str], dict[str, Any]]:
+    """Load aliases from term-aliases.yaml + business-ontology.yaml.
+    Returns (flat_aliases_dict, ontology_structure_dict).
+    """
     aliases: dict[str, str] = {}
+    ontology: dict[str, object] = {}
 
     # Source 1: term-aliases.yaml (specific, skill-local)
     aliases_path = skill_root / "references" / "term-aliases.yaml"
@@ -53,13 +58,12 @@ def _load_aliases(skill_root: Path) -> dict[str, str]:
                         aliases[item] = standard
 
     # Source 2: business-ontology.yaml (broad, shared industry knowledge)
-    # Located at $LANLNK_BASE/knowledge/business-ontology.yaml
     import os
     ontology_path = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "knowledge" / "business-ontology.yaml"
     if ontology_path.is_file():
-        onto = yaml.safe_load(ontology_path.read_text(encoding="utf-8"))
-        if isinstance(onto, dict):
-            for module in onto.get("modules", {}).values():
+        ontology = yaml.safe_load(ontology_path.read_text(encoding="utf-8")) or {}
+        if isinstance(ontology, dict):
+            for module in ontology.get("modules", {}).values():
                 if not isinstance(module, dict):
                     continue
                 for sub in module.get("sub_functions", {}).values():
@@ -67,16 +71,14 @@ def _load_aliases(skill_root: Path) -> dict[str, str]:
                         continue
                     caps = sub.get("capabilities", [])
                     terms = sub.get("terms", [])
-                    if not isinstance(caps, list) or not isinstance(terms, list):
-                        continue
-                    if not caps:
+                    if not isinstance(caps, list) or not isinstance(terms, list) or not caps:
                         continue
                     primary_cap = str(caps[0])
                     for term in terms:
                         if isinstance(term, str) and term not in aliases:
                             aliases[term] = primary_cap
 
-    return aliases
+    return aliases, ontology
 
 
 def _classify_source_type(rel_path: Path) -> str:
@@ -400,8 +402,68 @@ def _extract_customer(rel_path: Path) -> str:
     return ""
 
 
+def _classify_module(
+    scenario: str, sub_scenario: str, function: str, ontology: dict[str, Any]
+) -> str | None:
+    """Phase 1: classify requirement into business module using weighted signals."""
+    modules = ontology.get("modules", {})
+    if not isinstance(modules, dict):
+        return None
+    scores: dict[str, float] = {}
+    for mod_name, mod_data in modules.items():
+        if not isinstance(mod_data, dict):
+            continue
+        score = 0.0
+        for alias in mod_data.get("aliases", []):
+            if not isinstance(alias, str):
+                continue
+            if alias in scenario:
+                score += len(alias) * 3
+            if alias in sub_scenario:
+                score += len(alias) * 2
+            if alias in function:
+                score += len(alias)
+        for sub in mod_data.get("sub_functions", {}).values():
+            if not isinstance(sub, dict):
+                continue
+            for term in sub.get("terms", []):
+                if isinstance(term, str) and term in function:
+                    score += len(term) * 0.5
+        if score > 0:
+            scores[mod_name] = score
+    if scores:
+        return max(scores, key=lambda k: scores[k])
+    return None
+
+
+def _match_with_context(
+    function: str,
+    scenario: str,
+    sub_scenario: str,
+    ontology: dict[str, Any],
+    flat_aliases: dict[str, str],
+) -> str:
+    """Two-phase matching: classify module, then match within module's sub-functions.
+    Falls back to flat alias matching if no module-specific match found."""
+    mod_name = _classify_module(scenario, sub_scenario, function, ontology)
+    if mod_name:
+        mod_data = ontology.get("modules", {}).get(mod_name, {})
+        if isinstance(mod_data, dict):
+            for sub in mod_data.get("sub_functions", {}).values():
+                if not isinstance(sub, dict):
+                    continue
+                caps = sub.get("capabilities", [])
+                terms = sub.get("terms", [])
+                if not isinstance(caps, list) or not isinstance(terms, list) or not caps:
+                    continue
+                for term in sorted(terms, key=len, reverse=True):
+                    if isinstance(term, str) and term in function:
+                        return str(caps[0])
+    return _normalize_term(function, flat_aliases)
+
+
 def _parse_requirements(
-    md_path: Path, docs_root: Path, aliases: dict[str, str]
+    md_path: Path, docs_root: Path, aliases: dict[str, str], ontology: dict[str, Any]
 ) -> tuple[Requirement, ...]:
     """Extract leaf-only Requirements with scenario context + nearby_text.
 
@@ -440,9 +502,9 @@ def _parse_requirements(
             if candidates[j].depth <= cand.depth:
                 break
 
-        if is_leaf and not _is_noise_heading(cand.text):
+        if is_leaf and not _is_noise_text(cand.text):
             nearby = _extract_nearby_text(text, cand.end)
-            normalized = _normalize_term(cand.text, aliases)
+            normalized = _match_with_context(cand.text, scenario, sub_scenario, ontology, aliases)
             nearby_images = _nearby_image_refs(text, cand.pos, image_refs)
             req = Requirement(
                 source_file=str(rel_path),
@@ -499,7 +561,7 @@ def _nearby_image_refs(
 
 
 def extract(docs_root: Path, skill_root: Path, project: str = "商管系统") -> DocMap:
-    aliases = _load_aliases(skill_root)
+    aliases, ontology = _load_aliases(skill_root)
     md_files = _iter_markdown_files(docs_root)
     features: dict[str, DocFeature] = {}
     requirements: dict[tuple[str, str], Requirement] = {}
@@ -508,10 +570,7 @@ def extract(docs_root: Path, skill_root: Path, project: str = "商管系统") ->
             existing = features.get(feature.normalized_term)
             if existing is None or feature.depth > existing.depth:
                 features[feature.normalized_term] = feature
-        for req in _parse_requirements(md_path, docs_root, aliases):
-            # Dedup by (normalized_term, source_file) — NOT normalized_term alone.
-            # Broad aliases map many headings to the same term; collapsing them
-            # would lose distinct requirements from different docs.
+        for req in _parse_requirements(md_path, docs_root, aliases, ontology):
             key = (req.normalized_term, req.source_file)
             existing = requirements.get(key)
             if existing is None or req.depth > existing.depth:
