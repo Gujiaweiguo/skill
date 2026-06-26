@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "PRD generator for commercial property management products"
 requires-python = ">=3.10"
 dependencies = [
+    "pypdf>=6.14.2",
     "pyyaml>=6.0",
 ]
 
