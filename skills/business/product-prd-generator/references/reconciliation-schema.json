@@ -1,0 +1,52 @@
+{
+  "schema_version": "1",
+  "project": "商管系统",
+  "generated_at": "2026-06-25T00:00:00Z",
+  "source_paths": {
+    "code": "/opt/code/mi",
+    "docs": "/opt/code/docs/lanlnk/prd/projects/商管系统/raw",
+    "specs": "/opt/code/mi/openspec/specs",
+    "alignment": "/opt/code/mi/artifacts/alignment"
+  },
+  "capabilities": [
+    {
+      "id": "contract-management",
+      "name": "合同管理",
+      "module": "合同管理",
+      "code_status": "partial",
+      "doc_status": "existing",
+      "reconciled_status": "partial",
+      "confidence": "medium",
+      "priority": "P1",
+      "gaps": [
+        "合同续租流程未完整",
+        "审批链路与手册描述不一致"
+      ],
+      "evidence": [
+        {
+          "kind": "spec",
+          "ref": "openspec/specs/contract-template-management/spec.md"
+        },
+        {
+          "kind": "code",
+          "ref": "frontend/src/pages/contract"
+        },
+        {
+          "kind": "doc",
+          "ref": "raw/明源/操作手册/xxx.docx.md"
+        },
+        {
+          "kind": "image",
+          "ref": "raw/明源/用户场景/.../image1.png"
+        }
+      ],
+      "signals": {
+        "vibe_coded": true,
+        "has_tests": false,
+        "has_open_change": true,
+        "partial_reason": "仅完成列表页与基础表单"
+      },
+      "recommendation": "纳入P1，补齐续租与审批链路"
+    }
+  ]
+}
