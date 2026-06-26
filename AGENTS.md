@@ -201,6 +201,23 @@ AI agents don't have cross-session memory. All "memory" lives in files that are 
 
 **Promote up, don't duplicate.** If a lesson applies to 2+ skills, move it to `AGENTS.md`. If it only matters to one skill, keep it local.
 
+### 「复利工程」触发词
+
+当用户在完成 skill 工作后说「复利工程」，执行以下检查清单：
+
+1. **回顾改动**：本次改了什么（代码、bug 修复、设计决策）
+2. **分流经验**：对每个非显而易见的行为/修复/决策，判断去向：
+   - 跨 skill 通用 → 写入 `AGENTS.md`
+   - 本 skill 特有 → 写入 `SKILL.md`（「已知限制」/「设计决策」）
+   - 诊断流程 → 写入 `references/troubleshooting.md`
+3. **检查分级要求是否满足**：
+   - 复杂 skill → 有「已知限制」+「设计决策」+「维护规则」？有 `references/troubleshooting.md`？
+   - 中等 skill → 有「已知限制」？
+   - 简单 skill → 不强制
+4. **共享文件检查**：改了 `domain-tags.md` / `term-aliases.yaml`？→ 同步另一边
+5. **依赖图检查**：集成模式有变化？→ 更新本文件「Skill Dependencies」依赖图
+6. **提交**：`docs: persist lessons via 复利工程`
+
 ## Skill Dependencies & Integration Patterns
 
 ### Dependency graph
