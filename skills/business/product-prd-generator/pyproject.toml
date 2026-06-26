@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "product-prd-generator"
+version = "0.1.0"
+description = "PRD generator for commercial property management products"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+product-prd-generator = "product_prd_generator.main:main"
+prdgen = "product_prd_generator.main:main"
+
+[tool.setuptools]
+package-dir = {"" = "."}
