@@ -162,6 +162,9 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
                         if isinstance(e, Mapping)
                     )
                 stale_markers = ("spec has no doc evidence yet", "doc gap: code has it but doc does not mention it")
+                # When a doc feature matches a spec capability, remove stale
+                # "no doc evidence" gaps — they are no longer true. Without
+                # this cleanup every matched capability carries a false gap.
                 retained_gaps = tuple(g for g in existing.gaps if not any(m in g for m in stale_markers))
                 by_id[term] = ReconciledCapability(
                     id=term,
@@ -183,6 +186,10 @@ def _add_unmatched_customer_requirements(
     by_id: dict[str, ReconciledCapability],
     doc_features: object,
 ) -> None:
+    # Discovers customer requirements that have NO matching code capability,
+    # creates them as `missing`. Capped at 80, sorted by depth (shallow =
+    # core modules first) then by client count. Heavy noise filtering because
+    # raw doc headings include IDs, metadata, and generic chapter names.
     if not isinstance(doc_features, list):
         return
     features_list: list[Mapping[str, object]] = [f for f in doc_features if isinstance(f, Mapping)]

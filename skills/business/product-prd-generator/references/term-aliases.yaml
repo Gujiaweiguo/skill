@@ -1,6 +1,16 @@
 # term-aliases.yaml
-# key = 标准术语（英文 capability ID 或中文功能点 ID）
+#
+# DESIGN: key must be the same identifier used in reconcile's by_id dict —
+# i.e. English spec capability IDs (e.g. lease-contract-management) or
+# product-definition-matrix row IDs (L01-L33). Chinese terms MUST NOT be
+# keys, because reconcile matches doc features by normalized_term → by_id,
+# and by_id keys come from code_map (English IDs). If keys were Chinese,
+# the match would silently fail and every capability would carry a false
+# "no doc evidence" gap.
+#
+# key   = 标准术语（英文 capability ID 或 matrix row ID）
 # value = 别名列表（中文功能名、章节标题中的常见词）
+#
 # doc_map._normalize_term 用 substring 匹配，所以别名越具体越好，避免误匹配。
 # 匹配后 normalized_term = key，reconcile 用它直接对 by_id[cap_id] 查找。
 

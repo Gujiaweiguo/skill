@@ -272,10 +272,66 @@ uv run product-prd-generator --project 商管系统 \
 
 ## 交付原则
 
-这个 Skill 的核心不是“写 PRD”，而是：
+这个 Skill 的核心不是"写 PRD"，而是：
 
 - 抽能力
 - 统一术语
 - 对齐代码
 - 找 gap
 - 再生成 PRD
+
+## 已知限制
+
+- **PDF 转换需要 poppler-utils**：`apt install poppler-utils`。无 sudo 权限时，PDF 无法用 markitdown 转换，需要 LibreOffice 预转换或手动转 md。当前项目有 6 个竞品 PDF 受此影响（政策文件，影响小）。
+- **未匹配需求封顶 80 条**：`_add_unmatched_customer_requirements` 取深度排序前 80 条。如果客户需求超过 80 个不同功能点，多余的会被截断。
+- **噪音过滤可能误判**：`_is_noise_heading` 和 unmatched 的 noise 正则会过滤编号、元数据、通用描述。极端情况下可能误杀合法标题（如以"管理"结尾的功能名被过滤）。
+- **term-aliases 覆盖不全**：当前只覆盖 40+ spec capabilities 和 33 matrix rows。新加的 spec 或客户用的新术语需要手动补充。
+- **word-master .venv 依赖**：word_export 调用 word-master 时依赖其目录下的 `.venv`。如果 word-master 目录未 `uv sync`，会报 `ModuleNotFoundError: docx`。
+
+## 设计决策
+
+### term-aliases.yaml 用英文 spec capability ID 做 key
+
+**原因**：reconcile 的 `by_id` 字典用 spec ID 做 key（如 `CONTRACT_MANAGEMENT`）。aliases 必须把中文 heading 映射到这些英文 ID，否则 normalized_term（中文）和 spec ID（英文）无法匹配。
+
+**L01-L33** 是 product-definition-matrix 的行 ID，不是随机编号。
+
+### doc_map.py 三种提取方式
+
+| 方式 | 正则 | 解决什么问题 |
+|------|------|-------------|
+| `_HEADING` | `^#{1,6}\s+` | 标准 markdown 标题 |
+| `_BOLD_HEADING` | `^\*\*(.+?)\*\*$` | 万达文档用 `**加粗**` 当标题（无 # 前缀） |
+| `_TABLE_ROW` | `^\|(.+?)\|(.+?)\|` | 中旅/锦和/安居文档用 xlsx 表格列当功能点 |
+
+**`_TABLE_ROW` 必须带 `re.MULTILINE`**：否则 `^$` 锚点不匹配多行文本，一行都提取不到。
+
+### 图片证据去重与区段限制
+
+- **`seen` set 去重**：`_collect_image_refs` 用 `seen` 避免同一图片重复挂到多个 feature。
+- **区段限制**：`_nearby_image_refs` 只挂标题所在区段内的图片（从当前标题到下一个 `#` 标题之间），避免所有图片挂到第一个标题。
+- **media_dir stem 双候选**：`foo.docx.md` 的 stem 是 `foo.docx`，但 media_dir 可能叫 `foo_media`。双候选 `[md_path.stem, md_path.stem.rsplit(".",1)[0]]` 解决此问题。
+
+### reconcile stale gap 清理
+
+doc feature 匹配到 spec capability 后，移除 `"spec has no doc evidence yet"` 和 `"doc gap: code has it but doc does not mention it"` 等过时 gap。**不清理会导致每个已匹配 capability 都带着过时 gap，污染输出。**
+
+### unmatched 需求排序策略
+
+深度优先（depth 1-2 的核心模块优先）+ 客户数倒序（多客户共同需求优先），封顶 80 条。
+
+### word_export 跨 skill 调用
+
+**不用 `python3` 直接调用 word-master**，而是在 word-master 目录下用 `uv run python -m src.main`。原因：word-master 有自己的 `.venv`，直接调用会因为 venv 不匹配报 `ModuleNotFoundError`。
+
+内容包路径必须 `.resolve()` 转绝对路径再传给 subprocess，否则 word-master 的 cwd 变化后相对路径失效。
+
+## 维护规则
+
+修改本 skill 时，如发现新的非显而易见行为或踩到新坑：
+
+1. **更新本文件**的「已知限制」和「设计决策」章节
+2. **如是诊断流程**，更新 `references/troubleshooting.md`
+3. **修改 term-aliases.yaml 时**，同时检查 `material-importer/references/domain-tags.md` 是否需要同步（如涉及共享术语）
+
+**判断标准**：如果一个行为或坑"下次的我"读到代码不一定能立刻理解为什么这么做，就应该记录。

@@ -12,6 +12,21 @@ import yaml
 
 from .models import DocFeature, DocMap, EvidenceKind, EvidenceRef
 
+# --- Extraction regexes ---------------------------------------------------
+# Three heading styles are extracted because customer/competitor docs use
+# inconsistent formats:
+#
+#   _HEADING      — standard markdown  # / ## / ###
+#   _BOLD_HEADING — **bold text** on its own line (Wanda docs use bold as
+#                   headings without any # prefix)
+#   _TABLE_ROW    — two-column markdown tables (中旅/锦和/安居 docs embed
+#                   functional points as xlsx table rows). MUST use
+#                   re.MULTILINE or ^/$ anchors won't match across lines.
+_HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*$", re.MULTILINE)
+_BOLD_HEADING = re.compile(r"^\*\*(.+?)\*\*\s*$", re.MULTILINE)
+_IMAGE = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
+_TABLE_ROW = re.compile(r"^\|\s*(.+?)\s*\|\s*(.+?)\s*\|", re.MULTILINE)
+
 
 @unique
 class SourceType(str, Enum):
@@ -19,12 +34,6 @@ class SourceType(str, Enum):
     CURRENT = "current-product"
     COMPETITOR = "competitor"
     UNKNOWN = "unknown"
-
-
-_HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*$", re.MULTILINE)
-_BOLD_HEADING = re.compile(r"^\*\*(.+?)\*\*\s*$", re.MULTILINE)
-_IMAGE = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
-_TABLE_ROW = re.compile(r"^\|\s*(.+?)\s*\|\s*(.+?)\s*\|", re.MULTILINE)
 
 
 def _load_aliases(skill_root: Path) -> dict[str, str]:
@@ -71,6 +80,10 @@ def _normalize_term(heading: str, aliases: dict[str, str]) -> str:
 
 
 def _collect_image_refs(md_path: Path, docs_root: Path, text: str) -> tuple[EvidenceRef, ...]:
+    # Dedup via `seen` set: same image may appear both as inline ![](path)
+    # and in _media/ dir — we keep it once. media_dir stem uses dual
+    # candidates (foo.docx and foo) because markitdown may strip the
+    # .docx suffix when naming the _media directory.
     docs_root = docs_root.resolve()
     seen: set[str] = set()
     refs: list[EvidenceRef] = []
@@ -80,7 +93,6 @@ def _collect_image_refs(md_path: Path, docs_root: Path, text: str) -> tuple[Evid
         if key not in seen:
             seen.add(key)
             refs.append(EvidenceRef(kind=EvidenceKind.IMAGE, ref=ref_str))
-
     for match in _IMAGE.finditer(text):
         target = match.group(1)
         resolved = (md_path.parent / target).resolve()
@@ -206,6 +218,9 @@ def _parse_markdown(md_path: Path, docs_root: Path, aliases: dict[str, str]) -> 
 def _nearby_image_refs(
     text: str, heading_pos: int, all_images: tuple[EvidenceRef, ...]
 ) -> tuple[EvidenceRef, ...]:
+    # Only attach images that appear within the heading's section (from
+    # heading_pos to the next "# " heading). Without this, all images in
+    # the file would pile onto the first heading.
     span_end = text.find("\n#", heading_pos + 1)
     if span_end == -1:
         span_end = len(text)
