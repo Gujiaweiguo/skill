@@ -689,6 +689,13 @@ def _render_field_spec_module(
             lines.append(f"**删除规则**：{delete_rule}")
             lines.append("")
 
+        doc_sources = doc_data.get("sources", [])
+        if doc_sources:
+            lines.append("**来源参考**：")
+            for s in doc_sources:
+                lines.append(f"- {s}")
+            lines.append("")
+
         if workflow:
             lines.append(f"**流程**：{workflow}")
             lines.append("")
