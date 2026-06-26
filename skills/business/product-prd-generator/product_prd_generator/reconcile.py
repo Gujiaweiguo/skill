@@ -343,18 +343,23 @@ def _load_json(path: str) -> Mapping[str, object]:
 
 
 _VALUE_KEYWORDS = ("效率", "降低", "提升", "减少", "提高", "自动", "优化", "避免", "防止", "加快", "简化")
+_INTERFACE_KEYWORDS = ("接口", "对接", "集成", "OA", "单点登录", "webhook", "API对接")
 
 
-def _calculate_priority(customer_count: int, code_status: str, nearby_text: str) -> str:
+def _calculate_priority(customer_count: int, code_status: str, nearby_text: str, function: str = "") -> str:
     """Rule 3B: auto-suggest priority based on customer count, code status, value keywords.
-    'unmatched' (can't match term) scores lower than 'missing' (confirmed absent)."""
+    'unmatched' (can't match term) scores lower than 'missing' (confirmed absent).
+    Interface/integration requirements get a penalty (user feedback: lower priority)."""
     score = min(customer_count, 3)
     if code_status == "missing":
         score += 2
     elif code_status in ("partial", "unmatched"):
         score += 1
+    combined_text = function + " " + nearby_text
     if any(kw in nearby_text for kw in _VALUE_KEYWORDS):
         score += 1
+    if any(kw in combined_text for kw in _INTERFACE_KEYWORDS):
+        score = max(0, score - 1)
     if score >= 4:
         return "高"
     if score >= 2:
@@ -394,7 +399,7 @@ def _build_requirement_records(
         code_status = matched.reconciled_status if matched else "unmatched"
         customers = term_customers.get(term, set())
         nearby = str(feat.get("nearby_text", ""))
-        priority = _calculate_priority(len(customers), code_status, nearby)
+        priority = _calculate_priority(len(customers), code_status, nearby, str(feat.get("function", "")))
         records.append(RequirementRecord(
             source_file=str(feat.get("source_file", "")),
             source_type=str(feat.get("source_type", "")),

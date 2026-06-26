@@ -226,6 +226,9 @@ _NOISE_TEXT_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r'^[\d\.,\-\s]+$'), # numbers only
     re.compile(r'^\s*\{.*\}\s*$'), # JSON blocks
     re.compile(r'^\s*"data"'),     # JSON data fragments
+    re.compile(r'(人天|报价|乙方应|甲方应|投标|招标|中标|供应商应)'),  # commercial terms
+    re.compile(r'(平衡计分卡|考核表|考核目标|绩效考核|目标管理责任)'),  # performance assessment
+    re.compile(r'(安全生产|综合治理|隐患整改率|应急演练执行率)'),  # safety management policy
 ]
 
 
@@ -489,10 +492,15 @@ def _parse_requirements(
         scenario = "未分类"
         sub_scenario = ""
         for d, t in stack:
-            if d == 1:
-                scenario = t
-            elif d == 2:
-                sub_scenario = t
+            clean_t = re.sub(r'[*#`~]', '', t).strip()
+            if d == 1 and scenario == "未分类":
+                scenario = clean_t
+            elif d == 2 and not sub_scenario:
+                sub_scenario = clean_t
+
+        _GENERIC_SCENARIOS = {"一级模块", "二级模块", "三级模块", "序号", "编号", "分类", "说明", "基础数据"}
+        if scenario in _GENERIC_SCENARIOS:
+            scenario = "未分类"
 
         is_leaf = True
         for j in range(i + 1, len(candidates)):
