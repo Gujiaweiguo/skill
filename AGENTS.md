@@ -115,6 +115,28 @@ cd skills/business/material-importer
 uv run scripts/check_cert.py $LANLNK_BASE/materials [--json]
 ```
 
+### OCR Image Extraction (DeepSeek-OCR-2)
+
+```bash
+# Extract structured text from image-heavy PPT/Word/Excel docs
+# Uses DeepSeek-OCR-2 (VLM, 3B params, ~8GB VRAM, outputs markdown + bbox)
+# PEP 723 inline deps — no need to modify material-importer pyproject.toml
+uv run scripts/ocr_extract.py <input_dir> [<input_dir> ...] \
+  --sql-dir <sql_ddl_dir> \
+  --output-dir <output_dir> \
+  [--skip-existing]   # resume after interruption (reads slides.jsonl checkpoint)
+
+# Example: extract Haiding contract table structures from PPT images
+uv run scripts/ocr_extract.py \
+  /opt/code/docs/lanlnk/prd/projects/商管系统/raw/02-competitors/海鼎/业务逻辑 \
+  --sql-dir /opt/code/docs/lanlnk/prd/projects/商管系统/input/02-competitors/海鼎/数据结构 \
+  --output-dir /opt/code/docs/lanlnk/prd/projects/商管系统/raw/02-competitors/海鼎/业务逻辑/_extracted
+```
+
+Outputs: `slides.jsonl` (per-image OCR + bbox), `tables.jsonl` (table names + SQL calibration), `all-ocr.md` (human-readable), `manifest.json`.
+
+SQL DDL files provide ground-truth table/field names for OCR calibration (corrects形近字 like `DtI`→`Dtl`).
+
 ## Architecture Notes
 
 ### PPT: Two Compiler Paths
@@ -169,6 +191,8 @@ LSP reports many false errors in this repo:
 - **YAML OrderedDict 陷阱**（跨 skill）：Python 代码中 **永远不要把 `OrderedDict` 直接 `yaml.dump` 到文件**。`yaml.dump(OrderedDict(...))` 会写入 `!!python/object/apply:collections.OrderedDict` tag，导致 `yaml.safe_load` 报 `ConstructorError`。Python 3.7+ 普通 `dict` 已保序，直接用 `dict`。如需恢复已被污染的文件，用 `yaml.unsafe_load` 读取→转 `dict`→重写。详见 product-prd-generator `references/troubleshooting.md`。
 - **多来源文档合并优先级**（product-prd-generator）：当多个客户/竞品描述同一套系统时，按"系统家族"而非"来源目录"分优先级。例如海鼎/华侨城/锦和同属海鼎系统家族，合并时海鼎骨架优先，其他只补证据。家族检测靠扫描路径段（不限 `/02-competitors/`），因为家族成员会出现在 `01-customer-requirements/` 里。变体标题通过 `_FAMILY_CLAUSE_ALIASES` 归一到标准条款名（如"正式合同"→"新合同申请"）。
 - **xlsx/markitdown 噪音模式**（product-prd-generator）：markitdown 转换 xlsx 时会产生 `Unnamed: N` 列名和 `NaN` 空值，这些会污染 nearby_text。`_extract_nearby_text` 已内置清洗（strip NaN/Unnamed）。纯日期条目（"2026年11月"）和枚举块（"业态代码"下的 200 个行业分类码）需要显式过滤——前者加到 `_NOISE_TEXT_PATTERNS`，后者加到 `_SKIP_SCENARIOS`。
+- **OCR 引擎选择**（跨 skill，图片型资料抽取）：本地 RTX 5060 Ti 是 Blackwell 架构（sm_120），**PaddleOCR 不可用**（paddlepaddle-gpu 2.6.2 只编译到 sm_90，inference 时 segfault；3.x GPU wheel 装不上）。**DeepSeek-OCR-2 是首选**（VLM，3B BF16，8GB VRAM，直接输出 markdown+bbox，中文精度业界顶级）。EasyOCR（torch+Blackwell CUDA）可用但只输出纯文本行，无法还原表格结构。Tesseract 不用（需 apt 装系统包破坏 uv 隔离，纯 CPU 慢）。脚本走 PEP 723 inline deps，不影响 material-importer 主依赖。OCR 形近字（`DtI`→`Dtl`）用 SQL DDL schema 做后校准。
+- **OCR 增量 checkpoint**（material-importer）：`ocr_extract.py` 每张图 OCR 完立即 append 到 `slides.jsonl`（`flush()` 后再继续）。`--skip-existing` 从已有 `slides.jsonl` 读取已处理图片路径，跳过不重跑。聚合输出（`tables.jsonl`/`all-ocr.md`/`manifest.json`）只在最后从 `slides.jsonl` 重建。这样即使超时被 kill，已处理的结果不丢，下次 `--skip-existing` 续跑。
 
 ## Knowledge Persistence
 

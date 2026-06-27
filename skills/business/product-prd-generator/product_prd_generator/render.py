@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -916,6 +917,73 @@ def _render_field_table(fields: list[dict[str, Any]]) -> list[str]:  # noqa: ANY
     return "\n".join(lines)
 
 
+def _render_data_model(requirements: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
+    """Render OCR-extracted database table structures as a data model section."""
+    entries = [r for r in requirements if str(r.get("function", "")).startswith("数据结构")]
+    if not entries:
+        return ""
+
+    _DOMAIN_MAP = [
+        ("合同主数据层", lambda n: n.startswith("m3contract") or n.startswith("m3rdbcontract")),
+        ("合同申请单层", lambda n: any(n.startswith(p) for p in (
+            "m3newcontract", "m3modifycontract", "m3cancelcontract", "m3finishcontract"))),
+        ("合同条款与账款公式", lambda n: n.startswith("m3rdbc")),
+        ("铺位与物业资源", lambda n: n.startswith("m3position") or n.startswith("m3countermand") or n.startswith("m3delivery")),
+        ("商户与品牌", lambda n: n.startswith("m3tenant") or n.startswith("m3brand") or n.startswith("m3merchant") or n.startswith("m3assistant")),
+        ("财务基础与账款", lambda n: n.startswith("ac") or n.startswith("acl")),
+    ]
+
+    table_re = re.compile(r"数据结构\s+(\S+?)（(.+?)）")
+    parsed = []
+    for r in entries:
+        func = str(r.get("function", ""))
+        nearby = str(r.get("nearby_text", ""))
+        m = table_re.search(func)
+        if m:
+            parsed.append({"name": m.group(1), "cn": m.group(2), "detail": nearby})
+        else:
+            name = func.replace("数据结构", "").strip()
+            parsed.append({"name": name, "cn": "", "detail": nearby})
+
+    lines = ["## 3A. 合同数据模型（OCR 提取）", ""]
+    lines.append(f"> 从海鼎业务逻辑 PPT 图片中 OCR 提取的 {len(parsed)} 张数据库表，")
+    lines.append("> 已用 SQL DDL 校准表名与字段。按业务域分层展示。")
+    lines.append("")
+
+    used = set()
+    for domain_title, matcher in _DOMAIN_MAP:
+        group = [p for p in parsed if matcher(p["name"]) and p["name"] not in used]
+        if not group:
+            continue
+        for p in group:
+            used.add(p["name"])
+        group.sort(key=lambda p: p["name"])
+        lines.append(f"### {domain_title}（{len(group)} 张表）")
+        lines.append("")
+        lines.append("| 表名 | 中文名 | 字段信息 |")
+        lines.append("| --- | --- | --- |")
+        for p in group:
+            detail = p["detail"].replace("|", "／")[:120] or "—"
+            lines.append(f"| `{p['name']}` | {p['cn'] or '—'} | {detail} |")
+        lines.append("")
+
+    remaining = [p for p in parsed if p["name"] not in used]
+    if remaining:
+        remaining.sort(key=lambda p: p["name"])
+        lines.append(f"### 其他数据表（{len(remaining)} 张）")
+        lines.append("")
+        lines.append("| 表名 | 中文名 | 字段信息 |")
+        lines.append("| --- | --- | --- |")
+        for p in remaining:
+            detail = p["detail"].replace("|", "／")[:120] or "—"
+            lines.append(f"| `{p['name']}` | {p['cn'] or '—'} | {detail} |")
+        lines.append("")
+
+    lines.append("---")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def render_prd(inputs: RenderInputs) -> str:
     project = inputs.reconcile.get("project", "商管系统")
     capabilities = inputs.reconcile.get("capabilities", [])
@@ -927,6 +995,7 @@ def render_prd(inputs: RenderInputs) -> str:
         _render_customer_summary(inputs.doc_map),
         _render_structure_summary(requirements),
         _render_blueprint_modules(requirements, capabilities, ontology) if ontology else _render_requirement_list(requirements),
+        _render_data_model(requirements),
         _render_module_summary(requirements),
         "## 4. 功能清单",
         "",

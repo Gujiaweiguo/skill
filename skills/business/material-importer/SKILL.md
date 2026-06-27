@@ -17,7 +17,8 @@ compatibility: >
   ```
 
   Falls back from markitdown → python-pptx/python-docx/openpyxl if unavailable.
-  OCR (pytesseract) is optional for expiry-date extraction.
+  OCR: DeepSeek-OCR-2 (VLM) for image-heavy docs via `scripts/ocr_extract.py` (PEP 723 inline deps, ~8GB VRAM).
+  Cert expiry: pytesseract (optional, CPU-only, lightweight).
 change: >
   v2 — 2026-06-18
   • 简化目录结构：移除 incoming/raw/，转换结果统一进 raw/
