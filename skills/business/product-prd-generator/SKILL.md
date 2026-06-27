@@ -300,6 +300,8 @@ uv run product-prd-generator --project 商管系统 \
 - **field-specs YAML 完整性**：`module-field-specs.yaml` 在多次编辑后可能丢失实体（如 OrderedDict 序列化失败导致 yaml.safe_load 无法读取→数据丢失）。每次大改后应验证实体数量：`len(mfs['招商管理'])` 等。
 - **噪音过滤可能误判**：`_is_noise_text` 过滤编号、元数据、表格残留、图片路径、JSON 块、句子型文本。极端情况下可能误杀合法标题。
 - **word-master .venv 依赖**：word_export 调用 word-master 时依赖其目录下的 `.venv`。如果 word-master 目录未 `uv sync`，会报 `ModuleNotFoundError: docx`。
+- **OCR 数据结构去重陷阱**：OCR 提取的表名标题（如 `数据结构 m3newcontractrequest（新合同申请）`）经过 `_normalize_term()` 后全部归一到同一业务术语（如 `lease-contract-management`）。`_parse_requirements()` 用 `normalized` 做 dict key 去重，导致 117/214 张表被吞。已修复：以 `数据结构` 开头的标题用 heading 原文做 key。新增 OCR 数据源时注意这个模式。
+- **OCR all-ocr.md 噪音**：`ocr_extract.py` 生成的人类可读汇总 `all-ocr.md` 会被 `_iter_markdown_files()` 当作需求源解析，产生图片文件名噪音。PRD 生成前必须删除 `_extracted/all-ocr.md`，只保留 `haiding-data-model.md`。
 
 ## 设计决策
 
@@ -440,6 +442,25 @@ PRD 中的实体/单据名称必须满足：
 - 华侨城将物料管理(14个子项)放在物业管理 → 我们也放物业，不放运营
 
 **原则**：source documents 的结构 IS the requirements。
+
+### OCR 图片型资料 → PRD 数据模型（Pipeline）
+
+图片型 PPT/Word 资料（如海鼎业务逻辑介绍）的表结构信息无法通过 markitdown 提取。完整 pipeline：
+
+```
+ocr_extract.py (DeepSeek-OCR-2)
+  → slides.jsonl + tables.jsonl (OCR 原始结果 + SQL 校准表名)
+ocr_to_features.py
+  → haiding-data-model.md (bold-heading 格式，每张表一条)
+_parse_markdown()
+  → requirements (function="数据结构 m3contract（合同表）")
+_render_data_model()
+  → PRD section 3A (按域分层的表结构概览)
+```
+
+**bold-heading 格式约束**：`_BOLD_HEADING` 正则 `^\*\*(.+?)\*\*\s*$` 要求 bold 文本独占一行。字段信息必须放在下一行，不能同行。否则正则不匹配，OCR 数据全部丢失。
+
+**域分组**：`_render_data_model()` 按表名前缀分组（m3contract→主数据，m3newcontract→申请单，m3rdbc→条款/公式）。新增厂商时在 `_DOMAIN_MAP` 里加前缀映射。
 
 ## 维护规则
 

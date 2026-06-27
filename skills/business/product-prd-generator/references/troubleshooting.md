@@ -369,3 +369,54 @@ for mod in mfs:
 ```
 
 **预防**：每次大改 YAML 后运行此检查。entity 有 sub_function 但无 documents = 空 = 误导用户。
+
+---
+
+## OCR 数据模型：PRD 中表数量远少于 OCR 提取数量
+
+**症状**：`ocr_to_features.py` 报告 214 张表，但 PRD "3A. 合同数据模型" 章节只显示 98 张。
+
+**根因**：OCR 表名标题（如 `数据结构 m3newcontractrequest（新合同申请）`）经过 `_normalize_term()` 后全部归一到同一业务术语（如 `lease-contract-management`）。`_parse_requirements()` 用 `normalized` 做 dict key 去重，同 key 的后续条目被丢弃。
+
+**诊断**：
+```bash
+cd skills/business/product-prd-generator
+uv run python -c "
+from pathlib import Path
+from product_prd_generator.doc_map import _parse_requirements, _load_aliases
+aliases, ontology = _load_aliases(Path('.'))
+md = Path('<docs_root>/02-competitors/海鼎/业务逻辑/_extracted/haiding-data-model.md')
+reqs = _parse_requirements(md, Path('<docs_root>'), aliases, ontology)
+print(f'reqs: {len(reqs)} (expected 214)')
+# Check if specific tables survived
+for kw in ['m3newcontract', 'm3modifycontract']:
+    print(f'  {kw}: {sum(1 for r in reqs if kw in str(r.function))}')
+"
+```
+
+**修复**：`_parse_requirements()` 中，以 `数据结构` 开头的标题用 heading 原文做 dedup key（而非 normalized term）。已修复。
+
+---
+
+## OCR 数据模型：bold-heading 不被 `_BOLD_HEADING` 正则匹配
+
+**症状**：`ocr_to_features.py` 输出的 `haiding-data-model.md` 中 bold 标题没有被 `_parse_markdown()` / `_collect_heading_candidates()` 提取。
+
+**根因**：`_BOLD_HEADING = re.compile(r"^\*\*(.+?)\*\*\s*$")` 要求 bold 文本后只有空白和行尾。如果字段信息跟在 `**` 同一行（如 `**数据结构 table（名）** 20字段 ✅ ...`），正则不匹配。
+
+**修复**：字段信息放在 bold 标题的**下一行**：
+```markdown
+**数据结构 m3contract（合同表）**
+
+20字段 ✅ uuid, fversion, ...
+```
+
+---
+
+## OCR 噪音：`all-ocr.md` 被当作需求源
+
+**症状**：PRD 需求清单中出现 `OCR 提取结果汇总` 作为 source_file，heading 为 `image42.png` 等图片文件名。
+
+**根因**：`ocr_extract.py` 生成的人类可读汇总 `all-ocr.md` 是合法 markdown，被 `_iter_markdown_files()` 自动发现并解析。
+
+**修复**：PRD 生成前删除 `_extracted/all-ocr.md`。只保留 `haiding-data-model.md`（结构化转换结果）。
