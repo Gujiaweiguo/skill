@@ -109,6 +109,9 @@ class Requirement:
     nearby_text: str
     normalized_term: str
     evidence: tuple[EvidenceRef, ...]
+    kind: str = "feature"
+    clause_parent: str = ""
+    clause_path: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,6 +140,7 @@ class RequirementRecord:
     source_file: str
     source_type: str
     source_customer: str
+    kind: str
     scenario: str
     sub_scenario: str
     function: str
@@ -145,6 +149,8 @@ class RequirementRecord:
     matched_capability: str
     code_status: str
     priority: str
+    clause_parent: str = ""
+    clause_path: str = ""
     evidence: tuple[EvidenceRef, ...] = ()
 
 

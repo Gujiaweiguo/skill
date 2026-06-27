@@ -63,7 +63,10 @@ def _load_aliases(skill_root: Path) -> tuple[dict[str, str], dict[str, Any]]:
     if ontology_path.is_file():
         ontology = yaml.safe_load(ontology_path.read_text(encoding="utf-8")) or {}
         if isinstance(ontology, dict):
-            for module in ontology.get("modules", {}).values():
+            modules = ontology.get("modules", {})
+            if not isinstance(modules, dict):
+                modules = {}
+            for module in modules.values():
                 if not isinstance(module, dict):
                     continue
                 for sub in module.get("sub_functions", {}).values():
@@ -79,6 +82,113 @@ def _load_aliases(skill_root: Path) -> tuple[dict[str, str], dict[str, Any]]:
                             aliases[term] = primary_cap
 
     return aliases, ontology
+
+
+_HAIDING_FAMILY = ('海鼎', '华侨城', '锦和')
+
+
+def _source_family(source_file: str) -> str | None:
+    """Detect 海鼎 system family by scanning path segments.
+
+    华侨城、锦和的蓝图/合同文档由海鼎编写，属于同一系统家族。
+    扫描整个路径段而非固定 /02-competitors/X/ 前缀，因为家族成员
+    会出现在客户需求目录或其他位置。
+    """
+    for segment in source_file.replace('\\', '/').split('/'):
+        for member in _HAIDING_FAMILY:
+            if member in segment:
+                return member
+    return None
+
+
+def _source_priority(source_file: str) -> int:
+    if _source_family(source_file):
+        return 0
+    source = source_file.replace('\\', '/')
+    if '/00-current-product/' in source:
+        return 1
+    if '/01-customer-requirements/' in source:
+        return 2
+    if '/02-competitors/' in source:
+        return 3
+    return 4
+
+
+# 海鼎家族（海鼎/华侨城/锦和）的文档使用不同标题风格描述同一套合同条款。
+# 锦和蓝图由海鼎编写，华侨城用表格行条目。此表把变体标题归一到海鼎标准条款名。
+_FAMILY_CLAUSE_ALIASES: dict[str, str] = {
+    # 锦和 "X业务说明" 风格
+    "固定租金计算方式": "账款条款",
+    "进场管理业务说明": "进场条款",
+    "进场管理流程图": "进场条款",
+    "进场管理": "进场条款",
+    "意向合同(特批)管理说明": "新合同申请",
+    "居间合同管理": "新合同申请",
+    "外包合同管理": "新合同申请",
+    "增值合同管理": "新合同申请",
+    "租赁合同管理业务说明": "新合同申请",
+    # 华侨城 表格行条目
+    "正式合同": "新合同申请",
+    "合同退租/提前解约": "合同终止",
+    "合同模板管理": "合同模板",
+    "结算管理": "结算周期",
+    "保证金管理": "预存款条款",
+    "预付款管理": "预存款条款",
+}
+
+
+def _normalize_clause_heading(heading: str) -> str:
+    """Remap family variant headings to canonical 海鼎 clause titles.
+
+    Only exact matches are remapped to avoid over-normalizing unrelated headings.
+    """
+    clean = re.sub(r'[*#`~]', '', heading).strip()
+    return _FAMILY_CLAUSE_ALIASES.get(clean, clean)
+
+
+def _kind_priority(kind: str) -> int:
+    return {
+        'clause-group': 0,
+        'clause-field': 1,
+        'data-structure': 2,
+        'workflow': 3,
+        'permission': 4,
+        'feature': 5,
+    }.get(kind, 6)
+
+
+def _merge_evidence(existing: tuple[EvidenceRef, ...], incoming: tuple[EvidenceRef, ...]) -> tuple[EvidenceRef, ...]:
+    merged = list(existing)
+    seen = {(e.kind, e.ref) for e in existing}
+    for evidence in incoming:
+        key = (evidence.kind, evidence.ref)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(evidence)
+    return tuple(merged)
+
+
+def _prefer_doc_feature(existing: DocFeature, candidate: DocFeature) -> bool:
+    return (
+        _source_priority(candidate.source_file),
+        -candidate.depth,
+    ) < (
+        _source_priority(existing.source_file),
+        -existing.depth,
+    )
+
+
+def _prefer_requirement(existing: Requirement, candidate: Requirement) -> bool:
+    return (
+        _source_priority(candidate.source_file),
+        _kind_priority(candidate.kind),
+        -candidate.depth,
+    ) < (
+        _source_priority(existing.source_file),
+        _kind_priority(existing.kind),
+        -existing.depth,
+    )
 
 
 def _classify_source_type(rel_path: Path) -> str:
@@ -234,6 +344,14 @@ _NOISE_TEXT_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r'^实施范围'),  # project scope
     re.compile(r'^(修改原因|关联业务说明|名词解释|功能操作注意|要点说明|文档目的|操作菜单|操作界面|参考文档|模块说明|功能手册|功能介绍|概要信息|步骤名称|业务要点|目录表|适用范围|文档名)$'),  # doc metadata
     re.compile(r'^(简介|说明|附表|基本信息|其他|链接|按钮|附件|姓名|合计|描述|金额|日期|时间|名称|单位)$'),  # generic labels
+    re.compile(r'^Unnamed'),                  # pandas/xlsx column artifacts
+    re.compile(r'^NaN\s*$'),                  # null cell artifacts
+    re.compile(r'^20\d{2}年\d{1,2}月'),       # standalone year-month dates
+    re.compile(r'^20\d{2}-\d{1,2}-\d{1,2}'),  # standalone full dates
+    re.compile(r'^\d{4}年\d{1,2}月份'),       # "2019年8月份..." dates
+    re.compile(r'^(FW|GC|WL)\d+'),            # maintenance item codes (锦和)
+    re.compile(r'^XM-\d+'),                   # project IDs (华侨城)
+    re.compile(r'(并稿|初审|复审|终稿|草稿)'), # document revision stages
 ]
 
 
@@ -398,7 +516,81 @@ def _extract_nearby_text(text: str, heading_end: int) -> str:
             continue
         para.append(stripped)
     result = ' '.join(para)
+    result = re.sub(r'\bNaN\b', '', result)
+    result = re.sub(r'Unnamed:\s*\d+', '', result)
+    result = re.sub(r'\s{2,}', ' ', result).strip()
     return result[:200]
+
+
+def _classify_requirement_kind(source_file: str, heading: str, nearby_text: str, source_type: str) -> str:
+    combined = f"{source_file} {heading} {nearby_text} {source_type}"
+    section_titles = {
+        "合同模板",
+        "新合同申请",
+        "合同概要字段显示配置",
+        "合同变更",
+        "合同改期",
+        "合同提前",
+        "合同推迟",
+        "合同延期",
+        "合同终止",
+        "合同作废",
+        "合同保存",
+        "合同保存草稿",
+        "合同查询",
+        "合同台账",
+        "结算周期",
+        "账款条款",
+        "销售付款扣率",
+        "滞纳金条款",
+        "免租条款",
+        "调租条款",
+        "条件免租条款",
+        "一次性费用",
+        "预存款条款",
+        "自定义条款",
+        "合同附件",
+        "结束申请",
+        "结算预览",
+    }
+    if heading in section_titles:
+        return "clause-group"
+    if heading in {"合同基本信息", "基本信息"} and any(token in nearby_text for token in ("合同", "条款", "字段", "配置", "显示")):
+        return "clause-group"
+    if any(keyword in combined for keyword in ("权限", "授权", "用户组", "岗位", "角色", "数据权限", "模块权限", "授权组", "组织管理", "用户管理")):
+        return "permission"
+    if any(keyword in combined for keyword in ("流程", "审批", "流转", "待办", "节点", "会签", "委派", "候选人", "签收", "生效", "作废", "发起", "终止", "回调", "定时事件")):
+        return "workflow"
+    if any(keyword in combined for keyword in ("数据结构", "表结构", "数据逻辑", "模型", "实体", "主表", "明细表", "子表", "关联表", "字段定义", "字段说明", "表单关键字段", "关键字段", "账款表", "合同账务表", "结构分类", "汇总明细表", "账款模型")):
+        return "data-structure"
+    return "feature"
+
+
+def _extract_clause_items(section_text: str) -> tuple[tuple[str, str], ...]:
+    items: list[tuple[str, str]] = []
+    for raw_line in section_text.splitlines():
+        line = raw_line.strip().strip("*")
+        if not line or line.startswith(("!", "|", "```")):
+            continue
+        if "：" not in line and ":" not in line and "包括" not in line and "包含" not in line:
+            continue
+        left, sep, right = line.partition("：") if "：" in line else line.partition(":")
+        head = _strip_section_prefix(left).strip().strip("：:，,。；;")
+        body = right.strip().strip("。；;") if sep else line
+        if not head:
+            continue
+        if len(head) > 40 and not any(keyword in head for keyword in ("合同", "条款", "周期", "字段", "信息", "配置", "说明")):
+            continue
+        if body:
+            items.append((head, body))
+        quote_items: list[str] = []
+        for match in re.findall(r"“([^”]+)”|\"([^\"]+)\"", body or line):
+            quote_items.append(match[0] or match[1])
+        if quote_items:
+            for item in quote_items:
+                if item and item != head:
+                    items.append((item, body or line))
+    return tuple(items)
 
 
 def _extract_customer(rel_path: Path) -> str:
@@ -504,6 +696,10 @@ def _parse_requirements(
                 sub_scenario = clean_t
 
         _GENERIC_SCENARIOS = {"一级模块", "二级模块", "三级模块", "序号", "编号", "分类", "说明", "基础数据"}
+        _SKIP_SCENARIOS = {"业态代码"}
+        if scenario in _SKIP_SCENARIOS:
+            stack.append((cand.depth, cand.text))
+            continue
         if scenario in _GENERIC_SCENARIOS:
             scenario = "未分类"
 
@@ -517,23 +713,56 @@ def _parse_requirements(
 
         if is_leaf and not _is_noise_text(cand.text):
             nearby = _extract_nearby_text(text, cand.end)
-            normalized = _match_with_context(cand.text, scenario, sub_scenario, ontology, aliases)
+            canonical_heading = _normalize_clause_heading(cand.text)
+            normalized = _match_with_context(canonical_heading, scenario, sub_scenario, ontology, aliases)
             nearby_images = _nearby_image_refs(text, cand.pos, image_refs)
+            kind = _classify_requirement_kind(str(rel_path), canonical_heading, nearby, source_type)
+            clause_items = _extract_clause_items(nearby)
+            clause_parent = ""
+            clause_path = ""
+            if kind == "clause-group" and clause_items:
+                clause_parent = canonical_heading
+                clause_path = " / ".join(item for item, _ in clause_items[:4])
             req = Requirement(
                 source_file=str(rel_path),
                 source_type=source_type,
                 source_customer=source_customer,
                 scenario=scenario,
                 sub_scenario=sub_scenario,
-                function=cand.text,
+                function=canonical_heading,
                 depth=cand.depth,
                 nearby_text=nearby,
                 normalized_term=normalized,
                 evidence=(doc_ref, *nearby_images),
+                kind=kind,
+                clause_parent=clause_parent,
+                clause_path=clause_path,
             )
             existing = requirements.get(normalized)
             if existing is None or cand.depth > existing.depth:
                 requirements[normalized] = req
+
+            if kind == "clause-group":
+                for clause_name, clause_desc in clause_items:
+                    clause_norm = _normalize_term(f"{canonical_heading} {clause_name}", aliases)
+                    clause_req = Requirement(
+                        source_file=str(rel_path),
+                        source_type=source_type,
+                        source_customer=source_customer,
+                        scenario=scenario,
+                        sub_scenario=canonical_heading if not sub_scenario else sub_scenario,
+                        function=clause_name,
+                        depth=cand.depth + 1,
+                        nearby_text=clause_desc,
+                        normalized_term=clause_norm,
+                        evidence=(doc_ref, *nearby_images),
+                        kind="clause-field",
+                        clause_parent=canonical_heading,
+                        clause_path=f"{canonical_heading} / {clause_name}",
+                    )
+                    existing_clause = requirements.get(clause_norm)
+                    if existing_clause is None or clause_req.depth > existing_clause.depth:
+                        requirements[clause_norm] = clause_req
 
         stack.append((cand.depth, cand.text))
 
@@ -550,6 +779,9 @@ def _parse_requirements(
             nearby_text="",
             normalized_term=normalized,
             evidence=(doc_ref,),
+            kind=_classify_requirement_kind(str(rel_path), md_path.stem, "", source_type),
+            clause_parent="",
+            clause_path="",
         )
 
     return tuple(requirements.values())
@@ -581,13 +813,46 @@ def extract(docs_root: Path, skill_root: Path, project: str = "商管系统") ->
     for md_path in md_files:
         for feature in _parse_markdown(md_path, docs_root, aliases):
             existing = features.get(feature.normalized_term)
-            if existing is None or feature.depth > existing.depth:
+            if existing is None or _prefer_doc_feature(existing, feature):
                 features[feature.normalized_term] = feature
         for req in _parse_requirements(md_path, docs_root, aliases, ontology):
-            key = (req.normalized_term, req.source_file)
+            key = (req.normalized_term, req.function)
             existing = requirements.get(key)
-            if existing is None or req.depth > existing.depth:
+            if existing is None:
                 requirements[key] = req
+                continue
+            if _prefer_requirement(existing, req):
+                requirements[key] = Requirement(
+                    source_file=req.source_file,
+                    source_type=req.source_type,
+                    source_customer=req.source_customer,
+                    scenario=req.scenario,
+                    sub_scenario=req.sub_scenario,
+                    function=req.function,
+                    depth=req.depth,
+                    nearby_text=req.nearby_text,
+                    normalized_term=req.normalized_term,
+                    evidence=_merge_evidence(existing.evidence, req.evidence),
+                    kind=req.kind,
+                    clause_parent=req.clause_parent,
+                    clause_path=req.clause_path,
+                )
+            else:
+                requirements[key] = Requirement(
+                    source_file=existing.source_file,
+                    source_type=existing.source_type,
+                    source_customer=existing.source_customer,
+                    scenario=existing.scenario,
+                    sub_scenario=existing.sub_scenario,
+                    function=existing.function,
+                    depth=existing.depth,
+                    nearby_text=existing.nearby_text,
+                    normalized_term=existing.normalized_term,
+                    evidence=_merge_evidence(existing.evidence, req.evidence),
+                    kind=existing.kind,
+                    clause_parent=existing.clause_parent,
+                    clause_path=existing.clause_path,
+                )
     return DocMap(
         project=project,
         source_path=str(docs_root),
@@ -622,6 +887,7 @@ def to_json(doc_map: DocMap) -> dict[str, object]:
                 "depth": r.depth,
                 "nearby_text": r.nearby_text,
                 "normalized_term": r.normalized_term,
+                "kind": r.kind,
                 "evidence": [{"kind": e.kind.value, "ref": e.ref} for e in r.evidence],
             }
             for r in doc_map.requirements
