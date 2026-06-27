@@ -101,6 +101,27 @@ def _render_customer_summary(doc_map: dict[str, Any] | None) -> str:  # noqa: AN
     return "\n".join(lines) + "\n"
 
 
+def _structure_kind_label(kind: str) -> str:
+    return {
+        "clause-group": "合同条款组",
+        "clause-field": "合同字段",
+        "data-structure": "数据结构",
+        "workflow": "流程",
+        "permission": "权限",
+        "feature": "功能",
+    }.get(kind, kind or "功能")
+
+
+def _render_structure_summary(requirements: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
+    if not requirements:
+        return ""
+    counts: Counter[str] = Counter(_structure_kind_label(str(req.get("kind", "feature"))) for req in requirements)
+    lines = ["## 3.2 结构类型概览", "", "| 类型 | 数量 |", "|---|---|"]
+    for label in ("合同条款组", "合同字段", "数据结构", "流程", "权限", "功能"):
+        lines.append(f"| {label} | {counts.get(label, 0)} |")
+    return "\n".join(lines) + "\n"
+
+
 def _render_feature_list(capabilities: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
     lines = ["# 功能清单", "", "| 功能名 | 状态 | 置信度 | 证据数 |", "|---|---|---|---|"]
     for cap in capabilities:
@@ -207,30 +228,36 @@ def _render_requirement_list(requirements: list[dict[str, Any]]) -> str:  # noqa
     if not requirements:
         return ""
     priority_order = {"高": 0, "中": 1, "低": 2}
+    kind_order = {"合同条款组": 0, "合同字段": 1, "数据结构": 2, "流程": 3, "权限": 4, "功能": 5}
     reqs_sorted = sorted(
         requirements,
         key=lambda r: (
+            kind_order.get(_structure_kind_label(str(r.get("kind", "feature"))), 4),
             priority_order.get(r.get("priority", "低"), 3),
             r.get("scenario", ""),
             r.get("sub_scenario", ""),
         ),
     )
+    kind_counts = Counter(_structure_kind_label(str(r.get("kind", "feature"))) for r in reqs_sorted)
     high = sum(1 for r in reqs_sorted if r.get("priority") == "高")
     med = sum(1 for r in reqs_sorted if r.get("priority") == "中")
     low = sum(1 for r in reqs_sorted if r.get("priority") == "低")
     lines = [
         "## 3.5 需求清单（六维框架）",
         "",
+        f"结构分布：合同条款组 {kind_counts.get('合同条款组', 0)} / 合同字段 {kind_counts.get('合同字段', 0)} / 数据结构 {kind_counts.get('数据结构', 0)} / 流程 {kind_counts.get('流程', 0)} / 权限 {kind_counts.get('权限', 0)} / 功能 {kind_counts.get('功能', 0)}。",
         f"共 {len(reqs_sorted)} 条需求。优先级分布：高 {high} / 中 {med} / 低 {low}。",
         f"本节列出前 100 条（按优先级排序），完整清单见 [需求清单.md](需求清单.md)。",
         "",
-        "| 场景 | 子场景 | 功能 | 痛点/描述 | 来源 | 优先级 | 代码状态 | 匹配能力 |",
-        "|------|--------|------|-----------|------|--------|---------|---------|",
+        "| 类型 | 场景 | 子场景 | 功能 | 条款路径 | 痛点/描述 | 来源 | 优先级 | 代码状态 | 匹配能力 |",
+        "|------|------|--------|------|------|-----------|------|--------|---------|---------|",
     ]
     for req in reqs_sorted[:100]:
+        kind = _structure_kind_label(str(req.get("kind", "feature")))
         scenario = req.get("scenario", "未分类")
         sub = req.get("sub_scenario", "") or "—"
         func = req.get("function", "")
+        clause_path = req.get("clause_path", "") or "—"
         nearby = req.get("nearby_text", "") or "—"
         if len(nearby) > 60:
             nearby = nearby[:60] + "…"
@@ -238,7 +265,7 @@ def _render_requirement_list(requirements: list[dict[str, Any]]) -> str:  # noqa
         priority = req.get("priority", "低")
         status = req.get("code_status", "unmatched")
         matched = req.get("matched_capability", "") or "—"
-        lines.append(f"| {scenario} | {sub} | {func} | {nearby} | {customer} | {priority} | {status} | {matched} |")
+        lines.append(f"| {kind} | {scenario} | {sub} | {func} | {clause_path} | {nearby} | {customer} | {priority} | {status} | {matched} |")
     return "\n".join(lines) + "\n"
 
 
@@ -260,13 +287,15 @@ def _render_requirement_list_file(requirements: list[dict[str, Any]]) -> str:  #
         "",
         f"共 {len(reqs_sorted)} 条需求。",
         "",
-        "| 场景 | 子场景 | 功能 | 痛点/描述 | 来源 | 优先级 | 代码状态 | 匹配能力 |",
-        "|------|--------|------|-----------|------|--------|---------|---------|",
+        "| 类型 | 场景 | 子场景 | 功能 | 条款路径 | 痛点/描述 | 来源 | 优先级 | 代码状态 | 匹配能力 |",
+        "|------|------|--------|------|------|-----------|------|--------|---------|---------|",
     ]
     for req in reqs_sorted:
+        kind = _structure_kind_label(str(req.get("kind", "feature")))
         scenario = req.get("scenario", "未分类")
         sub = req.get("sub_scenario", "") or "—"
         func = req.get("function", "")
+        clause_path = req.get("clause_path", "") or "—"
         nearby = req.get("nearby_text", "") or "—"
         if len(nearby) > 80:
             nearby = nearby[:80] + "…"
@@ -274,7 +303,7 @@ def _render_requirement_list_file(requirements: list[dict[str, Any]]) -> str:  #
         priority = req.get("priority", "低")
         status = req.get("code_status", "unmatched")
         matched = req.get("matched_capability", "") or "—"
-        lines.append(f"| {scenario} | {sub} | {func} | {nearby} | {customer} | {priority} | {status} | {matched} |")
+        lines.append(f"| {kind} | {scenario} | {sub} | {func} | {clause_path} | {nearby} | {customer} | {priority} | {status} | {matched} |")
     return "\n".join(lines) + "\n"
 
 
@@ -351,15 +380,20 @@ def _render_priority_review(requirements: list[dict[str, Any]]) -> str:  # noqa:
         "",
     ]
     for i, req in enumerate(high_reqs, 1):
+        kind = _structure_kind_label(str(req.get("kind", "feature")))
         func = req.get("function", "")
         scenario = req.get("scenario", "未分类")
         sub = req.get("sub_scenario", "")
+        clause_path = req.get("clause_path", "")
         nearby = req.get("nearby_text", "")
         customer = req.get("source_customer", "") or "未知"
         status = req.get("code_status", "unmatched")
         matched = req.get("matched_capability", "") or "未匹配"
         lines.append(f"## {i}. {func}")
+        lines.append(f"- 类型：{kind}")
         lines.append(f"- 场景：{scenario}" + (f" > {sub}" if sub else ""))
+        if clause_path:
+            lines.append(f"- 条款路径：{clause_path}")
         lines.append(f"- 来源：{customer}")
         lines.append(f"- 代码状态：{status}")
         lines.append(f"- 匹配能力：{matched}")
@@ -486,6 +520,12 @@ def _render_blueprint_modules(
             lines.append("")
         lines.append(f"**需求**：{len(reqs)} 条 | **能力**：{len(mod_caps)} 项（✅{existing_count} / ❌{missing_count}）")
         lines.append("")
+        if reqs:
+            kind_counts = Counter(_structure_kind_label(str(req.get("kind", "feature"))) for req in reqs)
+            lines.append(
+                f"**结构类型**：数据结构 {kind_counts.get('数据结构', 0)} / 流程 {kind_counts.get('流程', 0)} / 权限 {kind_counts.get('权限', 0)} / 功能 {kind_counts.get('功能', 0)}"
+            )
+            lines.append("")
 
         # If field specs exist for this module's sub_functions, render field-level tables
         mod_has_specs = field_specs and any(
@@ -570,14 +610,15 @@ def _render_blueprint_modules(
                         lines.append(f"- {func}（{customer}）")
                     lines.append("")
             elif sub_r:
-                lines.append("| 角色 | 场景 | 场景描述 | 状态 | 来源 | 端点 |")
-                lines.append("|------|------|---------|------|------|------|")
+                lines.append("| 类型 | 角色 | 场景 | 场景描述 | 状态 | 来源 | 端点 |")
+                lines.append("|------|------|------|---------|------|------|------|")
                 seen_t2: set[str] = set()
                 for req in sorted(sub_r, key=lambda r: r.get("priority", "低")):
                     term = req.get("normalized_term", "")
                     if term in seen_t2:
                         continue
                     seen_t2.add(term)
+                    kind = _structure_kind_label(str(req.get("kind", "feature")))
                     func = str(req.get("function", ""))[:30].replace("|", "／")
                     nearby = str(req.get("nearby_text", ""))[:50].replace("|", "／").replace("\n", " ") or "—"
                     combined_text = str(req.get("nearby_text", "")) + " " + str(req.get("function", ""))
@@ -587,7 +628,7 @@ def _render_blueprint_modules(
                     icon = _STATUS_ICON.get(status, "🔍")
                     customer = str(req.get("source_customer", "")) or "—"
                     platform = _infer_platform(combined_text)
-                    lines.append(f"| {depts} | {sub_name} | {desc_s} | {icon} {status} | {customer} | {platform} |")
+                    lines.append(f"| {kind} | {depts} | {sub_name} | {desc_s} | {icon} {status} | {customer} | {platform} |")
                 lines.append("")
                 gaps = [req for req in sub_r if req.get("code_status") in ("missing", "unmatched")]
                 if gaps:
@@ -884,6 +925,7 @@ def render_prd(inputs: RenderInputs) -> str:
     parts = [
         _render_header(project, stats),
         _render_customer_summary(inputs.doc_map),
+        _render_structure_summary(requirements),
         _render_blueprint_modules(requirements, capabilities, ontology) if ontology else _render_requirement_list(requirements),
         _render_module_summary(requirements),
         "## 4. 功能清单",
