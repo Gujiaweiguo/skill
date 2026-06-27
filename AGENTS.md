@@ -167,6 +167,8 @@ LSP reports many false errors in this repo:
 - **Domain tags** shared between `material-importer/references/domain-tags.md` and `company-intro-generator` — update both if changing tags
 - **winshang-crawler** is self-contained (own `src/`, `pyproject.toml`, separate git history)
 - **YAML OrderedDict 陷阱**（跨 skill）：Python 代码中 **永远不要把 `OrderedDict` 直接 `yaml.dump` 到文件**。`yaml.dump(OrderedDict(...))` 会写入 `!!python/object/apply:collections.OrderedDict` tag，导致 `yaml.safe_load` 报 `ConstructorError`。Python 3.7+ 普通 `dict` 已保序，直接用 `dict`。如需恢复已被污染的文件，用 `yaml.unsafe_load` 读取→转 `dict`→重写。详见 product-prd-generator `references/troubleshooting.md`。
+- **多来源文档合并优先级**（product-prd-generator）：当多个客户/竞品描述同一套系统时，按"系统家族"而非"来源目录"分优先级。例如海鼎/华侨城/锦和同属海鼎系统家族，合并时海鼎骨架优先，其他只补证据。家族检测靠扫描路径段（不限 `/02-competitors/`），因为家族成员会出现在 `01-customer-requirements/` 里。变体标题通过 `_FAMILY_CLAUSE_ALIASES` 归一到标准条款名（如"正式合同"→"新合同申请"）。
+- **xlsx/markitdown 噪音模式**（product-prd-generator）：markitdown 转换 xlsx 时会产生 `Unnamed: N` 列名和 `NaN` 空值，这些会污染 nearby_text。`_extract_nearby_text` 已内置清洗（strip NaN/Unnamed）。纯日期条目（"2026年11月"）和枚举块（"业态代码"下的 200 个行业分类码）需要显式过滤——前者加到 `_NOISE_TEXT_PATTERNS`，后者加到 `_SKIP_SCENARIOS`。
 
 ## Knowledge Persistence
 
