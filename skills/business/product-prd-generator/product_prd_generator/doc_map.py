@@ -738,9 +738,10 @@ def _parse_requirements(
                 clause_parent=clause_parent,
                 clause_path=clause_path,
             )
-            existing = requirements.get(normalized)
+            dedup_key = canonical_heading if canonical_heading.startswith("数据结构") else normalized
+            existing = requirements.get(dedup_key)
             if existing is None or cand.depth > existing.depth:
-                requirements[normalized] = req
+                requirements[dedup_key] = req
 
             if kind == "clause-group":
                 for clause_name, clause_desc in clause_items:
