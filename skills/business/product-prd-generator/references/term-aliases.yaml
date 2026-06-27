@@ -18,6 +18,9 @@ lease-contract-management:
 - 租约
 - 进场条款
 - 自定义条款
+- 居间合同管理
+- 外包合同管理
+- 增值合同管理
 contract-template-management:
 - 合同模板
 - 合同生成
