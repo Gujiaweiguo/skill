@@ -42,7 +42,7 @@ def main() -> int:
         return 1
     if _run("product_prd_generator.reconcile", ["--code-map", str(code_map_path), "--doc-map", str(doc_map_path), "--output", str(reconcile_path)]) != 0:
         return 1
-    if _run("product_prd_generator.render", ["--reconcile", str(reconcile_path), "--doc-map", str(doc_map_path), "--output-dir", args.output_dir]) != 0:
+    if _run("product_prd_generator.render", ["--reconcile", str(reconcile_path), "--doc-map", str(doc_map_path), "--docs-root", args.docs_root, "--output-dir", args.output_dir]) != 0:
         return 1
 
     content_package_path = build_content_package(reconcile_path, doc_map_path, args.output_dir)

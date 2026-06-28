@@ -24,16 +24,18 @@ VERSION_BY_STATUS = {
 class RenderInputs:
     reconcile: dict[str, Any]  # noqa: ANY_OK
     doc_map: dict[str, Any] | None  # noqa: ANY_OK
+    docs_root: str = ""
 
 
 def _load_json(path: str) -> dict[str, Any]:  # noqa: ANY_OK
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def _load_inputs(reconcile_path: str, doc_map_path: str | None) -> RenderInputs:
+def _load_inputs(reconcile_path: str, doc_map_path: str | None, docs_root: str = "") -> RenderInputs:
     return RenderInputs(
         reconcile=_load_json(reconcile_path),
         doc_map=_load_json(doc_map_path) if doc_map_path else None,
+        docs_root=docs_root,
     )
 
 
@@ -917,66 +919,131 @@ def _render_field_table(fields: list[dict[str, Any]]) -> list[str]:  # noqa: ANY
     return "\n".join(lines)
 
 
-def _render_data_model(requirements: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
-    """Render OCR-extracted database table structures as a data model section."""
-    entries = [r for r in requirements if str(r.get("function", "")).startswith("数据结构")]
-    if not entries:
+_DATA_DICT_GLOB = "**/_extracted/haiding-*-model.md"
+_DD_HEADING_RE = re.compile(r"^###\s+`(\w+)`（(.+?)）")
+_DD_FIELD_RE = re.compile(r"^\|\s*(\w+)\s*\|\s*\S+\s*\|\s*(.+?)\s*\|")
+_DD_DOMAIN_TITLE_RE = re.compile(r"^##\s+(.+?)（(\d+)\s*张表）")
+_DD_FIELD_COUNT_RE = re.compile(r"共\s+(\d+)\s*字段")
+
+
+def _parse_data_dict_file(path: Path) -> list[dict[str, Any]]:  # noqa: ANY_OK
+    """Parse one data dictionary md file → list of table dicts."""
+    tables: list[dict[str, Any]] = []
+    cur: dict[str, Any] | None = None
+    cur_domain = ""
+    for line in path.read_text(encoding="utf-8").splitlines():
+        dm = _DD_DOMAIN_TITLE_RE.match(line)
+        if dm:
+            cur_domain = dm.group(1)
+            continue
+        hm = _DD_HEADING_RE.match(line)
+        if hm:
+            if cur:
+                tables.append(cur)
+            cur = {"name": hm.group(1), "cn": hm.group(2), "domain": cur_domain, "fields": []}
+            continue
+        fm = _DD_FIELD_RE.match(line)
+        if fm and cur is not None:
+            cur["fields"].append({"name": fm.group(1), "cn": fm.group(2).strip()})
+    if cur:
+        tables.append(cur)
+    return tables
+
+
+def _pick_key_fields(fields: list[dict[str, str]], n: int = 5) -> str:
+    """Pick the most meaningful field descriptions for a summary."""
+    seen: set[str] = set()
+    picked: list[str] = []
+    for f in fields:
+        cn = f.get("cn", "").strip()
+        if cn and cn not in seen and cn not in ("—", "nan", "null", "None"):
+            picked.append(cn)
+            seen.add(cn)
+        if len(picked) >= n:
+            break
+    return "、".join(picked)
+
+
+def _render_data_model(docs_root: str) -> str:  # noqa: ANY_OK
+    """Render data dictionary tables as a data model section."""
+    if not docs_root:
+        return ""
+    root = Path(docs_root)
+    files = sorted(root.glob(_DATA_DICT_GLOB))
+    if not files:
+        return ""
+
+    all_tables: list[dict[str, Any]] = []  # noqa: ANY_OK
+    file_labels: dict[str, str] = {}
+    for f in files:
+        tables = _parse_data_dict_file(f)
+        label = f.stem
+        short = label.replace("haiding-", "").replace("-model", "")
+        file_labels[short] = str(f)
+        for t in tables:
+            t["source"] = short
+        all_tables.extend(tables)
+
+    if not all_tables:
         return ""
 
     _DOMAIN_MAP = [
-        ("合同主数据层", lambda n: n.startswith("m3contract") or n.startswith("m3rdbcontract")),
-        ("合同申请单层", lambda n: any(n.startswith(p) for p in (
+        ("合同主数据", lambda t: t["name"].startswith("m3contract") or "合同" in t.get("domain", "")),
+        ("合同申请/变更/终止", lambda t: any(t["name"].startswith(p) for p in (
             "m3newcontract", "m3modifycontract", "m3cancelcontract", "m3finishcontract"))),
-        ("合同条款与账款公式", lambda n: n.startswith("m3rdbc")),
-        ("铺位与物业资源", lambda n: n.startswith("m3position") or n.startswith("m3countermand") or n.startswith("m3delivery")),
-        ("商户与品牌", lambda n: n.startswith("m3tenant") or n.startswith("m3brand") or n.startswith("m3merchant") or n.startswith("m3assistant")),
-        ("财务基础与账款", lambda n: n.startswith("ac") or n.startswith("acl")),
+        ("合同条款与账款公式", lambda t: t["name"].startswith("m3rdbc") or "条款" in t.get("domain", "")),
+        ("铺位与物业资源", lambda t: t["name"].startswith("m3position") or t["name"].startswith("blp") or "铺位" in t.get("domain", "")),
+        ("商户与品牌", lambda t: any(t["name"].startswith(p) for p in (
+            "m3tenant", "m3brand", "m3merchant", "m3assistant")) or "商户" in t.get("domain", "")),
+        ("财务基础与科目", lambda t: t["name"].startswith("ac") or "财务" in t.get("domain", "") or "科目" in t.get("domain", "")),
+        ("销售与提成", lambda t: any(t["name"].startswith(p) for p in (
+            "m3sale", "m3gift", "m3product", "m3coupons")) or t.get("source") == "xiaoshou"),
     ]
 
-    table_re = re.compile(r"数据结构\s+(\S+?)（(.+?)）")
-    parsed = []
-    for r in entries:
-        func = str(r.get("function", ""))
-        nearby = str(r.get("nearby_text", ""))
-        m = table_re.search(func)
-        if m:
-            parsed.append({"name": m.group(1), "cn": m.group(2), "detail": nearby})
-        else:
-            name = func.replace("数据结构", "").strip()
-            parsed.append({"name": name, "cn": "", "detail": nearby})
+    total = len(all_tables)
+    lines = [
+        "## 3A. 海鼎数据模型（数据字典提取）",
+        "",
+        f"> 从 CRE 4.1.0 数据字典提取的 {total} 张数据库表，",
+        "> 含字段级中文说明、数据类型、约束条件。按业务域分组展示。",
+        "",
+    ]
 
-    lines = ["## 3A. 合同数据模型（OCR 提取）", ""]
-    lines.append(f"> 从海鼎业务逻辑 PPT 图片中 OCR 提取的 {len(parsed)} 张数据库表，")
-    lines.append("> 已用 SQL DDL 校准表名与字段。按业务域分层展示。")
+    lines.append("**数据来源**：")
+    lines.append("")
+    for short, path_str in sorted(file_labels.items()):
+        lines.append(f"- `{short}`: {path_str}")
     lines.append("")
 
-    used = set()
+    used: set[str] = set()
     for domain_title, matcher in _DOMAIN_MAP:
-        group = [p for p in parsed if matcher(p["name"]) and p["name"] not in used]
+        group = [t for t in all_tables if matcher(t) and t["name"] not in used]
         if not group:
             continue
-        for p in group:
-            used.add(p["name"])
-        group.sort(key=lambda p: p["name"])
+        for t in group:
+            used.add(t["name"])
+        group.sort(key=lambda t: t["name"])
         lines.append(f"### {domain_title}（{len(group)} 张表）")
         lines.append("")
-        lines.append("| 表名 | 中文名 | 字段信息 |")
-        lines.append("| --- | --- | --- |")
-        for p in group:
-            detail = p["detail"].replace("|", "／")[:120] or "—"
-            lines.append(f"| `{p['name']}` | {p['cn'] or '—'} | {detail} |")
+        lines.append("| 表名 | 中文名 | 字段数 | 关键字段 |")
+        lines.append("| --- | --- | --- | --- |")
+        for t in group:
+            field_count = len(t.get("fields", []))
+            key_fields = _pick_key_fields(t.get("fields", []))
+            lines.append(f"| `{t['name']}` | {t.get('cn', '—')} | {field_count} | {key_fields or '—'} |")
         lines.append("")
 
-    remaining = [p for p in parsed if p["name"] not in used]
+    remaining = [t for t in all_tables if t["name"] not in used]
     if remaining:
-        remaining.sort(key=lambda p: p["name"])
+        remaining.sort(key=lambda t: t["name"])
         lines.append(f"### 其他数据表（{len(remaining)} 张）")
         lines.append("")
-        lines.append("| 表名 | 中文名 | 字段信息 |")
-        lines.append("| --- | --- | --- |")
-        for p in remaining:
-            detail = p["detail"].replace("|", "／")[:120] or "—"
-            lines.append(f"| `{p['name']}` | {p['cn'] or '—'} | {detail} |")
+        lines.append("| 表名 | 中文名 | 字段数 | 关键字段 |")
+        lines.append("| --- | --- | --- | --- |")
+        for t in remaining:
+            field_count = len(t.get("fields", []))
+            key_fields = _pick_key_fields(t.get("fields", []))
+            lines.append(f"| `{t['name']}` | {t.get('cn', '—')} | {field_count} | {key_fields or '—'} |")
         lines.append("")
 
     lines.append("---")
@@ -995,7 +1062,7 @@ def render_prd(inputs: RenderInputs) -> str:
         _render_customer_summary(inputs.doc_map),
         _render_structure_summary(requirements),
         _render_blueprint_modules(requirements, capabilities, ontology) if ontology else _render_requirement_list(requirements),
-        _render_data_model(requirements),
+        _render_data_model(inputs.docs_root),
         _render_module_summary(requirements),
         "## 4. 功能清单",
         "",
@@ -1018,11 +1085,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Render PRD markdown from capability-reconciliation.json")
     parser.add_argument("--reconcile", required=True)
     parser.add_argument("--doc-map", default="")
+    parser.add_argument("--docs-root", default="")
     parser.add_argument("--output-dir", default="output")
     args = parser.parse_args()
 
     doc_map_path = args.doc_map if args.doc_map else None
-    inputs = _load_inputs(args.reconcile, doc_map_path)
+    inputs = _load_inputs(args.reconcile, doc_map_path, args.docs_root)
     capabilities = inputs.reconcile.get("capabilities", [])
     requirements = inputs.reconcile.get("requirements", [])
 
