@@ -11,6 +11,14 @@ from typing import Any
 
 import yaml
 
+from .data_model import (
+    TableMeta,
+    get_unmatched,
+    group_by_module,
+    parse_data_dict_files,
+    pick_key_fields,
+)
+
 
 VERSION_BY_STATUS = {
     "existing": "P3",
@@ -479,10 +487,27 @@ def _infer_platform(text: str) -> str:
     return "PC端"
 
 
+def _render_mod_tables(mod_tables: list[TableMeta]) -> list[str]:
+    if not mod_tables:
+        return []
+    lines = [
+        f"**数据模型**（{len(mod_tables)} 张表）：",
+        "",
+        "| 表名 | 中文名 | 字段数 | 关键字段 |",
+        "| --- | --- | --- | --- |",
+    ]
+    for t in sorted(mod_tables, key=lambda x: x.name):
+        kf = pick_key_fields(t.fields)
+        lines.append(f"| `{t.name}` | {t.cn} | {len(t.fields)} | {kf or '—'} |")
+    lines.append("")
+    return lines
+
+
 def _render_blueprint_modules(
     requirements: list[dict[str, Any]],  # noqa: ANY_OK
     capabilities: list[dict[str, Any]],  # noqa: ANY_OK
     ontology: dict[str, Any],  # noqa: ANY_OK
+    tables_by_module: dict[str, list[TableMeta]] | None = None,
 ) -> str:
     """Render PRD by business module — blueprint style with field-level specs."""
     modules = ontology.get("modules", {})
@@ -511,6 +536,7 @@ def _render_blueprint_modules(
         mod_caps = [cap_by_id[c] for c in mod_cap_ids if c in cap_by_id]
         existing_count = sum(1 for c in mod_caps if c.get("reconciled_status") == "existing")
         missing_count = sum(1 for c in mod_caps if c.get("reconciled_status") == "missing")
+        mod_tables = (tables_by_module or {}).get(mod_name, [])
         lines.append(f"### 3.{idx + 1} {mod_name}")
         lines.append("")
         desc = mod_data.get("description", "")
@@ -521,7 +547,10 @@ def _render_blueprint_modules(
         if aliases:
             lines.append(f"**关键词**：{', '.join(str(a) for a in aliases[:6])}")
             lines.append("")
-        lines.append(f"**需求**：{len(reqs)} 条 | **能力**：{len(mod_caps)} 项（✅{existing_count} / ❌{missing_count}）")
+        header = f"**需求**：{len(reqs)} 条 | **能力**：{len(mod_caps)} 项（✅{existing_count} / ❌{missing_count}）"
+        if mod_tables:
+            header += f" | **数据表**：{len(mod_tables)} 张"
+        lines.append(header)
         lines.append("")
         if reqs:
             kind_counts = Counter(_structure_kind_label(str(req.get("kind", "feature"))) for req in reqs)
@@ -552,6 +581,7 @@ def _render_blueprint_modules(
                             lines.append(f"#### {sub_name}")
                             lines.append(f"- {icon} {cap.get('name', cap_ids[0])[:30]}")
                             lines.append("")
+            lines.extend(_render_mod_tables(mod_tables))
             lines.append("---")
             lines.append("")
             continue
@@ -657,6 +687,7 @@ def _render_blueprint_modules(
             if ungrouped_funcs:
                 lines.append(f"**其他**：{', '.join(ungrouped_funcs)}")
                 lines.append("")
+        lines.extend(_render_mod_tables(mod_tables))
         lines.append("---")
         lines.append("")
     return "\n".join(lines)
@@ -763,291 +794,25 @@ def _render_field_table(fields: list[dict[str, Any]]) -> list[str]:  # noqa: ANY
         lines.append(f"| {fname} | {ftype} | {req} | {edit} | {fdesc} |")
     lines.append("")
     return lines
-    for idx, (mod_name, mod_data) in enumerate(modules.items()):
-        if not isinstance(mod_data, dict):
-            continue
-        reqs = module_reqs.get(mod_name, [])
-        sub_funcs = mod_data.get("sub_functions", {})
-        mod_cap_ids: set[str] = set()
-        for sub in sub_funcs.values():
-            if isinstance(sub, dict):
-                for cap_id in sub.get("capabilities", []):
-                    mod_cap_ids.add(str(cap_id))
-        mod_caps = [cap_by_id[c] for c in mod_cap_ids if c in cap_by_id]
-        existing_count = sum(1 for c in mod_caps if c.get("reconciled_status") == "existing")
-        missing_count = sum(1 for c in mod_caps if c.get("reconciled_status") == "missing")
-        lines.append(f"### 3.{idx + 1} {mod_name}")
-        lines.append("")
-        desc = mod_data.get("description", "")
-        if desc:
-            lines.append(f"> {desc}")
-            lines.append("")
-        aliases = mod_data.get("aliases", [])
-        if aliases:
-            lines.append(f"**关键词**：{', '.join(str(a) for a in aliases[:6])}")
-            lines.append("")
-        lines.append(f"**需求**：{len(reqs)} 条 | **能力**：{len(mod_caps)} 项（✅{existing_count} / ❌{missing_count}）")
-        lines.append("")
-
-        # Group requirements by sub_function
-        sub_groups: dict[str, list[dict[str, Any]]] = defaultdict(list)  # noqa: ANY_OK
-        ungrouped: list[dict[str, Any]] = []
-        for req in reqs:
-            func_text = str(req.get("function", "")) + " " + str(req.get("nearby_text", ""))
-            matched_sub = False
-            for sub_name, sub_data in sub_funcs.items():
-                if not isinstance(sub_data, dict):
-                    continue
-                for term in sub_data.get("terms", []):
-                    if isinstance(term, str) and term in func_text:
-                        sub_groups[sub_name].append(req)
-                        matched_sub = True
-                        break
-                if matched_sub:
-                    break
-            if not matched_sub:
-                ungrouped.append(req)
-
-        for sub_name, sub_data in sub_funcs.items():
-            if not isinstance(sub_data, dict):
-                continue
-            sub_r = sub_groups.get(sub_name, [])
-            sub_role = str(sub_data.get("role", "—"))
-            curated = sub_data.get("scenarios", [])
-            lines.append(f"#### {sub_name}" + (f"（{sub_role}）" if sub_role != "—" else ""))
-            lines.append("")
-
-            if curated and isinstance(curated, list):
-                for sc in curated:
-                    if not isinstance(sc, dict):
-                        continue
-                    sc_name = str(sc.get("name", ""))
-                    sc_desc = str(sc.get("description", ""))
-                    sc_source = str(sc.get("source", ""))
-                    cap_ids = sub_data.get("capabilities", [])
-                    cap = cap_by_id.get(str(cap_ids[0])) if cap_ids else None
-                    status = str(cap.get("reconciled_status", "existing")) if cap else "existing"
-                    icon = _STATUS_ICON.get(status, "✅")
-                    lines.append(f"> **{sc_name}**")
-                    lines.append(f"> {sc_desc}")
-                    if sc_source:
-                        lines.append(f"> — 来源：{sc_source} | 状态：{icon} {status}")
-                    lines.append("")
-                # Also show extracted evidence if available
-                if sub_r:
-                    lines.append("*客户需求证据*：")
-                    seen_t: set[str] = set()
-                    for req in sorted(sub_r, key=lambda r: r.get("priority", "低"))[:5]:
-                        term = req.get("normalized_term", "")
-                        if term in seen_t:
-                            continue
-                        seen_t.add(term)
-                        func = str(req.get("function", ""))[:30]
-                        customer = str(req.get("source_customer", "")) or "—"
-                        lines.append(f"- {func}（{customer}）")
-                    lines.append("")
-            elif sub_r:
-                lines.append("| 角色 | 场景 | 场景描述 | 状态 | 来源 | 端点 |")
-                lines.append("|------|------|---------|------|------|------|")
-                seen_t: set[str] = set()
-                for req in sorted(sub_r, key=lambda r: r.get("priority", "低")):
-                    term = req.get("normalized_term", "")
-                    if term in seen_t:
-                        continue
-                    seen_t.add(term)
-                    func = str(req.get("function", ""))[:30].replace("|", "／")
-                    nearby = str(req.get("nearby_text", ""))[:50].replace("|", "／").replace("\n", " ") or "—"
-                    combined_text = str(req.get("nearby_text", "")) + " " + str(req.get("function", ""))
-                    depts = _extract_depts(combined_text)
-                    desc = f"{func}：{nearby[:40]}" if nearby != "—" else func
-                    status = str(req.get("code_status", "unmatched"))
-                    icon = _STATUS_ICON.get(status, "🔍")
-                    customer = str(req.get("source_customer", "")) or "—"
-                    platform = _infer_platform(combined_text)
-                    lines.append(f"| {depts} | {sub_name} | {desc} | {icon} {status} | {customer} | {platform} |")
-                lines.append("")
-                # Scenarios
-                scenarios = [
-                    req for req in sub_r
-                    if len(str(req.get("nearby_text", ""))) > 30
-                    and any(role in str(req.get("nearby_text", "")) for role in _ROLE_KEYWORDS)
-                ]
-                if scenarios:
-                    lines.append("**用户场景**：")
-                    lines.append("")
-                    seen_s: set[str] = set()
-                    for req in scenarios[:3]:
-                        nearby = str(req.get("nearby_text", ""))[:150]
-                        if nearby in seen_s:
-                            continue
-                        seen_s.add(nearby)
-                        func = req.get("function", "")
-                        customer = req.get("source_customer", "")
-                        doc_type = _classify_doc_type(req.get("source_file", ""))
-                        lines.append(f"> **{func}**")
-                        lines.append(f"> {nearby}")
-                        if customer:
-                            lines.append(f"> — {customer}（{doc_type}）")
-                        lines.append("")
-            else:
-                cap_ids = sub_data.get("capabilities", [])
-                if cap_ids:
-                    cap = cap_by_id.get(str(cap_ids[0]))
-                    if cap:
-                        status = str(cap.get("reconciled_status", "missing"))
-                        icon = _STATUS_ICON.get(status, "🔍")
-                        lines.append(f"- {icon} **{cap.get('name', cap_ids[0])[:30]}** ({cap_ids[0]})")
-                        terms = sub_data.get("terms", [])
-                        if terms:
-                            lines.append(f"  术语：{', '.join(str(t) for t in terms[:5])}")
-                        lines.append("")
-            # Gaps
-            gaps = [req for req in sub_r if req.get("code_status") in ("missing", "unmatched")]
-            if gaps:
-                gap_funcs = sorted(set(str(r.get("function", ""))[:25] for r in gaps))[:8]
-                if gap_funcs:
-                    lines.append(f"**差距**：{', '.join(gap_funcs)}")
-                    lines.append("")
-
-        if ungrouped:
-            ungrouped_funcs = sorted(set(str(r.get("function", ""))[:25] for r in ungrouped))[:10]
-            if ungrouped_funcs:
-                lines.append(f"**其他**：{', '.join(ungrouped_funcs)}")
-                lines.append("")
-        lines.append("---")
-        lines.append("")
-    return "\n".join(lines)
 
 
-_DATA_DICT_GLOB = "**/_extracted/haiding-*-model.md"
-_DD_HEADING_RE = re.compile(r"^###\s+`(\w+)`（(.+?)）")
-_DD_FIELD_RE = re.compile(r"^\|\s*(\w+)\s*\|\s*\S+\s*\|\s*(.+?)\s*\|")
-_DD_DOMAIN_TITLE_RE = re.compile(r"^##\s+(.+?)（(\d+)\s*张表）")
-_DD_FIELD_COUNT_RE = re.compile(r"共\s+(\d+)\s*字段")
-
-
-def _parse_data_dict_file(path: Path) -> list[dict[str, Any]]:  # noqa: ANY_OK
-    """Parse one data dictionary md file → list of table dicts."""
-    tables: list[dict[str, Any]] = []
-    cur: dict[str, Any] | None = None
-    cur_domain = ""
-    for line in path.read_text(encoding="utf-8").splitlines():
-        dm = _DD_DOMAIN_TITLE_RE.match(line)
-        if dm:
-            cur_domain = dm.group(1)
-            continue
-        hm = _DD_HEADING_RE.match(line)
-        if hm:
-            if cur:
-                tables.append(cur)
-            cur = {"name": hm.group(1), "cn": hm.group(2), "domain": cur_domain, "fields": []}
-            continue
-        fm = _DD_FIELD_RE.match(line)
-        if fm and cur is not None:
-            cur["fields"].append({"name": fm.group(1), "cn": fm.group(2).strip()})
-    if cur:
-        tables.append(cur)
-    return tables
-
-
-def _pick_key_fields(fields: list[dict[str, str]], n: int = 5) -> str:
-    """Pick the most meaningful field descriptions for a summary."""
-    seen: set[str] = set()
-    picked: list[str] = []
-    for f in fields:
-        cn = f.get("cn", "").strip()
-        if cn and cn not in seen and cn not in ("—", "nan", "null", "None"):
-            picked.append(cn)
-            seen.add(cn)
-        if len(picked) >= n:
-            break
-    return "、".join(picked)
-
-
-def _render_data_model(docs_root: str) -> str:  # noqa: ANY_OK
-    """Render data dictionary tables as a data model section."""
-    if not docs_root:
+def _render_data_model_index(tables_by_module: dict[str, list[TableMeta]], unmatched: list[TableMeta]) -> str:
+    if not tables_by_module and not unmatched:
         return ""
-    root = Path(docs_root)
-    files = sorted(root.glob(_DATA_DICT_GLOB))
-    if not files:
-        return ""
-
-    all_tables: list[dict[str, Any]] = []  # noqa: ANY_OK
-    file_labels: dict[str, str] = {}
-    for f in files:
-        tables = _parse_data_dict_file(f)
-        label = f.stem
-        short = label.replace("haiding-", "").replace("-model", "")
-        file_labels[short] = str(f)
-        for t in tables:
-            t["source"] = short
-        all_tables.extend(tables)
-
-    if not all_tables:
-        return ""
-
-    _DOMAIN_MAP = [
-        ("合同主数据", lambda t: t["name"].startswith("m3contract") or "合同" in t.get("domain", "")),
-        ("合同申请/变更/终止", lambda t: any(t["name"].startswith(p) for p in (
-            "m3newcontract", "m3modifycontract", "m3cancelcontract", "m3finishcontract"))),
-        ("合同条款与账款公式", lambda t: t["name"].startswith("m3rdbc") or "条款" in t.get("domain", "")),
-        ("铺位与物业资源", lambda t: t["name"].startswith("m3position") or t["name"].startswith("blp") or "铺位" in t.get("domain", "")),
-        ("商户与品牌", lambda t: any(t["name"].startswith(p) for p in (
-            "m3tenant", "m3brand", "m3merchant", "m3assistant")) or "商户" in t.get("domain", "")),
-        ("财务基础与科目", lambda t: t["name"].startswith("ac") or "财务" in t.get("domain", "") or "科目" in t.get("domain", "")),
-        ("销售与提成", lambda t: any(t["name"].startswith(p) for p in (
-            "m3sale", "m3gift", "m3product", "m3coupons")) or t.get("source") == "xiaoshou"),
-    ]
-
-    total = len(all_tables)
+    total = sum(len(v) for v in tables_by_module.values()) + len(unmatched)
     lines = [
-        "## 3A. 海鼎数据模型（数据字典提取）",
+        "## 3A. 数据模型汇总",
         "",
-        f"> 从 CRE 4.1.0 数据字典提取的 {total} 张数据库表，",
-        "> 含字段级中文说明、数据类型、约束条件。按业务域分组展示。",
+        f"> 海鼎 CRE 4.1.0 数据字典共 {total} 张表，已融合到各业务模块（3.1-3.12）。本节为索引。",
         "",
+        "| 模块 | 表数 |",
+        "| --- | --- |",
     ]
-
-    lines.append("**数据来源**：")
-    lines.append("")
-    for short, path_str in sorted(file_labels.items()):
-        lines.append(f"- `{short}`: {path_str}")
-    lines.append("")
-
-    used: set[str] = set()
-    for domain_title, matcher in _DOMAIN_MAP:
-        group = [t for t in all_tables if matcher(t) and t["name"] not in used]
-        if not group:
-            continue
-        for t in group:
-            used.add(t["name"])
-        group.sort(key=lambda t: t["name"])
-        lines.append(f"### {domain_title}（{len(group)} 张表）")
-        lines.append("")
-        lines.append("| 表名 | 中文名 | 字段数 | 关键字段 |")
-        lines.append("| --- | --- | --- | --- |")
-        for t in group:
-            field_count = len(t.get("fields", []))
-            key_fields = _pick_key_fields(t.get("fields", []))
-            lines.append(f"| `{t['name']}` | {t.get('cn', '—')} | {field_count} | {key_fields or '—'} |")
-        lines.append("")
-
-    remaining = [t for t in all_tables if t["name"] not in used]
-    if remaining:
-        remaining.sort(key=lambda t: t["name"])
-        lines.append(f"### 其他数据表（{len(remaining)} 张）")
-        lines.append("")
-        lines.append("| 表名 | 中文名 | 字段数 | 关键字段 |")
-        lines.append("| --- | --- | --- | --- |")
-        for t in remaining:
-            field_count = len(t.get("fields", []))
-            key_fields = _pick_key_fields(t.get("fields", []))
-            lines.append(f"| `{t['name']}` | {t.get('cn', '—')} | {field_count} | {key_fields or '—'} |")
-        lines.append("")
-
-    lines.append("---")
-    lines.append("")
+    for mod, tables in sorted(tables_by_module.items(), key=lambda x: -len(x[1])):
+        lines.append(f"| {mod} | {len(tables)} |")
+    if unmatched:
+        lines.append(f"| 其他（未归类） | {len(unmatched)} |")
+    lines.extend(["", "---", ""])
     return "\n".join(lines)
 
 
@@ -1057,12 +822,15 @@ def render_prd(inputs: RenderInputs) -> str:
     requirements = inputs.reconcile.get("requirements", [])
     stats = _status_stats(capabilities)
     ontology = _load_ontology()
+    all_tables = parse_data_dict_files(inputs.docs_root)
+    tables_by_mod = group_by_module(all_tables)
+    unmatched_tables = get_unmatched(all_tables)
     parts = [
         _render_header(project, stats),
         _render_customer_summary(inputs.doc_map),
         _render_structure_summary(requirements),
-        _render_blueprint_modules(requirements, capabilities, ontology) if ontology else _render_requirement_list(requirements),
-        _render_data_model(inputs.docs_root),
+        _render_blueprint_modules(requirements, capabilities, ontology, tables_by_mod) if ontology else _render_requirement_list(requirements),
+        _render_data_model_index(tables_by_mod, unmatched_tables),
         _render_module_summary(requirements),
         "## 4. 功能清单",
         "",

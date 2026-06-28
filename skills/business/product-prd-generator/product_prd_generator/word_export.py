@@ -12,6 +12,13 @@ from typing import Any
 
 import yaml
 
+from .data_model import (
+    TableMeta,
+    group_by_module,
+    parse_data_dict_files,
+    pick_key_fields,
+)
+
 _CONTROL_CHARS = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
 
 
@@ -417,6 +424,7 @@ def _classify_mod_w(req: dict[str, Any], ontology: dict[str, Any]) -> str:
 def _render_blueprint_section(
     requirements: list[dict[str, Any]],
     capabilities: list[dict[str, Any]],
+    docs_root: str = "",
 ) -> list[str]:
     """Blueprint-style module breakdown for Word export."""
     ontology = _load_ontology_w()
@@ -428,6 +436,9 @@ def _render_blueprint_section(
     mod_reqs: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for req in requirements:
         mod_reqs[_classify_mod_w(req, ontology)].append(req)
+
+    all_tables = parse_data_dict_files(docs_root)
+    tables_by_mod = group_by_module(all_tables)
 
     lines: list[str] = []
     for idx, (mod_name, mod_data) in enumerate(modules.items()):
@@ -446,6 +457,7 @@ def _render_blueprint_section(
         mod_caps = [cap_by_id[c] for c in mod_cap_ids if c in cap_by_id]
         existing = sum(1 for c in mod_caps if c.get("reconciled_status") == "existing")
         missing = sum(1 for c in mod_caps if c.get("reconciled_status") == "missing")
+        mod_tables = tables_by_mod.get(mod_name, [])
 
         lines.append(f"### 3.{idx + 1} {mod_name}")
         lines.append("")
@@ -455,7 +467,10 @@ def _render_blueprint_section(
         if kw_str:
             lines.append(f"**关键词**：{kw_str}")
             lines.append("")
-        lines.append(f"需求 {len(reqs)} 条 | 能力 {len(mod_caps)} 项（✅{existing} / ❌{missing}）")
+        header = f"需求 {len(reqs)} 条 | 能力 {len(mod_caps)} 项（✅{existing} / ❌{missing}）"
+        if mod_tables:
+            header += f" | 数据表 {len(mod_tables)} 张"
+        lines.append(header)
         lines.append("")
 
         # Group by sub_function
@@ -530,13 +545,23 @@ def _render_blueprint_section(
                         lines.append(f"- {icon} {cap.get('name', cap_ids[0])[:30]}")
                         lines.append("")
 
+        if mod_tables:
+            lines.append(f"**数据模型**（{len(mod_tables)} 张表）：")
+            lines.append("")
+            lines.append("| 表名 | 中文名 | 字段数 | 关键字段 |")
+            lines.append("| --- | --- | --- | --- |")
+            for t in sorted(mod_tables, key=lambda x: x.name):
+                kf = pick_key_fields(t.fields)
+                lines.append(f"| `{t.name}` | {t.cn} | {len(t.fields)} | {kf or '—'} |")
+            lines.append("")
+
         lines.append("---")
         lines.append("")
 
     return _chapter_with_lines("3. 业务模块详细设计", lines, page_break=False)
 
 
-def build_content_package(reconcile_path: str | Path, doc_map_path: str | Path | None, output_dir: str | Path) -> Path:
+def build_content_package(reconcile_path: str | Path, doc_map_path: str | Path | None, output_dir: str | Path, docs_root: str = "") -> Path:
     reconcile = _load_json(reconcile_path)
     doc_map = _load_json(doc_map_path) if doc_map_path else None
     capabilities = list(reconcile.get("capabilities", []))
@@ -552,7 +577,7 @@ def build_content_package(reconcile_path: str | Path, doc_map_path: str | Path |
         "",
         *_render_baseline_section(stats, capabilities),
         *_render_customer_section(doc_map),
-        *_render_blueprint_section(list(reconcile.get("requirements", [])), capabilities),
+        *_render_blueprint_section(list(reconcile.get("requirements", [])), capabilities, docs_root),
         *_render_feature_section(capabilities),
         *_render_unmatched_section(capabilities),
         *_render_gap_section(capabilities),
