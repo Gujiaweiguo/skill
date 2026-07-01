@@ -128,9 +128,9 @@ uv run scripts/ocr_extract.py <input_dir> [<input_dir> ...] \
 
 # Example: extract Haiding contract table structures from PPT images
 uv run scripts/ocr_extract.py \
-  /opt/code/docs/lanlnk/prd/projects/商管系统/raw/02-competitors/海鼎/业务逻辑 \
-  --sql-dir /opt/code/docs/lanlnk/prd/projects/商管系统/input/02-competitors/海鼎/数据结构 \
-  --output-dir /opt/code/docs/lanlnk/prd/projects/商管系统/raw/02-competitors/海鼎/业务逻辑/_extracted
+  /opt/code/docs/lanlnk/prd/商管系统/raw/02-competitors/海鼎/业务逻辑 \
+  --sql-dir /opt/code/docs/lanlnk/prd/商管系统/input/02-competitors/海鼎/数据结构 \
+  --output-dir /opt/code/docs/lanlnk/prd/商管系统/raw/02-competitors/海鼎/业务逻辑/_extracted
 ```
 
 Outputs: `slides.jsonl` (per-image OCR + bbox), `tables.jsonl` (table names + SQL calibration), `all-ocr.md` (human-readable), `manifest.json`.
@@ -197,6 +197,11 @@ LSP reports many false errors in this repo:
 - **OCR 增量 checkpoint**（material-importer）：`ocr_extract.py` 每张图 OCR 完立即 append 到 `slides.jsonl`（`flush()` 后再继续）。`--skip-existing` 从已有 `slides.jsonl` 读取已处理图片路径，跳过不重跑。聚合输出（`tables.jsonl`/`all-ocr.md`/`manifest.json`）只在最后从 `slides.jsonl` 重建。这样即使超时被 kill，已处理的结果不丢，下次 `--skip-existing` 续跑。
 - **Markdown 矩阵表格列名陷阱**（跨 skill，product-prd-generator/bid-doc-master/word-master）：YAML `markdown` 字段里的 markdown 表格列名**不能含特殊字符**（`→`/`←`/`*`/`#` 等）。分隔符行 `| → |` 不是合法对齐说明符（合法的是 `---`/`:---`/`---:`/`:---:`），会导致 markdown 解析器无法识别表格结构，整张表格渲染为纯文本。**修复**：把特殊字符合并到相邻列（如 `| 源模块 | → | 目标模块 |` → `| 联动路径（源→目标） |`）。影响范围：所有用 markdown 矩阵渲染的 skill（product-prd-generator `render.py` 的 `markdown` 字段、bid-doc-master 表格、word-master 表格）。
 - **ontology 与 field-specs 全局同步**（product-prd-generator）：`business-ontology.yaml` 的 `sub_functions` 如果有旧名称而 `module-field-specs.yaml` 没有对应实体，渲染器会**静默产生空 `####` 标题**（有标题无内容，不报错）。每次大改后必须做全局同步检查：`for mod in specs: assert ont_subs[mod] == set(specs[mod].keys())`。常见原因：重命名实体后只改了 field-specs 忘了改 ontology，或删除实体后只删了 field-specs 忘了删 ontology。
+- **PRD→实施交接边界**（跨系统规划）：做商管/CRM/供应链等产品 PRD 后，默认只输出“目标蓝图 + PRD-vs-代码差异 + 分期 + 验收链路”交接文档，不在 PRD skill 会话里直接修改业务系统代码。业务系统（如 `/opt/code/mi`）自己基于交接文档拆 OpenSpec change、迁移、接口、前端和测试。避免 PRD 生成上下文漂移成实现上下文。
+- **分期按业务闭环而非模块名**（跨系统规划）：P0 必须是可上线运营的最小端到端闭环，不是“每个核心模块做一点”。商管例：资源→招商→合同→财务→营运/物业→退出→资源释放；CRM 例：线索→客户→商机→报价/合同→回款/服务→续约。P1 放交付可用性与管控增强（移动端、报表、流程增强、关键分析/对账），P2 放数据决策/集团管控/深度集成，P3 放非主闭环拓展能力。
+- **资源/对象 taxonomy 要先统一再分期**（跨系统规划）：不要用窄词误导阶段范围。商管“铺位/位置/资源”包含铺位、单元、场地、广告位、车位、多经点位；CRM“客户”可能包含线索、联系人、企业客户、门店、渠道伙伴、会员等。先定义统一对象模型和别名，再做差异与实施阶段。
+- **AI 产品族术语口径**（跨 skill，product-prd-generator/strategy-brief-generator/company-intro-generator 都会碰到）：蓝联 AI 产品族有 3 个产品，代号演变历史必须记住：(1) **LnkChatBI** = CREAISkill 文档里的 `mysqlbot` = 更早的 `SQLBot`，三者同一产品（rebrand-migration spec 实证，代码 header 仍保留 `X-SQLBOT-ASK-TOKEN`）。(2) **langchat** 是第三方开源 fork（git remote: `Gujiaweiguo/langchat`），蓝联零源码改造；蓝联在它之上构建岗位 AI Skill 工作流产品。(3) **mymaxkb 产品已被 langchat 取代**——OrchestratorAgent 代码里 `system: maxkb` / `MaxKBApiExecutor` 是 legacy 标识符，产品实际为 langchat。写 PRD/方案/汇报时统一用现名（LnkChatBI / langchat），代码引用保留 legacy 名并加注。术语权威来源：`$LANLNK_BASE/prd/AI产品族架构.md` §9 术语对照表。
+- **deep task 大产出拆分策略**（跨 skill，delegation 经验）：一个 deep task 一次性生成 8 个大文件（每个 200-8000 行）会卡住——实测 LnkChatBI PRD task 跑 31 分钟后 0 文件产出，被迫取消手工重写。**正确做法**：(1) 8 文件套件拆成 2-3 个 task（每个 3-4 文件）；(2) 或先 fire task 做简单文件（功能清单/需求清单/差距分析），再手工写核心文件（产品PRD）；(3) 给 task 明确的 per-file 行数上限（如"每个文件不超过 500 行"），避免模型在单文件上耗尽 token。
 
 ## Knowledge Persistence
 
@@ -295,6 +300,7 @@ subprocess.run(
 |---|---|
 | `material-importer/references/domain-tags.md` | material-importer, company-intro-generator |
 | `product-prd-generator/references/term-aliases.yaml` | product-prd-generator (currently solo, but structure ready for sharing) |
+| `$LANLNK_BASE/prd/商管系统/域知识.md` | product-prd-generator (商管 project only; 域知识跟着项目走，不放 skill 目录) |
 | `$LANLNK_BASE/knowledge/business-ontology.yaml` | product-prd-generator (runtime dependency; ready for company-intro-generator, bid-doc-master) |
 
 ## OpenSpec Workflow
