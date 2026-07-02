@@ -5,6 +5,12 @@ node_modules/
 .env
 .env.local
 
+# Playwright MCP runtime artifacts (console logs, page snapshots)
+.playwright-mcp/
+
+# OpenCode runtime state (sessions, continuation, etc.)
+.omo/
+
 # OpenSpec transient artifacts
 openspec/changes/*/proposal.md
 openspec/changes/*/design.md
@@ -33,7 +39,7 @@ skills/word/word-master/templates/_analysis_report.json
 skills/word/word-master/test/*.docx
 skills/word/word-master/output/
 skills/ppt/ppt-master/output/
-# Generated artifacts
+skills/ppt/mckinsey-pptx/slides/output/
 skills/business/product-prd-generator/output/
 skills/business/product-prd-generator/parsed/
 skills/business/product-prd-generator/review/
