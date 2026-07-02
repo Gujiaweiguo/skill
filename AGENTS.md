@@ -185,7 +185,9 @@ LSP reports many false errors in this repo:
 
 - **Conventional commits**: `feat(scope): ...`, `fix(scope): ...`, `docs: ...`, `refactor: ...`
 - **No CI, no linting, no formatter** — repo is markdown + Python scripts
-- **Generated artifacts** gitignored: `_analysis_report.json`, `test/*.docx`, `output/`
+- **Generated artifacts gitignore 约定**（跨 skill）：skill 仓库的 `.gitignore` 覆盖三类生成产物：(1) **统一 `output/` 目录** — 各 skill 的 `skills/<path>/<skill>/output/`；(2) **运行时状态** — `.playwright-mcp/`（Playwright 日志）、`.omo/`（OpenCode 会话）；(3) **lock 文件** — `*.lock`（匹配 `uv.lock`）和 `package-lock.json`（`*.lock` **不匹配** `package-lock.json`，因为扩展名是 `.json` 不是 `.lock`，Node skill 必须显式加这条）。新建 skill 后检查是否有未 gitignore 的生成产物（如一次性 PPT 生成脚本 `slides/compile.js`）。
+- **文档输出路径统一在 lanlnk 下**（跨 skill）：所有 skill 的文档输出基目录都必须解析到 `/opt/code/docs/lanlnk/` 下。`$LANLNK_BASE = /opt/code/docs/lanlnk`，`$USERGUIDE_BASE = /opt/code/docs/lanlnk/UserGuide`（在 lanlnk 内）。新 skill 的默认路径不要写成独立的 `/opt/code/docs/xxx/`，必须挂到 lanlnk 子目录。
+- **Gitignored 文件中的旧路径不需要手动修正**（跨 skill）：全局路径迁移时，`openspec/changes/archive/`（历史快照，只读）和 `*/parsed/`（生成产物）中的旧路径不需要手动改——前者是不可变历史，后者下次运行自动刷新。只修 git tracked 的源文件。
 - **Domain tags** shared between `material-importer/references/domain-tags.md` and `company-intro-generator` — update both if changing tags
 - **winshang-crawler** is self-contained (own `src/`, `pyproject.toml`, separate git history)
 - **YAML OrderedDict 陷阱**（跨 skill）：Python 代码中 **永远不要把 `OrderedDict` 直接 `yaml.dump` 到文件**。`yaml.dump(OrderedDict(...))` 会写入 `!!python/object/apply:collections.OrderedDict` tag，导致 `yaml.safe_load` 报 `ConstructorError`。Python 3.7+ 普通 `dict` 已保序，直接用 `dict`。如需恢复已被污染的文件，用 `yaml.unsafe_load` 读取→转 `dict`→重写。详见 product-prd-generator `references/troubleshooting.md`。
