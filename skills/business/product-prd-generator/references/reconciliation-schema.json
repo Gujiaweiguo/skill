@@ -4,7 +4,7 @@
   "generated_at": "2026-06-25T00:00:00Z",
   "source_paths": {
     "code": "/opt/code/mi",
-    "docs": "/opt/code/docs/lanlnk/prd/projects/商管系统/raw",
+    "docs": "/opt/code/docs/lanlnk/prd/商管系统/raw",
     "specs": "/opt/code/mi/openspec/specs",
     "alignment": "/opt/code/mi/artifacts/alignment"
   },

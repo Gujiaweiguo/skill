@@ -12,7 +12,7 @@ description: |-
 compatibility: >
   Pure template skill — 无 Python 依赖、无脚本、无 uv sync。
   Agent 直接读取 references/ 下的模板文件。
-  Requires `$USERGUIDE_BASE` env var (default `/opt/code/docs/UserGuide/`).
+  Requires `$USERGUIDE_BASE` env var (default `/opt/code/docs/lanlnk/UserGuide/`).
 ---
 
 # Ops Manual Generator - 系统部署与维护手册生成器
@@ -177,7 +177,7 @@ $USERGUIDE_BASE/{name}/
 
 | 变量 | 默认值 | 作用 |
 |------|--------|------|
-| `$USERGUIDE_BASE` | `/opt/code/docs/UserGuide/` | 文档根目录 |
+| `$USERGUIDE_BASE` | `/opt/code/docs/lanlnk/UserGuide/` | 文档根目录 |
 
 无 CLI flags、无 per-app config.yaml、无 Python 依赖——agent 直接对话收集所有变量输入。
 

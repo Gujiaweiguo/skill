@@ -19,7 +19,7 @@ The skill SHALL execute the documentation pipeline in fixed phase order: **P0 çŽ
 
 ### Requirement: UserGUIDE_BASE Environment Variable
 
-The skill SHALL read `$USERGUIDE_BASE` to determine the documentation root. When unset, the skill SHALL default to `/opt/code/docs/UserGuide/`. The skill SHALL NOT write any documentation output outside `$USERGUIDE_BASE`.
+The skill SHALL read `$USERGUIDE_BASE` to determine the documentation root. When unset, the skill SHALL default to `/opt/code/docs/lanlnk/UserGuide/`. The skill SHALL NOT write any documentation output outside `$USERGUIDE_BASE`.
 
 #### Scenario: Env var explicitly set
 
@@ -29,7 +29,7 @@ The skill SHALL read `$USERGUIDE_BASE` to determine the documentation root. When
 #### Scenario: Env var unset uses default
 
 - **WHEN** `$USERGUIDE_BASE` is not set
-- **THEN** the skill uses `/opt/code/docs/UserGuide/` and informs the user that the default is being used
+- **THEN** the skill uses `/opt/code/docs/lanlnk/UserGuide/` and informs the user that the default is being used
 
 ### Requirement: Software Name Discovery
 

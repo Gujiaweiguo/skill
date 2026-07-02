@@ -16,7 +16,7 @@ Two skill types:
 | OpenCode symlinks | `.opencode/skills/<name>` → `../../skills/...` (relative) or `/opt/code/skill/skills/...` (absolute) |
 | OpenSpec commands | `.opencode/command/opsx-*.md` |
 | External data (business skills) | `$LANLNK_BASE` = `/opt/code/docs/lanlnk` (not in this repo) |
-| External data (user guides) | `$USERGUIDE_BASE` = `/opt/code/docs/UserGuide` (not in this repo) |
+| External data (user guides) | `$USERGUIDE_BASE` = `/opt/code/docs/lanlnk/UserGuide` (not in this repo) |
 | Config | `config/lanlnk.yaml` |
 
 **Never edit** `.opencode/skills/openspec-*/` — these are upstream artifacts.
@@ -25,7 +25,7 @@ Two skill types:
 
 ```bash
 export LANLNK_BASE=/opt/code/docs/lanlnk           # required for business/ppt/word skills
-export USERGUIDE_BASE=/opt/code/docs/UserGuide     # required for doc-generator skill
+export USERGUIDE_BASE=/opt/code/docs/lanlnk/UserGuide     # required for doc-generator skill
 ```
 
 Python skills use **uv exclusively** (never pip). Each skill has its own `.venv`:

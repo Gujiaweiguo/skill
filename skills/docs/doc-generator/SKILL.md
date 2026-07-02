@@ -9,13 +9,13 @@ description: |-
   当用户提供一个运行中的 SPA 应用（含源码）并要求生成操作文档时，触发此 skill。
 compatibility: >
   Requires Python 3.10+ and uv.
-  Requires `$USERGUIDE_BASE` env var (default `/opt/code/docs/UserGuide/`).
+  Requires `$USERGUIDE_BASE` env var (default `/opt/code/docs/lanlnk/UserGuide/`).
   Requires the builtin `playwright` skill (loaded mid-execution for screenshots).
   Requires the target app's dev server to be running (e.g., `npm run dev` on port 5173/3000/8080).
 
   Quick start:
   ```bash
-  export USERGUIDE_BASE=/opt/code/docs/UserGuide
+  export USERGUIDE_BASE=/opt/code/docs/lanlnk/UserGuide
   cd skills/docs/doc-generator
   uv sync
   ```
@@ -80,7 +80,7 @@ P5: 交互确认（TOC + 成功率 + 迭代）
 
 ### Procedure
 
-1. **解析 `$USERGUIDE_BASE`**：未设置时使用默认 `/opt/code/docs/UserGuide/`，并告知用户默认路径。
+1. **解析 `$USERGUIDE_BASE`**：未设置时使用默认 `/opt/code/docs/lanlnk/UserGuide/`，并告知用户默认路径。
 2. **校验 `$USERGUIDE_BASE` 可写**：尝试创建目录与临时文件；失败为 blocking error，终止并打印 "请检查 $USERGUIDE_BASE 权限：{path}"。
 3. **发现软件名**（4 级优先级，找到即停）：
    1. 读源码根 `package.json` 的 `name` 字段；存在 `@scope/` 前缀时剥离。
@@ -501,7 +501,7 @@ P4 处理 `.docx` / `.pptx` 参考资料时调用 `markitdown`，**复用 `mater
 
 | 变量 | 默认值 | 作用 |
 |------|--------|------|
-| `$USERGUIDE_BASE` | `/opt/code/docs/UserGuide/` | 文档根目录。输入在 `_input/{name}/`，输出在 `{name}/` |
+| `$USERGUIDE_BASE` | `/opt/code/docs/lanlnk/UserGuide/` | 文档根目录。输入在 `_input/{name}/`，输出在 `{name}/` |
 
 ### CLI Flags
 

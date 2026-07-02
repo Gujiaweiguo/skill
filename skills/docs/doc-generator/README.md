@@ -17,7 +17,7 @@ Web 应用操作手册生成器 Skill。基于 **运行时探测 + 源码 hint +
 |---|---|
 | Python | 3.10+ |
 | 依赖管理 | uv（不用 pip） |
-| 环境变量 | `$USERGUIDE_BASE`（默认 `/opt/code/docs/UserGuide/`） |
+| 环境变量 | `$USERGUIDE_BASE`（默认 `/opt/code/docs/lanlnk/UserGuide/`） |
 | 内置 skill | `playwright`（MCP，P3 阶段加载） |
 | 目标应用 | 运行中的 SPA dev server（默认探测 5173/3000/8080） |
 
@@ -25,7 +25,7 @@ Web 应用操作手册生成器 Skill。基于 **运行时探测 + 源码 hint +
 
 ```bash
 # 1. 设置环境变量
-export USERGUIDE_BASE=/opt/code/docs/UserGuide
+export USERGUIDE_BASE=/opt/code/docs/lanlnk/UserGuide
 
 # 2. 安装依赖（一次性）
 cd /opt/code/skill/skills/docs/doc-generator
