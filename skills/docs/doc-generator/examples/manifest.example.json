@@ -1,0 +1,24 @@
+{
+  "app_name": "testapp",
+  "executor_error": null,
+  "tasks": [
+    {
+      "task_id": "task_001",
+      "page_title": "登录",
+      "url": "http://localhost:5173/login",
+      "actions": [
+        {"action_id": "a1", "type": "screenshot", "status": "success", "output_path": "imgs/login_1_load.png", "elapsed_ms": 100, "primary_locator": null},
+        {"action_id": "a2", "type": "click", "status": "success", "output_path": null, "elapsed_ms": 50, "primary_locator": {"strategy": "text", "value": "登录"}}
+      ]
+    },
+    {
+      "task_id": "task_002",
+      "page_title": "用户管理",
+      "url": "http://localhost:5173/users",
+      "actions": [
+        {"action_id": "a3", "type": "screenshot", "status": "success", "output_path": "imgs/users_1_list.png", "elapsed_ms": 120, "primary_locator": null},
+        {"action_id": "a4", "type": "click", "status": "failed", "output_path": null, "elapsed_ms": 5000, "primary_locator": {"strategy": "text", "value": "新建"}, "error": "selector timeout"}
+      ]
+    }
+  ]
+}

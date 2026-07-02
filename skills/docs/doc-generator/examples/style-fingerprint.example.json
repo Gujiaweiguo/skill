@@ -1,0 +1,14 @@
+{
+  "chapter_depth": 2,
+  "step_density": "medium",
+  "screenshot_frequency": "medium",
+  "table_preference": "minimal",
+  "faq_style": "short",
+  "sources": {
+    "chapter_depth": "default",
+    "step_density": "default",
+    "screenshot_frequency": "default",
+    "table_preference": "default",
+    "faq_style": "default"
+  }
+}

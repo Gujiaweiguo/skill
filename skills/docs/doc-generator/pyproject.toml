@@ -1,0 +1,23 @@
+[project]
+name = "doc-generator"
+version = "0.1.0"
+description = "Web 应用操作手册生成器 — Vue/React SPA 自动截图 + 双 RAG 输出"
+requires-python = ">=3.10"
+dependencies = [
+    "jinja2>=3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.0",
+]
+test = [
+    "pytest>=8.0",
+    "pytest-cov>=4.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["scripts", "tests"]
+python_files = "test_*.py"
+addopts = "-v --tb=short"

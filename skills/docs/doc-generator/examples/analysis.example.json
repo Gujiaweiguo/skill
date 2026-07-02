@@ -1,0 +1,50 @@
+{
+  "app_name": "testapp",
+  "version": "1.0.0",
+  "framework_hint": "vue3",
+  "dev_server_url": "http://localhost:5173",
+  "app_purpose": "测试用 SPA 应用",
+  "routes": [
+    {
+      "path": "/login",
+      "title": "登录",
+      "accessible": true,
+      "discovered_via": "menu",
+      "elements": [
+        {"element_id": "el_001", "type": "input", "placeholder": "用户名", "action": null},
+        {"element_id": "el_002", "type": "input", "placeholder": "密码", "action": null},
+        {"element_id": "el_003", "type": "button", "text": "登录", "action": "submit_login"}
+      ],
+      "flows": [
+        {"flow_id": "flow_001", "name": "登录流程", "steps": [
+          {"action": "click", "element_id": "el_003", "expected_outcome": "进入仪表盘"}
+        ]}
+      ]
+    },
+    {
+      "path": "/users",
+      "title": "用户管理",
+      "accessible": true,
+      "discovered_via": "sidebar",
+      "elements": [
+        {"element_id": "el_010", "type": "button", "text": "新建", "action": "open_create_modal"},
+        {"element_id": "el_011", "type": "table", "text": "用户列表", "action": null}
+      ],
+      "flows": [
+        {"flow_id": "flow_010", "name": "新建用户", "steps": [
+          {"action": "click", "element_id": "el_010", "expected_outcome": "弹窗打开"},
+          {"action": "submit", "element_id": "el_010", "expected_outcome": "列表刷新"}
+        ]}
+      ]
+    }
+  ],
+  "auth": {
+    "login_route": "/login",
+    "form_fields": [{"name": "username", "placeholder": "用户名", "type": "text"}],
+    "post_login_route": "/dashboard"
+  },
+  "faqs": [
+    {"question": "登录失败怎么办？", "answer": "检查用户名密码或联系管理员。"}
+  ],
+  "generated_at": "2026-06-21T10:00:00Z"
+}
