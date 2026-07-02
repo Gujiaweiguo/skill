@@ -6,7 +6,7 @@ OpenCode skills repository for 蓝联科技 (Lanlnk). **Skill definitions** (mar
 
 Two skill types:
 - **OpenSpec skills** (10) in `.opencode/skills/openspec-*/` — REAL directories (not symlinks). Bundled upstream, **read-only**.
-- **Custom skills** (12) in `skills/<category>/<name>/` — symlinks from `.opencode/skills/<name>`.
+- **Custom skills** (14) in `skills/<category>/<name>/` — symlinks from `.opencode/skills/<name>`.
 
 ## Critical Paths
 
@@ -239,20 +239,19 @@ AI agents don't have cross-session memory. All "memory" lives in files that are 
 
 ### 「复利工程」触发词
 
-当用户在完成 skill 工作后说「复利工程」，执行以下检查清单：
+当用户在完成 OpenCode/skill/OpenSpec 工作后说「复利工程」「沉淀这次经验」「把这次 OpenCode/PRD/投标/方案经验沉淀一下」时，**优先加载 `compound-learning` skill**。
 
-1. **回顾改动**：本次改了什么（代码、bug 修复、设计决策）
-2. **分流经验**：对每个非显而易见的行为/修复/决策，判断去向：
-   - 跨 skill 通用 → 写入 `AGENTS.md`
-   - 本 skill 特有 → 写入 `SKILL.md`（「已知限制」/「设计决策」）
-   - 诊断流程 → 写入 `references/troubleshooting.md`
-3. **检查分级要求是否满足**：
-   - 复杂 skill → 有「已知限制」+「设计决策」+「维护规则」？有 `references/troubleshooting.md`？
-   - 中等 skill → 有「已知限制」？
-   - 简单 skill → 不强制
-4. **共享文件检查**：改了 `domain-tags.md` / `term-aliases.yaml`？→ 同步另一边
-5. **依赖图检查**：集成模式有变化？→ 更新本文件「Skill Dependencies」依赖图
-6. **提交**：`docs: persist lessons via 复利工程`
+`compound-learning` 是纯提示词 meta-skill，负责开发、调试、部署、文档、方案、PRD、投标、手册、交接包工作的经验复盘与分流写入。它不生成业务文档或代码本身，而是在工作完成后判断哪些经验值得沉淀、写到哪里、哪些不应写入。
+
+兜底分流规则：
+
+1. 项目内复利（只影响当前项目）→ 写入目标项目 `AGENTS.md` / docs / OpenSpec。
+2. 公共 OpenCode 使用复利（影响多个项目或人如何操作 OpenCode）→ 写入 `/opt/code/docs/opencode` 对应手册并更新更新日志。
+3. Skill 自身复利（影响某个 skill 或跨 skill 规则）→ 写入本仓库 `AGENTS.md`、对应 `SKILL.md` 或 `references/troubleshooting.md`。
+4. 项目/产品域知识 → 写入 `$LANLNK_BASE/prd/<项目>/域知识.md`。
+5. 交接模式/跨系统验收 → 写入对应 `交接包/README.md` 或模板文件。
+6. 改了共享文件（如 `domain-tags.md` / `term-aliases.yaml`）→ 检查同步另一边。
+7. 用户要求提交时，建议 commit：`docs: persist lessons via 复利工程`。
 
 ## Skill Dependencies & Integration Patterns
 
