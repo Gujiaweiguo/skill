@@ -3,8 +3,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
-import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,11 +12,12 @@ from typing import Any
 import yaml
 
 from .data_model import (
-    TableMeta,
+    get_unmatched,
     group_by_module,
     parse_data_dict_files,
     pick_key_fields,
 )
+from .review_format import ReviewBriefInput, render_review_brief
 
 _CONTROL_CHARS = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
 
@@ -30,6 +30,17 @@ def _sanitize(text: str) -> str:
 class WordExportPaths:
     content_package: Path
     docx_path: Path | None
+
+
+class WordRenderFailedError(RuntimeError):
+    exit_code: int
+
+    def __init__(self, exit_code: int) -> None:
+        self.exit_code = exit_code
+        super().__init__(str(self))
+
+    def __str__(self) -> str:
+        return f"word-master render failed with exit code {self.exit_code}"
 
 
 def _load_json(path: str | Path) -> dict[str, Any]:
@@ -561,12 +572,77 @@ def _render_blueprint_section(
     return _chapter_with_lines("3. 业务模块详细设计", lines, page_break=False)
 
 
+def _approval_flows_from_file_w(docs_root: str) -> list[tuple[str, str, str, str, str]]:
+    path = Path(docs_root) / "02-competitors/海鼎/业务流程/ERP业务权限审批-结构化.md"
+    if not path.is_file():
+        return []
+    flows: list[tuple[str, str, str, str, str]] = []
+    module = "跨模块流程"
+    menu = "—"
+    document = "—"
+    pending = ""
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line.startswith("## "):
+            module = line.removeprefix("## ").strip()
+        elif line.startswith("### "):
+            menu = line.removeprefix("### ").strip()
+        elif line.startswith("#### "):
+            document = line.removeprefix("#### ").strip()
+        elif line.startswith("**") and line.endswith("**") and "审批链" in line:
+            pending = line.strip("*")
+        elif pending and line.startswith("审批流程："):
+            flows.append((module, menu, document, pending, line))
+            pending = ""
+    return flows
+
+
+def _render_approval_flow_section(docs_root: str) -> list[str]:
+    flows = _approval_flows_from_file_w(docs_root)
+    if not flows:
+        return []
+    grouped: dict[str, list[tuple[str, str, str, str]]] = defaultdict(list)
+    for module, menu, document, name, flow in flows:
+        grouped[module].append((menu, document, name, flow))
+    lines = [
+        "来源：`02-competitors/海鼎/业务流程/ERP业务权限审批-结构化.md`。",
+        f"共 {len(flows)} 条审批链。",
+        "",
+    ]
+    for module, items in sorted(grouped.items()):
+        rows = [[menu, document, name, flow] for menu, document, name, flow in sorted(items)]
+        lines.append(f"### {module}")
+        lines.append("")
+        lines.append("```yaml")
+        lines.extend(_yaml_block({
+            "style": "heading-2",
+            "table": f"approval-flow-{module}",
+            "table_data": {
+                "header": ["二级菜单", "单据/对象", "审批事项", "审批流程"],
+                "rows": _stringify_table(rows),
+            },
+        }))
+        lines.append("```")
+        lines.append("")
+    return _chapter_with_lines("3B. 海鼎 ERP 审批流证据", lines, page_break=False)
+
+
 def build_content_package(reconcile_path: str | Path, doc_map_path: str | Path | None, output_dir: str | Path, docs_root: str = "") -> Path:
     reconcile = _load_json(reconcile_path)
     doc_map = _load_json(doc_map_path) if doc_map_path else None
     capabilities = list(reconcile.get("capabilities", []))
+    requirements = list(reconcile.get("requirements", []))
     stats = _status_stats(capabilities)
     project = str(reconcile.get("project", "商管系统"))
+    all_tables = parse_data_dict_files(docs_root)
+    tables_by_mod = group_by_module(all_tables)
+    review_brief = render_review_brief(ReviewBriefInput(
+        project=project,
+        status_stats=Counter(stats),
+        requirement_count=len(requirements),
+        tables_by_module=tables_by_mod,
+        unmatched_table_count=len(get_unmatched(all_tables)),
+    ))
 
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -575,9 +651,12 @@ def build_content_package(reconcile_path: str | Path, doc_map_path: str | Path |
     sections = [
         *_frontmatter_lines(reconcile, doc_map),
         "",
+        *review_brief.splitlines(),
+        "",
         *_render_baseline_section(stats, capabilities),
         *_render_customer_section(doc_map),
-        *_render_blueprint_section(list(reconcile.get("requirements", [])), capabilities, docs_root),
+        *_render_blueprint_section(requirements, capabilities, docs_root),
+        *_render_approval_flow_section(docs_root),
         *_render_feature_section(capabilities),
         *_render_unmatched_section(capabilities),
         *_render_gap_section(capabilities),
@@ -603,5 +682,5 @@ def render_docx(content_package: str | Path, output_path: str | Path, word_maste
     cmd = ["uv", "run", "python", "-m", "src.main", str(content_package_path), "--output", str(output_path)]
     completed = subprocess.run(cmd, cwd=root, check=False)
     if completed.returncode != 0:
-        raise RuntimeError(f"word-master render failed with exit code {completed.returncode}")
+        raise WordRenderFailedError(completed.returncode)
     return output_path

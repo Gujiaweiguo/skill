@@ -1,6 +1,6 @@
 # ─── How to run ───
 #   cd skills/business/product-prd-generator
-#   uv run scripts/extract_doc_map.py --docs-root /opt/code/docs/lanlnk/prd/projects/商管系统/raw --output parsed/current-doc-map.json
+#   uv run scripts/extract_doc_map.py --docs-root /opt/code/docs/lanlnk/prd/商管系统/raw --output parsed/current-doc-map.json
 
 from __future__ import annotations
 

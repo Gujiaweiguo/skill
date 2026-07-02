@@ -18,6 +18,7 @@ from .data_model import (
     parse_data_dict_files,
     pick_key_fields,
 )
+from .review_format import ReviewBriefInput, render_review_brief
 
 
 VERSION_BY_STATUS = {
@@ -51,11 +52,9 @@ def _status_stats(capabilities: list[dict[str, Any]]) -> Counter[str]:  # noqa: 
     return Counter(cap.get("reconciled_status", "missing") for cap in capabilities)
 
 
-def _render_header(project: str, stats: Counter[str]) -> str:
+def _render_project_context(project: str, stats: Counter[str]) -> str:
     total = sum(stats.values())
-    return f"""# {project} 产品 PRD
-
-## 1. 背景
+    return f"""## 1. 背景
 
 - 项目：{project}
 - 来源：客户需求 + 竞品资料 + 当前产品代码基线（/opt/code/mi）
@@ -70,7 +69,91 @@ def _render_header(project: str, stats: Counter[str]) -> str:
 | partial | {stats.get("partial", 0)} |
 | missing | {stats.get("missing", 0)} |
 | explicitly-not-do | {stats.get("explicitly-not-do", 0)} |
-"""
+	"""
+
+
+def _approval_flows_from_file(docs_root: str) -> list[tuple[str, str, str, str, str]]:
+    path = Path(docs_root) / "02-competitors/海鼎/业务流程/ERP业务权限审批-结构化.md"
+    if not path.is_file():
+        return []
+    flows: list[tuple[str, str, str, str, str]] = []
+    module = "跨模块流程"
+    menu = "—"
+    document = "—"
+    pending = ""
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line.startswith("## "):
+            module = line.removeprefix("## ").strip()
+        elif line.startswith("### "):
+            menu = line.removeprefix("### ").strip()
+        elif line.startswith("#### "):
+            document = line.removeprefix("#### ").strip()
+        elif line.startswith("**") and line.endswith("**") and "审批链" in line:
+            pending = line.strip("*")
+        elif pending and line.startswith("审批流程："):
+            flows.append((module, menu, document, pending, line))
+            pending = ""
+    return flows
+
+
+def _render_approval_flow_evidence(requirements: list[dict[str, Any]], docs_root: str) -> str:  # noqa: ANY_OK
+    file_flows = _approval_flows_from_file(docs_root)
+    if file_flows:
+        file_grouped: dict[str, list[tuple[str, str, str, str]]] = defaultdict(list)
+        for module, menu, document, name, flow in file_flows:
+            file_grouped[module].append((menu, document, name, flow))
+        lines = [
+            "## 3B. 海鼎 ERP 审批流证据",
+            "",
+            "本节来自 `ERP业务权限审批.xlsx` 的结构化派生文件，用于补充流程、权限和审批链设计；原始 xlsx 与 markitdown 转换结果均已保留。",
+            "",
+            f"共 {len(file_flows)} 条审批链。",
+            "",
+        ]
+        for module, items in sorted(file_grouped.items()):
+            lines.extend([f"### {module}", ""])
+            lines.append("| 二级菜单 | 单据/对象 | 审批事项 | 审批流程 | 来源 |")
+            lines.append("| --- | --- | --- | --- | --- |")
+            for menu, document, name, flow in sorted(items):
+                lines.append(
+                    f"| {menu.replace('|', '／')} | {document.replace('|', '／')} | {name.replace('|', '／')} | {flow.replace('|', '／')} | `02-competitors/海鼎/业务流程/ERP业务权限审批-结构化.md` |"
+                )
+            lines.append("")
+        lines.extend(["---", ""])
+        return "\n".join(lines)
+
+    flows = [
+        req for req in requirements
+        if "ERP业务权限审批-结构化" in str(req.get("source_file", ""))
+        and "审批链" in str(req.get("function", ""))
+    ]
+    if not flows:
+        return ""
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)  # noqa: ANY_OK
+    for req in flows:
+        scenario = str(req.get("scenario", "跨模块流程")) or "跨模块流程"
+        grouped[scenario].append(req)
+    lines = [
+        "## 3B. 海鼎 ERP 审批流证据",
+        "",
+        "本节来自 `ERP业务权限审批.xlsx` 的结构化派生文件，用于补充流程、权限和审批链设计；原始 xlsx 与 markitdown 转换结果均已保留。",
+        "",
+        f"共 {len(flows)} 条审批链。",
+        "",
+    ]
+    for scenario, items in sorted(grouped.items()):
+        lines.extend([f"### {scenario}", ""])
+        lines.append("| 审批事项 | 审批流程 | 来源 |")
+        lines.append("| --- | --- | --- |")
+        for req in sorted(items, key=lambda r: str(r.get("function", ""))):
+            name = str(req.get("function", "")).replace("|", "／")
+            nearby = str(req.get("nearby_text", "")).replace("|", "／").replace("\n", " ")
+            source = str(req.get("source_file", "")).replace("|", "／")
+            lines.append(f"| {name} | {nearby or '—'} | `{source}` |")
+        lines.append("")
+    lines.extend(["---", ""])
+    return "\n".join(lines)
 
 
 def _render_customer_summary(doc_map: dict[str, Any] | None) -> str:  # noqa: ANY_OK
@@ -742,7 +825,7 @@ def _render_field_spec_module(
         constraints = doc_data.get("constraints", [])
         workflow = str(doc_data.get("workflow", ""))
 
-        lines.append(f"**单据**：{doc_name}")
+        lines.append(f"##### {doc_name}")
         lines.append("")
         if scenario:
             lines.append(f"**场景**：{scenario}")
@@ -750,6 +833,13 @@ def _render_field_spec_module(
 
         if fields:
             lines.extend(_render_field_table(fields))
+
+        markdown_blocks = doc_data.get("markdown", [])
+        if markdown_blocks:
+            for block in markdown_blocks:
+                if isinstance(block, str):
+                    lines.append(block)
+            lines.append("")
 
         if constraints:
             lines.append("**约束**：")
@@ -825,12 +915,22 @@ def render_prd(inputs: RenderInputs) -> str:
     all_tables = parse_data_dict_files(inputs.docs_root)
     tables_by_mod = group_by_module(all_tables)
     unmatched_tables = get_unmatched(all_tables)
+    review_brief = render_review_brief(ReviewBriefInput(
+        project=str(project),
+        status_stats=stats,
+        requirement_count=len(requirements),
+        tables_by_module=tables_by_mod,
+        unmatched_table_count=len(unmatched_tables),
+    ))
     parts = [
-        _render_header(project, stats),
+        f"# {project} 产品 PRD\n",
+        review_brief,
+        _render_project_context(str(project), stats),
         _render_customer_summary(inputs.doc_map),
         _render_structure_summary(requirements),
         _render_blueprint_modules(requirements, capabilities, ontology, tables_by_mod) if ontology else _render_requirement_list(requirements),
         _render_data_model_index(tables_by_mod, unmatched_tables),
+        _render_approval_flow_evidence(requirements, inputs.docs_root),
         _render_module_summary(requirements),
         "## 4. 功能清单",
         "",
