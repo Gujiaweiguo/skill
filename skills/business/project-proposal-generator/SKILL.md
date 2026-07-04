@@ -43,7 +43,7 @@ compatibility: >
 | 变量 | 路径 |
 |------|------|
 | `$MATERIALS_DIR` | `$LANLNK_BASE/materials` |
-| `$PROPOSALS_DIR` | `$LANLNK_BASE/proposals`（立项 + 方案统一存放） |
+| `$PROPOSALS_DIR` | `$LANLNK_BASE/materials/14-proposals`（立项 + 方案统一存放） |
 | `$CASES_DIR` | `$MATERIALS_DIR/04-cases` |
 | `$PRODUCTS_DIR` | `$MATERIALS_DIR/03-products` |
 | `$COMPANY_DIR` | `$MATERIALS_DIR/01-company-overview` |

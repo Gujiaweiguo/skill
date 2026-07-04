@@ -39,7 +39,7 @@ compatibility: >
 默认示例素材目录：
 
 ```text
-Bidding/中旅招投标/
+$BIDDING_DIR/中旅招投标/
 ├── 招标文件/
 │   ├── 会员系统采购文件.docx
 │   └── 附件2：会员合同模板.docx
@@ -442,7 +442,7 @@ YAML 格式支持 4 分类（软件核心/开发交付/实施服务/售后服务
 ### 5.1 推荐输出目录
 
 ```text
-Bidding/<项目名>/output/
+$BIDDING_DIR/<项目名>/output/
 ├── 01-招标文件解析-tender-analysis.md
 ├── 02-响应矩阵-response-matrix.md
 ├── 03-商务标-终稿.docx             （由 word-master 根据内容包生成）
