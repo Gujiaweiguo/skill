@@ -398,6 +398,12 @@ uv run ../../scripts/validate_ppt_package.py <YAML配置> --verbose
 4) 输出修改后的 .pptx、生成脚本 .js、所用插图资产
 ```
 
+## 已知坑与排障
+
+生成 PPT 后正文消失/挤压、表格行丢字、bullet 不可见 → 见 [`references/troubleshooting.md`](references/troubleshooting.md)。
+
+核心规则：**不要用 `text\nline2\nline3` 拼接多行**，改用 `addStackedText` 辅助函数每行独立 `addText`；生成后必须用 LibreOffice 转 PDF + OCR 视觉抽查，不能只检查 PPTX zip 完整性。
+
 ## 依赖
 
 | 工具 | 用途 | 安装 |
