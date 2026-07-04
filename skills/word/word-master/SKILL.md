@@ -48,8 +48,8 @@ export LANLNK_BASE=/opt/code/docs/lanlnk
 | 变量 | 路径 |
 |------|------|
 | `$WORD_TEMPLATES_DIR` | `/opt/code/skill/skills/word/word-master/templates` |
-| `$PROPOSALS_DIR` | `$LANLNK_BASE/proposals` |
-| `$BIDDING_DIR` | `$LANLNK_BASE/bidding` |
+| `$PROPOSALS_DIR` | `$LANLNK_BASE/materials/14-proposals` |
+| `$BIDDING_DIR` | `$LANLNK_BASE/materials/15-bidding` |
 
 ---
 
@@ -143,7 +143,7 @@ export LANLNK_BASE=/opt/code/docs/lanlnk
 uv run scripts/validate_package.py <内容包.word-content.md>
 
 # 校验目录下所有内容包
-uv run scripts/validate_package.py $LANLNK_BASE/proposals/
+uv run scripts/validate_package.py $LANLNK_BASE/materials/14-proposals/
 
 # 详细输出（显示警告）
 uv run scripts/validate_package.py <路径> --verbose
