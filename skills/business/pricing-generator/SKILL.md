@@ -26,10 +26,12 @@ compatibility: >
   cd skills/business/pricing-generator
   uv sync
   uv run python generate_quote.py --customer XX资产公司 --product MI --mode SAAS --date 20260705
+  uv run python generate_quote.py --customer XX资产公司 --product AI --mode SAAS --positions 3  # AI 岗位 Skill（默认3岗）
   ```
 
   用户只需告诉 Agent 客户名、产品和定价，Agent 自动完成：
   - "给XX资产公司做个MI报价，首年5万次年2万，SAAS模式"
+  - "出一份AI Skills报价，标准3个岗位"
   - "出一份CRM报价单，参考正祥的模板"
   - "需求评估做完了，帮我接着出报价单"
 ---
@@ -331,9 +333,12 @@ $PROPOSALS_DIR/<客户名>/
 cd skills/business/pricing-generator
 uv sync                                                       # 首次或依赖更新后
 uv run python generate_quote.py \
-    --customer <客户名> --product <MI|CRM|AI> \
-    --mode <SAAS|私有化> --date <YYYYMMDD>
+    --customer <客户名> --product <MI|AI> \
+    --mode <SAAS|私有化> --date <YYYYMMDD> \
+    [--positions <N>]  # AI 专用：岗位数（默认3，范围2-6）
 ```
+
+> **产品支持**：`MI`（商管系统，硬编码数据）✅ / `AI`（岗位 Skill，按 `--positions` 动态计算）✅ / `CRM`（待扩展）⏳
 
 ### 5.2 报价单结构（双 Sheet Excel）
 

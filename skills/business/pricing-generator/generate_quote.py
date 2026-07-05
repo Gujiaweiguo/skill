@@ -149,6 +149,106 @@ MI_DATA: dict[str, Any] = {
 }
 
 
+# === AI 岗位 Skill 数据（动态生成，按 positions 岗位数计算费用）===
+AI_POSITION_SKILLS: list[tuple[str, str]] = [
+    ("营运分析 Skill",
+     "经营日报/周报自动生成、异常预警、风险商户清单；P0 主线岗位"),
+    ("客服分流 Skill",
+     "高频 FAQ 应答、会员查询、转人工工单；P0 主线岗位"),
+    ("招商研究 Skill",
+     "品牌初筛画像、铺位匹配、招商漏斗周报；P0 主线岗位"),
+    ("财务账龄预警 Skill",
+     "账龄分析、催缴优先级、催缴跟踪；P0 备选岗位"),
+    ("工程工单协同 Skill",
+     "工单派单、SLA 预警、超时升级；P0 备选岗位"),
+    ("企划岗 Skill 组合",
+     "活动复盘、会员运营、内容生产、投放归因；P1 扩展岗位"),
+]
+
+AI_SERVICE_NOTES: list[str] = [
+    "1. 2 岗位起卖：单岗位难以形成经营闭环，至少 2 个岗位才能体现 AI 增强价值；",
+    "2. 首年含实施：每岗位首年 1 万含平台部署 + 知识库建设 + 工作流配置 + 试点运行"
+    "（约 5 人天/岗位）；",
+    "3. 次年运营服务费固定 2 万：不论购买几个岗位，次年运营服务费均为 2 万。"
+    "AI 岗位 Skill 卖的是运营服务——周复盘/命中率调优/知识库更新/效果看板/SLA 保障/持续优化，"
+    "确保 Skill 越用越准；",
+    "4. 新岗位 Skill 定制：如需当前 6 个以外的岗位 Skill，按 1,800 元/人天定制开发；",
+    "5. 数据接入：客户需提供商管系统/CRM/客流等数据源接口；"
+    "LnkAgent 本地部署确保数据安全；",
+    "6. 退出机制：试点 90 天后效果不达预期可停止，不绑定长期合同。",
+]
+
+
+def build_ai_data(positions: int) -> dict[str, Any]:
+    """根据岗位数构建 AI Skills 报价数据。
+
+    定价规则：
+    - 2 岗起卖（positions < 2 强制为 2）
+    - 首年 = positions × 10,000
+    - 次年 = 20,000（固定运营服务费）
+    """
+    positions = max(positions, 2)
+    positions = min(positions, 6)  # 当前最多 6 个岗位
+    first_year = positions * 10000
+    next_year = 20000
+
+    selected = AI_POSITION_SKILLS[:positions]
+    selected_names = "、".join(
+        s[0].replace(" Skill", "").replace(" 组合", "") for s in selected
+    )
+
+    return {
+        "product_name": "LnkAgent AI岗位Skill增强服务",
+        "product_label": "AI",
+        "mode_desc": "报价模式：SAAS 运营服务（首年含岗位 Skill 配置 + 上线试运营；次年固定运营服务费 2 万）",
+        "standard_items": [
+            ("1.1", "LnkAgent 平台 SAAS",
+             "AI Skills 编排平台（OrchestratorAgent + langchat + LnkChatBI 三引擎），"
+             "本地部署或 SAAS 托管，确保数据安全",
+             0, 0, "含在岗位费"),
+            ("1.2", f"岗位 Skill × {positions}",
+             f"已选 {positions} 个岗位：{selected_names}。"
+             "每个 Skill 含场景配置 + 知识库建设 + 工作流上线 + 试点运行",
+             first_year, 0, f"{positions} × 10,000；2 岗起卖"),
+            ("3.1", "实施服务",
+             "数据接入 + 知识库建设 + 工作流配置 + 试点辅导（约 5 人天/岗位）",
+             0, 0, "含在岗位费"),
+            ("4.1", "年度运营服务",
+             "周复盘 + 命中率调优 + 知识库更新 + 效果看板 + SLA 保障 + 持续优化",
+             0, next_year, "次年固定 2 万；首年含试运营"),
+        ],
+        "optional_items": [
+            ("2.1", "新岗位 Skill 定制开发",
+             "当前 6 个岗位 Skill 以外的定制需求（如物业岗/招商谈判岗等），按人天结算",
+             0, 0, "1,800 元/人天；按需"),
+        ],
+        "third_party": [
+            ("数据源接入", "商管系统/CRM/客流等数据接口",
+             "客户提供接口，LnkAgent 本地部署对接"),
+            ("大模型 API", "GLM/DeepSeek/通义等大模型推理 API",
+             "客户自购或蓝联代采，按 token 计费"),
+        ],
+        "plans": [
+            ("入门 2岗", "营运分析 + 客服分流",
+             20000, 20000, 60000, "",
+             "最小闭环：经营日报 + 客服减负"),
+            ("标准 3岗 ⭐", "营运 + 客服 + 招商研究",
+             30000, 20000, 70000, "",
+             "推荐起步：P0 三主 Skill"),
+            ("增强 4岗", "三主 + 财务账龄（或工程工单）",
+             40000, 20000, 80000, "",
+             "P0 三主 + 一备选"),
+            ("完整 6岗", "全部 6 个岗位 Skill",
+             60000, 20000, 100000, "",
+             "全岗位 AI 增强"),
+        ],
+        "modules": AI_POSITION_SKILLS,
+        "service_notes": AI_SERVICE_NOTES,
+        "standard_first_year_total": first_year,
+        "standard_next_year_total": next_year,
+    }
+
+
 def get_lanlnk_base() -> Path:
     return Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk"))
 
@@ -286,7 +386,9 @@ def build_quote_sheet(
     write_info_row(ws, r, info, end_col); r += 1
 
     # 模式说明
-    if mode == "SAAS":
+    if data.get("mode_desc"):
+        mode_desc = data["mode_desc"]
+    elif mode == "SAAS":
         mode_desc = "报价模式：SAAS（首年含软件租用费 + 实施费；次年只有年租用费）"
     else:
         mode_desc = "报价模式：私有化（首年含软件终生授权 + 实施费；次年售后可选）"
@@ -475,6 +577,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="报价日期 YYYYMMDD（默认今天）")
     p.add_argument("--devkit", default=None,
                    help="可选：requirement-evaluator 二开清单路径（v1 暂未启用）")
+    p.add_argument("--positions", type=int, default=3,
+                   help="AI Skills 岗位数（仅 --product AI 有效，默认 3，范围 2-6）")
     return p.parse_args(argv)
 
 
@@ -483,19 +587,21 @@ def main(argv: list[str] | None = None) -> int:
 
     date_str = args.date or datetime.now().strftime("%Y%m%d")
 
-    # 数据解析：v1 仅内置 MI，后续扩展为读 references/报价模板_<产品>_<模式>.md
-    if args.product != "MI":
+    # 数据解析：MI 硬编码；AI 按 positions 动态生成；CRM 后续扩展
+    if args.product == "MI":
+        data = MI_DATA
+    elif args.product == "AI":
+        data = build_ai_data(args.positions)
+    else:
         print(
-            f"[WARN] 当前版本仅内置 MI 数据；product={args.product} "
-            f"暂未实现动态加载。", file=sys.stderr,
+            f"[WARN] 当前版本仅支持 MI 和 AI；product={args.product} "
+            f"暂未实现。", file=sys.stderr,
         )
         print(
             "[WARN] 后续版本将读取 references/报价模板_<产品>_<模式>.md 动态生成。",
             file=sys.stderr,
         )
         return 1
-
-    data = MI_DATA
 
     # 输出路径：$PROPOSALS_DIR/<客户>/报价单_<产品>_<模式>_<客户>_<日期>.xlsx
     proposals_dir = get_lanlnk_base() / "materials" / "14-proposals"
