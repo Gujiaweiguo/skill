@@ -1,0 +1,8 @@
+[project]
+name = "pricing-generator"
+version = "0.1.0"
+description = "报价单生成工具 - 基于 openpyxl 生成 Excel 报价单（参考正祥格式）"
+requires-python = ">=3.10"
+dependencies = [
+    "openpyxl>=3.1",
+]
