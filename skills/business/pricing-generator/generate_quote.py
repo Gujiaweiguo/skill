@@ -437,9 +437,9 @@ def build_quote_sheet(
                         "三、第三方集成（另行计费，不在本报价内）",
                         end_col); r += 1
     write_header_row(ws, r,
-                     ["序号", "集成项", "说明", "计费方式", "", ""]); r += 1
+                     ["序号", "集成项", "说明", "", "", "备注"]); r += 1
     for i, item in enumerate(data["third_party"], start=1):
-        write_data_row(ws, r, [f"3.{i}", item[0], item[1], item[2], "", ""]); r += 1
+        write_data_row(ws, r, [f"3.{i}", item[0], item[1], "", "", item[2]]); r += 1
 
     r += 1
 
