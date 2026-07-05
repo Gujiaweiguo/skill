@@ -82,7 +82,7 @@ MI_DATA: dict[str, Any] = {
         ("活动效果自动复盘/投放归因", "活动复盘报告/投放 ROI 归因分析",
          "由蓝联 langchat AI Skills 承接，另报价"),
     ],
-    # 方案对比：方案 / 组合说明 / 首年 / 次年 / 3年TCO / 优惠价(留空) / 适用
+    # 方案对比：序号 / 方案 / 首年汇总 / 首年优惠价(留空) / 次年汇总 / 次年优惠价(留空) / 适用
     "plans": [
         ("5.1", "方案 A：标准产品（无二开，纯标准 SAAS）",
          50000, "", 20000, "",
@@ -149,6 +149,76 @@ MI_DATA: dict[str, Any] = {
 }
 
 
+CRM_DATA: dict[str, Any] = {
+    "product_name": "CRM 会员营销系统",
+    "product_label": "CRM",
+    "standard_items": [
+        ("1.1", "CRM 平台 SAAS 租用",
+         "智慧商圈会员营销 CRM 平台，含电子会员/会员卡券/会员积分/会员标签/会员等级/会员资产",
+         27000, 27000, "年租用费"),
+        ("1.2", "智慧商圈",
+         "开通微信/支付宝智慧商圈，实现支付即积分/支付即会员/无感积分/停车积分",
+         0, 0, "赠送"),
+        ("1.3", "实施服务",
+         "项目启动/方案设计/上线运行/项目验收",
+         18000, 0, "首年一次性，含 10 人天"),
+        ("1.4", "年度售后服务",
+         "问题排查/修复/安全漏洞修补/技术维护",
+         0, 0, "首年赠送，含在租用费"),
+    ],
+    "optional_items": [
+        ("2.1", "集成停车",
+         "CRM 集成停车系统，在线缴费/积分/停车券优惠停车等停车营销服务",
+         9000, 9000, "可选，按年"),
+        ("2.2", "定制开发",
+         "美团及抖音平台打通等定制需求",
+         18000, 0, "可选，一次性"),
+    ],
+    "third_party": [
+        ("在线支付网关", "微信/支付宝在线缴费", "客户指定支付网关后单独计费"),
+        ("第三方电子签", "法大大/e签宝等电子合同签署", "按第三方报价 + 集成人天"),
+    ],
+    "plans": [
+        ("5.1", "方案 A：标准产品（CRM 平台 + 智慧商圈 + 实施 + 售后）",
+         45000, "", 27000, "",
+         "标准会员营销闭环"),
+        ("5.2", "方案 B：标准 + 集成停车",
+         54000, "", 36000, "",
+         "含停车积分营销"),
+        ("5.3", "方案 C：标准 + 集成停车 + 定制开发",
+         72000, "", 36000, "",
+         "含美团/抖音平台打通"),
+    ],
+    "modules": [
+        ("会员管理",
+         "电子会员/会员卡券/会员积分管理/会员标签/会员等级/会员资产/会员档案"),
+        ("智慧商圈",
+         "微信/支付宝智慧商圈/支付即积分/支付即会员/无感积分/停车积分"),
+        ("营销活动",
+         "优惠券/满减/折扣/抽奖/拼团/秒杀/活动报名/活动审批/活动效果分析"),
+        ("停车营销",
+         "停车券/积分抵扣/在线缴费/停车月卡/停车积分规则"),
+        ("数据分析",
+         "会员画像/消费分析/积分分析/活跃度分析/流失预警/会员价值分级"),
+        ("消息中心",
+         "短信/模板消息/订阅消息/推送通知/会员触达/消息模板管理"),
+        ("移动端",
+         "会员小程序/会员中心/电子会员卡/卡券包/积分商城/在线缴费"),
+        ("系统管理",
+         "组织架构/权限管理/门店管理/数据隔离/日志审计/系统配置"),
+    ],
+    "service_notes": [
+        "1. 服务承诺：提供首次上线的后台数据切换，包括会员数据切入、积分数据切入、订单数据切入、历史会员资产备份；",
+        "2. 二开单价：未来新需求，二开人天单价按 1,800 元/人天结算；",
+        "3. SAAS 服务范围：含平台运维、安全更新、版本升级；不含定制开发和数据导出定制；",
+        "4. 实施人天：首年实施含 10 人天（项目启动+方案设计+上线+验收），超出部分按 1,800 元/人天另计；",
+        "5. 付款方式：首年签订合同时支付 50%，验收后支付 50%；次年租用费按年续费支付。",
+    ],
+    "standard_first_year_total": 45000,
+    "standard_next_year_total": 27000,
+}
+
+
 # === AI 岗位 Skill 数据（动态生成，按 positions 岗位数计算费用）===
 AI_POSITION_SKILLS: list[tuple[str, str]] = [
     ("营运分析 Skill",
@@ -187,8 +257,7 @@ def build_ai_data(positions: int) -> dict[str, Any]:
     - 首年 = positions × 10,000
     - 次年 = 20,000（固定运营服务费）
     """
-    positions = max(positions, 2)
-    positions = min(positions, 6)  # 当前最多 6 个岗位
+    positions = max(2, min(positions, 6))  # 2岗起卖，当前最多6个岗位
     first_year = positions * 10000
     next_year = 20000
 
@@ -251,6 +320,30 @@ def build_ai_data(positions: int) -> dict[str, Any]:
 
 def get_lanlnk_base() -> Path:
     return Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk"))
+
+
+def parse_devkit(path: Path) -> list[tuple[str, str, str, int, int, str]]:
+    """解析 requirement-evaluator 的需求评估报告，提取 MI 二开清单。
+
+    返回 optional_items 格式：[(序号, 名称, 说明, 首年报价, 次年报价, 备注), ...]
+    报价 = 人天 × 1800（pricing-generator 报价单价）
+    """
+    import re
+    text = path.read_text(encoding="utf-8")
+    items = []
+    # 匹配二开清单表格行：| # | 二开项 | ... | 人天 | ...
+    # 复杂度列可能带 markdown 加粗（**L**），用 \*{0,2} 兼容
+    pattern = r"\|\s*(\d+)\s*\|\s*(.+?)\s*\|.*?\|\s*\*{0,2}([SML])\*{0,2}\s*\|\s*(\d+)\s*\|"
+    for m in re.finditer(pattern, text):
+        num, name, complexity, days = m.group(1), m.group(2).strip(), m.group(3), int(m.group(4))
+        cost = days * 1800
+        seq = f"2.{num}"
+        items.append((
+            seq, f"定制开发-{name}",
+            f"{name}（{complexity} 级，{days} 人天）",
+            cost, 0, f"{days} 人天 × 1,800/天；P{0 if complexity in ('S','M') else 1}"
+        ))
+    return items
 
 
 # === 单元格样式辅助 ===
@@ -345,13 +438,7 @@ def write_data_row(
                        bg=bg, h="center", v="center")
             c.number_format = "#,##0"
         else:
-            # 序号居中，名称居中加粗（total 时），内容说明左对齐，其余居中
-            if i == 3:
-                h_align = "left"
-            elif i == 1:
-                h_align = "center"
-            else:
-                h_align = "center"
+            h_align = "left" if i == 3 else "center"
             style_cell(c, size=11 if total else 10,
                        bold=bold or total, bg=bg, h=h_align, v="center")
     col_widths = {idx: QUOTE_COL_WIDTHS[col]
@@ -467,7 +554,7 @@ def build_quote_sheet(
 
     r += 1
 
-    # 五、方案对比（A/B/C，含 3 年 TCO + 优惠价留空）
+    # 五、方案对比（A/B/C）
     write_section_title(ws, r,
                         "五、报价方案对比（A/B/C）",
                         end_col); r += 1
@@ -475,7 +562,7 @@ def build_quote_sheet(
                      ["序号", "方案", "首年汇总(元)", "首年优惠价",
                       "次年汇总(元)", "次年优惠价"]); r += 1
     for plan in data["plans"]:
-        # plan = (方案, 组合说明, 首年, 次年, 3年TCO, 优惠价(留空), 适用)
+        # plan = (序号, 方案, 首年汇总, 首年优惠价, 次年汇总, 次年优惠价, 适用)
         write_data_row(ws, r,
                        [plan[0], plan[1], plan[2], plan[3], plan[4], plan[5]]); r += 1
         # 适用场景说明（合并行）
@@ -567,7 +654,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     p.add_argument("--customer", required=True, help="客户名（用于输出目录）")
     p.add_argument("--product", required=True, choices=["MI", "CRM", "AI"],
-                   help="产品代号（v1 仅支持 MI）")
+                   help="产品代号（MI/CRM/AI 均已实现）")
     p.add_argument("--mode", required=True, choices=["SAAS", "私有化"],
                    help="报价模式")
     p.add_argument("--date", default=None,
@@ -584,21 +671,32 @@ def main(argv: list[str] | None = None) -> int:
 
     date_str = args.date or datetime.now().strftime("%Y%m%d")
 
-    # 数据解析：MI 硬编码；AI 按 positions 动态生成；CRM 后续扩展
+    # 数据解析：MI 硬编码；AI 按 positions 动态生成；CRM 硬编码
     if args.product == "MI":
         data = MI_DATA
     elif args.product == "AI":
         data = build_ai_data(args.positions)
+    elif args.product == "CRM":
+        data = CRM_DATA
     else:
-        print(
-            f"[WARN] 当前版本仅支持 MI 和 AI；product={args.product} "
-            f"暂未实现。", file=sys.stderr,
-        )
-        print(
-            "[WARN] 后续版本将读取 references/报价模板_<产品>_<模式>.md 动态生成。",
-            file=sys.stderr,
-        )
+        print(f"[ERROR] 不支持的产品：{args.product}", file=sys.stderr)
         return 1
+
+    if args.devkit:
+        devkit_path = Path(args.devkit)
+        if devkit_path.exists():
+            dev_items = parse_devkit(devkit_path)
+            if dev_items:
+                data["optional_items"] = dev_items
+                print(f"[INFO] 从需求评估加载 {len(dev_items)} 项二开")
+        else:
+            print(f"[WARN] --devkit 文件不存在：{devkit_path}", file=sys.stderr)
+
+    if args.mode == "私有化":
+        if not data.get("private_items"):
+            print(f"[WARN] {args.product} 私有化模式定价数据待确认，"
+                  f"当前输出 SAAS 结构（定价可能不准）。", file=sys.stderr)
+            print(f"[WARN] 请联系产品负责人确认私有化定价后补充。", file=sys.stderr)
 
     # 输出路径：$PROPOSALS_DIR/<客户>/报价单_<产品>_<模式>_<客户>_<日期>.xlsx
     proposals_dir = get_lanlnk_base() / "materials" / "14-proposals"
