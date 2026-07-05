@@ -313,6 +313,11 @@ uv run python -m src.main generate tender_info.json \
 3. 告知用户："技术标内容已编排完成，正在调用 word-master 排版..."
 4. word-master 读取内容包后生成 `.docx`，输出到 `$BIDDING_DIR/{项目名称}/output/`
 
+> **2026-07-05 补充：商管/经营类投标的特殊处理**。当投标对象是商业地产商管 ERP / 经营管控平台 / 资管系统时：
+> - **项目背景与需求理解**：可引用 `$LANLNK_BASE/knowledge/sales/methodology/15-商业地产岗位病药矩阵.md`，按岗位（招商总/财务总/营运总/企划总/物业总/IT总）拆需求理解，比泛泛的功能需求清单更有针对性。
+> - **功能需求响应方案**：功能矩阵表可用"岗位 × 病点 × 功能响应"组织，而非纯功能点逐条响应。
+> - **业绩/案例证明**：遵循证明口径分级（Z1 实证/Z2 竞品行业对标/Z3 蓝联产品状态/Z4 待试点验证）。开发中产品不把关联产品（如会员 CRM）的客户案例冒充本产品（如商管 ERP）实证。案例引用前必须确认产品边界。
+
 ### 3.3 述标PPT → proposal-pptx YAML 内容包
 
 述标PPT 统一输出 YAML 内容包，调用 `skills/ppt/ppt-master/templates/proposal-pptx/compile.py` 的 `mode=tender` 模式。
