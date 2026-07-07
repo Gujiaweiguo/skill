@@ -487,3 +487,98 @@ for kw in ['m3newcontract', 'm3modifycontract']:
 - 如果 PRD 会话中需要读代码做差异分析，只读不写。
 
 **修复**：发现漂移时，立即停止代码修改，将已做的代码 todo 标记为 cancelled，回到文档输出。
+
+---
+
+## coverage-validate：匹配率突然跌到 15% 左右
+
+**症状**：`--mode coverage-validate` 输出匹配率明显偏低（15%~20%），但 docs_root 下文档齐全、ontology 文件存在、客户需求清单已生成。
+
+**诊断步骤**：
+
+1. **检查 SKILL.md / 命令行里写的 docs-root 路径是否与磁盘实际路径一致**
+   - 历史根因：SKILL.md 写的是 `$LANLNK_BASE/prd/商管系统/raw`，但实际路径是 `$LANLNK_BASE/raw/prd-商管系统`。`doc_map._load_aliases()` 在找不到 ontology 时**静默退化**到纯 term-aliases 匹配（不报错），导致 ontology 从未加载，匹配率从应有水平跌到 ~15%。
+   - 自检：
+     ```bash
+     ls "$LANLNK_BASE/raw/prd-商管系统" 2>/dev/null || echo "❌ docs-root 路径错"
+     ls "$LANLNK_BASE/knowledge/ontology/business-ontology.yaml" || echo "❌ ontology 路径错"
+     ```
+2. **确认 ontology 是否真的被加载**
+   - 在 doc_map 里加一行临时日志，或检查 `parsed/current-doc-map.json` 的 alias 数量。ontology 没加载时 alias 数会少 60%~80%。
+
+**修复**：SKILL.md 里凡涉及文件系统路径，必须明确"配置项名 vs 磁盘实际路径"的对应关系。改完路径后立即重跑 coverage-validate 看匹配率是否回到 30%+ 区间。
+
+---
+
+## coverage-validate：matched 卡在天花板，怎么扩 ontology 都不涨
+
+**症状**：扩 ontology terms 后，caps 数量上升、客户需求匹配数也上升，但 `matched` 数量卡死在某个值（如 128）不再增长。
+
+**诊断步骤**：
+
+1. **检查 reconcile 是否包含 `_add_spec_referenced_capabilities`**
+   - 历史根因：reconcile 默认只把"代码已实现的 spec"加入矩阵。ontology 定义但代码未实现的 spec（即真正的缺口 spec）不会进矩阵，导致矩阵低估覆盖度上限。
+   - 现象：`missing` 列空，但 `code_status=missing` 的 spec 不出现在 capability_map 里。
+
+**修复**：reconcile 增加 `_add_spec_referenced_capabilities()`：扫描 ontology 里所有 spec ID，凡未在 code_map 命中的，作为 `code_status=missing` 的能力加入 capability_map。这样矩阵才能把"客户提了需求 + ontology 有定义 + 代码/spec 缺失"的真缺口暴露出来。本次实战中 matched 从 128 突破到 145。
+
+---
+
+## coverage-validate：明显同义的中文 term 互相不匹配
+
+**症状**：客户需求里有 "合同管理"，doc_map 里 feature heading 是 "合同 管理"，两者明显同义但归到不同 normalized_term，匹配率偏低。
+
+**诊断步骤**：
+
+1. **检查 `_normalize_clause_heading` / `_normalize_term` 是否清理中文间空格**
+   - 历史根因：markitdown / 手写 markdown 经常在中文字符之间插入空白（全角空格、制表符、换行），dedup key 因此分裂。
+   - 自检：在 normalized term 列表里搜索带空格的 term（如 `合同 管理`），有命中就是这个问题。
+
+**修复**：normalize 阶段加一行中文间空格清理：
+```python
+import re
+clean = re.sub(r'(?<=[\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5])', '', clean)
+```
+注意：只清理"中文↔中文"之间的空白，保留"中文↔英文"或"英文↔英文"之间的正常空格。
+
+---
+
+## reconcile：大量 spec 被判 `code_status=missing`
+
+**症状**：reconcile 输出几十条 `code_status=missing` 的 spec，看上去代码几乎啥都没实现，但 MI 团队反馈这些功能其实都有。
+
+**诊断步骤**：
+
+1. **先确认目标项目 code_map 是不是漏扫了**
+   - 历史根因（MI 项目案例）：MI code_map 扫描脚本有 bug，29 个已在 openspec 但代码未引用的 spec 全部被误判为 missing。MI 修复后 code_map 引用从 108 个 spec ID 涨到 137 个。
+   - 不要直接判"代码没实现"，先让目标项目团队复核 code_map。
+2. **诊断命令**（在目标项目根目录）：
+   ```bash
+   openspec list --json | jq '.[].id' | wc -l        # openspec 已有 spec 数
+   grep -rc "spec:" openspec/specs/ 2>/dev/null      # 代码侧引用计数
+   ```
+
+**修复**：reconcile 输出 `missing` 时，把"目标项目 code_map 漏扫"列为首要排查方向，再判定代码真的没实现。本次实战中 MI 修复 code_map 后，29 个误判 missing 全部消除。
+
+---
+
+## reconcile：明明 spec 存在却报 missing
+
+**症状**：openspec/specs/ 目录下确实有 `<spec-id>` 目录，但 reconcile 把它判为 `code_status=missing` 或 `gap: spec-not-found`。
+
+**诊断步骤**：
+
+1. **检查 ontology 里写的 spec ID 与 openspec 实际目录名是否完全一致**
+   - 历史根因：ontology 写 `inventory-management`，但 openspec 目录是 `material-inventory-documents`，spec ID 字符串不匹配，reconcile 找不到对应 spec。
+   - 类似案例：`budget-planning` vs `asset-budget-planning`、`report-center` vs `report-manager`、`business-dashboard` vs `workbench-dashboard`、`footfall-collection` vs `footfall-reporting`。
+
+2. **诊断命令**：
+   ```bash
+   # 列出 ontology 引用的所有 spec ID
+   grep -E '^\s+spec:\s' "$LANLNK_BASE/knowledge/ontology/business-ontology.yaml" | sort -u
+   # 列出 openspec 实际目录
+   ls openspec/specs/
+   # 对比差异
+   ```
+
+**修复**：扩 ontology 时新增的 spec ID 必须 `ls openspec/specs/` 校验。已存在但命名不一致的，**优先改 ontology 对齐 openspec**（不要反向改 openspec 目录名，会破坏 change 引用）。
