@@ -182,6 +182,8 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
 
     _add_unmatched_customer_requirements(by_id, doc_features)
 
+    _add_spec_referenced_capabilities(by_id, doc_map)
+
     _add_codebase_features(by_id)
 
     requirements = _build_requirement_records(doc_map, by_id)
@@ -298,6 +300,56 @@ def _add_unmatched_customer_requirements(
             reconciled_status=CapabilityStatus.MISSING.value,
             confidence=Confidence.LOW.value,
             gaps=(f"客户提出但代码无对应能力 ({len(unique_clients)} 个客户: {', '.join(unique_clients[:3])})",),
+            evidence=evidence,
+        )
+
+
+def _add_spec_referenced_capabilities(
+    by_id: dict[str, ReconciledCapability],
+    doc_map: Mapping[str, object],
+) -> None:
+    """Create missing capabilities for ontology spec IDs referenced in requirements.
+
+    When customer requirements normalize to ontology spec IDs (e.g.
+    platform-foundation, inventory-management) but code_map has no corresponding
+    spec, they never enter by_id and thus never match. This creates them as
+    code_status=missing so they appear in the matrix and gap analysis.
+    """
+    import re as _re
+    spec_id_pattern = _re.compile(r"^[a-z][a-z0-9-]*$|^L\d+$")
+
+    raw_reqs = doc_map.get("requirements", [])
+    if not isinstance(raw_reqs, list):
+        raw_reqs = doc_map.get("features", [])
+    if not isinstance(raw_reqs, list):
+        return
+
+    term_customers: dict[str, set[str]] = {}
+    for req in raw_reqs:
+        if not isinstance(req, Mapping):
+            continue
+        if str(req.get("source_type", "")) != "customer-requirements":
+            continue
+        term = str(req.get("normalized_term", ""))
+        if not term or term in by_id or not spec_id_pattern.match(term):
+            continue
+        customer = str(req.get("source_customer", ""))
+        if customer:
+            term_customers.setdefault(term, set()).add(customer)
+
+    for term, customers in term_customers.items():
+        client_list = sorted(customers)
+        evidence = tuple(
+            EvidenceRef(kind="doc", ref=f"customer:{c}") for c in client_list
+        )
+        by_id[term] = ReconciledCapability(
+            id=term,
+            name=term,
+            code_status=CapabilityStatus.MISSING.value,
+            doc_status=CapabilityStatus.EXISTING.value,
+            reconciled_status=CapabilityStatus.MISSING.value,
+            confidence=Confidence.LOW.value,
+            gaps=(f"匹配 ontology spec 但代码无实现 ({len(client_list)} 个客户: {', '.join(client_list[:3])})",),
             evidence=evidence,
         )
 

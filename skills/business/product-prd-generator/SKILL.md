@@ -6,6 +6,10 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 
 # Product PRD Generator
 
+## DocSpec 质量基线
+
+本 skill 生成的 PRD、功能清单、差距分析、需求证据表和 review 清单必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md`、`PRD质量规范.md` 和 `文档验收清单.md`。跨 PRD/方案/投标等多个文档类 skill 的质量经验，通过 `compound-learning` 回流到 DocSpec；只影响本 skill 的限制写入本 skill references。
+
 ## 目标
 
 将多来源材料合成为内部产品规划资产：
@@ -269,16 +273,81 @@ output/
 
 ## 运行方式
 
+### generate 模式（默认）
+
+全量生成 PRD + 功能清单 + 差距分析。
+
 ```bash
 cd skills/business/product-prd-generator
 uv sync
 uv run product-prd-generator --project 商管系统 \
   --code-root /opt/code/mi \
-  --docs-root $LANLNK_BASE/prd/商管系统/raw \
+  --docs-root $LANLNK_BASE/raw/prd-商管系统 \
   --skill-root /opt/code/skill/skills/business/product-prd-generator \
   --parsed-dir parsed \
   --output-dir output
 ```
+
+### coverage-validate 模式
+
+新材料（客户需求/竞品资料）入库后，对照现有 PRD + 代码做覆盖度校验，输出矩阵和增量 gap，不重跑全量 PRD。适用于 PRD v1.x 持续完善。
+
+```bash
+cd skills/business/product-prd-generator
+uv run product-prd-generator --project 商管系统 \
+  --code-root /opt/code/mi \
+  --docs-root $LANLNK_BASE/raw/prd-商管系统 \
+  --skill-root /opt/code/skill/skills/business/product-prd-generator \
+  --parsed-dir $LANLNK_BASE/raw/prd-商管系统/parsed \
+  --output-dir $LANLNK_BASE/prd/商管系统/output \
+  --mode coverage-validate \
+  --baseline $LANLNK_BASE/raw/prd-商管系统/parsed/coverage-baseline.json \
+  --update-baseline
+```
+
+可选参数：
+- `--customers 万达,深圳中旅,...`：限定纳入矩阵的客户
+- `--competitors 海鼎,明源,...`：限定纳入矩阵的竞品
+- `--baseline <path>`：上次运行的签名快照，用于增量检测
+- `--update-baseline`：本次运行结束后更新 baseline
+
+输出文件：
+
+| 文件 | 用途 |
+|---|---|
+| `output/PRD客户需求覆盖度矩阵.json` | 结构化矩阵，供下游工具消费 |
+| `output/PRD客户需求覆盖度矩阵.md` | 人类可读矩阵 |
+| `output/PRD竞品覆盖度矩阵.json` / `.md` | 同上，竞品维度 |
+| `output/增量gap报告.md` | 本次新材料带来的新缺口（已匹配 + 未匹配分开） |
+| `review/evidence-weak-items.md` | 机器无法确定的证据强度，需人工确认 |
+
+两种模式对比：
+
+| 维度 | generate | coverage-validate |
+|---|---|---|
+| code_map / doc_map / reconcile | ✅ | ✅ |
+| render（全量 PRD） | ✅ | ❌ |
+| 覆盖度矩阵 | ❌ | ✅ |
+| 增量 gap | ❌ | ✅ |
+| 弱证据 review | ❌ | ✅ |
+| 适用场景 | 首次生成 / 主干重构 | 持续完善 / 新材料校验 |
+
+证据强度评分规则详见 `references/coverage-validate-mode.md` §6。
+
+### 新竞品/新资料入库流程
+
+新增竞品或老竞品增加资料时，流程与现有覆盖度校验完全相同：
+
+1. **转换原始文档**：用 `material-importer` skill 把 docx/xlsx/pdf 转成 md + 提取图片
+2. **放入正确目录**：
+   - 竞品操作手册/蓝图/功能手册 → `$LANLNK_BASE/raw/prd-商管系统/02-competitors/{竞品名}/`
+   - 竞品数据结构/PRD 草案 → `$LANLNK_BASE/materials/13-competitors/{竞品名}/`
+   - demo 探测数据 → `$LANLNK_BASE/prd/商管系统/competitor-analysis/{竞品名}/`
+3. **跑覆盖度校验**：`--mode coverage-validate` 会自动扫描上述三个目录
+4. **看 gap 报告**：`增量gap报告.md` 的"竞品未匹配能力汇总"会列出新增竞品有多少能力被识别
+5. **扩 ontology**：如果新竞品术语未归一，在 `references/term-aliases.yaml` 中补充别名映射
+
+> **术语归一瓶颈**：矩阵单元格是否填充取决于 `term-aliases.yaml` 的覆盖率（当前 ~19%）。新竞品的能力名称如果不在别名表中，会显示为"—"，但不影响基础设施正确性。持续扩充 term-aliases 是提升矩阵覆盖率的唯一路径。
 
 ## 交付原则
 

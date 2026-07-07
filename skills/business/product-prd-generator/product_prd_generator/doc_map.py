@@ -59,7 +59,7 @@ def _load_aliases(skill_root: Path) -> tuple[dict[str, str], dict[str, Any]]:
 
     # Source 2: business-ontology.yaml (broad, shared industry knowledge)
     import os
-    ontology_path = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "knowledge" / "business-ontology.yaml"
+    ontology_path = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "knowledge" / "ontology" / "business-ontology.yaml"
     if ontology_path.is_file():
         ontology = yaml.safe_load(ontology_path.read_text(encoding="utf-8")) or {}
         if isinstance(ontology, dict):
@@ -143,6 +143,7 @@ def _normalize_clause_heading(heading: str) -> str:
     Only exact matches are remapped to avoid over-normalizing unrelated headings.
     """
     clean = re.sub(r'[*#`~]', '', heading).strip()
+    clean = re.sub(r'(?<=[\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5])', '', clean)
     return _FAMILY_CLAUSE_ALIASES.get(clean, clean)
 
 
@@ -197,7 +198,7 @@ def _classify_source_type(rel_path: Path) -> str:
         return SourceType.CUSTOMER.value
     if "00-current-product" in parts:
         return SourceType.CURRENT.value
-    if "02-competitors" in parts:
+    if "02-competitors" in parts or "13-competitors" in parts:
         return SourceType.COMPETITOR.value
     return SourceType.UNKNOWN.value
 
@@ -352,6 +353,17 @@ _NOISE_TEXT_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r'^(FW|GC|WL)\d+'),            # maintenance item codes (锦和)
     re.compile(r'^XM-\d+'),                   # project IDs (华侨城)
     re.compile(r'(并稿|初审|复审|终稿|草稿)'), # document revision stages
+    re.compile(r'(有限公司|股份有限公司|企业管理有限公司|置业|房地产开发|经纪|资产管理有限|投资管理有限)'),  # company names
+    re.compile(r'(系统测试计划|软件测试|交付文档|交付材料|运维部署|运维支持|运行日志|数据备份和恢复|部署指南)'),  # project delivery artifacts
+    re.compile(r'(灰度发布|微服务架构|中台架构|容器化部署|双活|多活|自主可控|容错性|敏捷部署)'),  # architecture requirements
+    re.compile(r'^(可用性|兼容性|稳定性|可靠性|安全性|多应用架构要求|架构标准|技术集成要求|其他系统组件要求|DevOps\s*规范)$'),  # non-functional requirements
+    re.compile(r'(知识产权|商用权利|源代码.*交付|二次开发.*源代码|软件著作权)'),  # IP/legal terms in function field
+    re.compile(r'(变更管理要求|技术支持要求|免费运维|技术开发|技术安全|培训支持|培训计划|售后服务|运维服务期满|项目进度要求|服务团队配置)'),  # project implementation requirements
+    re.compile(r'^总结'),  # document summary sections
+    re.compile(r'^招\s*标\s*文\s*件'),  # bidding document titles with spaces
+    re.compile(r'^(天数|小计|人均|字段分类|办事指南|二级模块概述)$'),  # table field labels not yet covered
+    re.compile(r'^(入住率|平均房价|间房收|客房收入|宴会指标|售票数|计价人数|门票收入|非门票收入|人均票|人均消费|对标市场|委托方|运营方)$'),  # hospitality/tourism metrics out of scope
+    re.compile(r'^(驻场办公|管理范围内授权|产品设计|UI/UE|整体需求|范围要求|技术目标|引言|采购具体需求)$'),  # project doc sections
 ]
 
 
@@ -642,13 +654,22 @@ def _match_with_context(
     sub_scenario: str,
     ontology: dict[str, Any],
     flat_aliases: dict[str, str],
+    nearby_text: str = "",
 ) -> str:
-    """Two-phase matching: classify module, then match within module's sub-functions.
-    Falls back to flat alias matching if no module-specific match found."""
+    """Three-phase matching with module classification and nearby_text fallback.
+
+    Phase 1: classify module, then exact term match in ``function``.
+    Phase 2: if function has no hit, long-term (≥4 chars) match in
+    ``nearby_text`` within the same module.
+    Phase 3: if module classification failed entirely, global nearby_text
+    search across all modules (long terms ≥5 chars, stricter to avoid false hits).
+    Phase 4: flat alias matching on function alone.
+    """
     mod_name = _classify_module(scenario, sub_scenario, function, ontology)
     if mod_name:
         mod_data = ontology.get("modules", {}).get(mod_name, {})
         if isinstance(mod_data, dict):
+            # Phase 1: function exact match
             for sub in mod_data.get("sub_functions", {}).values():
                 if not isinstance(sub, dict):
                     continue
@@ -658,6 +679,33 @@ def _match_with_context(
                     continue
                 for term in sorted(terms, key=len, reverse=True):
                     if isinstance(term, str) and term in function:
+                        return str(caps[0])
+            # Phase 2: nearby_text fallback (long terms only, ≥4 chars)
+            if nearby_text:
+                for sub in mod_data.get("sub_functions", {}).values():
+                    if not isinstance(sub, dict):
+                        continue
+                    caps = sub.get("capabilities", [])
+                    terms = sub.get("terms", [])
+                    if not isinstance(caps, list) or not isinstance(terms, list) or not caps:
+                        continue
+                    for term in sorted(terms, key=len, reverse=True):
+                        if isinstance(term, str) and len(term) >= 4 and term in nearby_text:
+                            return str(caps[0])
+    elif nearby_text:
+        # Phase 3: module classification failed — global nearby_text search (≥5 chars)
+        for mod_data in ontology.get("modules", {}).values():
+            if not isinstance(mod_data, dict):
+                continue
+            for sub in mod_data.get("sub_functions", {}).values():
+                if not isinstance(sub, dict):
+                    continue
+                caps = sub.get("capabilities", [])
+                terms = sub.get("terms", [])
+                if not isinstance(caps, list) or not isinstance(terms, list) or not caps:
+                    continue
+                for term in sorted(terms, key=len, reverse=True):
+                    if isinstance(term, str) and len(term) >= 5 and term in nearby_text:
                         return str(caps[0])
     return _normalize_term(function, flat_aliases)
 
@@ -714,7 +762,7 @@ def _parse_requirements(
         if is_leaf and not _is_noise_text(cand.text):
             nearby = _extract_nearby_text(text, cand.end)
             canonical_heading = _normalize_clause_heading(cand.text)
-            normalized = _match_with_context(canonical_heading, scenario, sub_scenario, ontology, aliases)
+            normalized = _match_with_context(canonical_heading, scenario, sub_scenario, ontology, aliases, nearby)
             nearby_images = _nearby_image_refs(text, cand.pos, image_refs)
             kind = _classify_requirement_kind(str(rel_path), canonical_heading, nearby, source_type)
             clause_items = _extract_clause_items(nearby)
@@ -806,7 +854,55 @@ def _nearby_image_refs(
     return tuple(result)
 
 
-def extract(docs_root: Path, skill_root: Path, project: str = "商管系统") -> DocMap:
+def _merge_requirement(
+    requirements: dict[tuple[str, str], Requirement],
+    req: Requirement,
+) -> None:
+    key = (req.normalized_term, req.function)
+    existing = requirements.get(key)
+    if existing is None:
+        requirements[key] = req
+        return
+    if _prefer_requirement(existing, req):
+        requirements[key] = Requirement(
+            source_file=req.source_file,
+            source_type=req.source_type,
+            source_customer=req.source_customer,
+            scenario=req.scenario,
+            sub_scenario=req.sub_scenario,
+            function=req.function,
+            depth=req.depth,
+            nearby_text=req.nearby_text,
+            normalized_term=req.normalized_term,
+            evidence=_merge_evidence(existing.evidence, req.evidence),
+            kind=req.kind,
+            clause_parent=req.clause_parent,
+            clause_path=req.clause_path,
+        )
+    else:
+        requirements[key] = Requirement(
+            source_file=existing.source_file,
+            source_type=existing.source_type,
+            source_customer=existing.source_customer,
+            scenario=existing.scenario,
+            sub_scenario=existing.sub_scenario,
+            function=existing.function,
+            depth=existing.depth,
+            nearby_text=existing.nearby_text,
+            normalized_term=existing.normalized_term,
+            evidence=_merge_evidence(existing.evidence, req.evidence),
+            kind=existing.kind,
+            clause_parent=existing.clause_parent,
+            clause_path=existing.clause_path,
+        )
+
+
+def extract(
+    docs_root: Path,
+    skill_root: Path,
+    project: str = "商管系统",
+    extra_roots: list[Path] | None = None,
+) -> DocMap:
     aliases, ontology = _load_aliases(skill_root)
     md_files = _iter_markdown_files(docs_root)
     features: dict[str, DocFeature] = {}
@@ -817,43 +913,16 @@ def extract(docs_root: Path, skill_root: Path, project: str = "商管系统") ->
             if existing is None or _prefer_doc_feature(existing, feature):
                 features[feature.normalized_term] = feature
         for req in _parse_requirements(md_path, docs_root, aliases, ontology):
-            key = (req.normalized_term, req.function)
-            existing = requirements.get(key)
-            if existing is None:
-                requirements[key] = req
-                continue
-            if _prefer_requirement(existing, req):
-                requirements[key] = Requirement(
-                    source_file=req.source_file,
-                    source_type=req.source_type,
-                    source_customer=req.source_customer,
-                    scenario=req.scenario,
-                    sub_scenario=req.sub_scenario,
-                    function=req.function,
-                    depth=req.depth,
-                    nearby_text=req.nearby_text,
-                    normalized_term=req.normalized_term,
-                    evidence=_merge_evidence(existing.evidence, req.evidence),
-                    kind=req.kind,
-                    clause_parent=req.clause_parent,
-                    clause_path=req.clause_path,
-                )
-            else:
-                requirements[key] = Requirement(
-                    source_file=existing.source_file,
-                    source_type=existing.source_type,
-                    source_customer=existing.source_customer,
-                    scenario=existing.scenario,
-                    sub_scenario=existing.sub_scenario,
-                    function=existing.function,
-                    depth=existing.depth,
-                    nearby_text=existing.nearby_text,
-                    normalized_term=existing.normalized_term,
-                    evidence=_merge_evidence(existing.evidence, req.evidence),
-                    kind=existing.kind,
-                    clause_parent=existing.clause_parent,
-                    clause_path=existing.clause_path,
-                )
+            _merge_requirement(requirements, req)
+    for extra_root in (extra_roots or []):
+        virtual_parent = extra_root.parent
+        for md_path in _iter_markdown_files(extra_root):
+            for feature in _parse_markdown(md_path, virtual_parent, aliases):
+                existing = features.get(feature.normalized_term)
+                if existing is None or _prefer_doc_feature(existing, feature):
+                    features[feature.normalized_term] = feature
+            for req in _parse_requirements(md_path, virtual_parent, aliases, ontology):
+                _merge_requirement(requirements, req)
     return DocMap(
         project=project,
         source_path=str(docs_root),
@@ -902,9 +971,11 @@ def main() -> int:
     parser.add_argument("--skill-root", default=str(Path(__file__).resolve().parents[1]))
     parser.add_argument("--project", default="商管系统")
     parser.add_argument("--output", default="-")
+    parser.add_argument("--extra-docs-root", action="append", default=[])
     args = parser.parse_args()
 
-    doc_map = extract(Path(args.docs_root), Path(args.skill_root), args.project)
+    extra_roots = [Path(r) for r in args.extra_docs_root if r]
+    doc_map = extract(Path(args.docs_root), Path(args.skill_root), args.project, extra_roots or None)
     payload = json.dumps(to_json(doc_map), ensure_ascii=False, indent=2)
     if args.output == "-":
         print(payload)
