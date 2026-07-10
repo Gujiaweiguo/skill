@@ -1,0 +1,9 @@
+[project]
+name = "openspec-practice"
+version = "0.1.0"
+description = "Lightweight OpenSpec project scanning helper for the openspec-practice skill."
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+package = false
