@@ -428,23 +428,24 @@ def _group_requirements_by_customer(
 
 
 def _group_features_by_competitor(
-    features: list[dict],
+    requirements: list[dict],
 ) -> dict[str, dict[str, list[dict]]]:
-    """Group: competitor → normalized_term → [features].
+    """Group: competitor → matched_capability → [requirements].
 
-    Key is normalized_term (the spec ID equivalent for competitor features).
+    Only includes matched competitor requirements (matched_capability non-empty).
+    Mirrors _group_requirements_by_customer but for competitor source_type.
     """
     result: dict[str, dict[str, list[dict]]] = {}
-    for feat in features:
-        if feat.get("source_type") != "competitor":
+    for req in requirements:
+        if req.get("source_type") != "competitor":
             continue
-        term = feat.get("normalized_term", "")
-        if not term:
+        cap = req.get("matched_capability", "")
+        if not cap:
             continue
-        competitor = _extract_competitor_name(feat.get("source_file", ""))
+        competitor = _extract_competitor_name(req.get("source_file", ""))
         if not competitor:
             continue
-        result.setdefault(competitor, {}).setdefault(term, []).append(feat)
+        result.setdefault(competitor, {}).setdefault(cap, []).append(req)
     return result
 
 
@@ -458,7 +459,18 @@ def build_matrix(
     cap_lookup = _build_capability_lookup(reconcile)
 
     cust_groups = _group_requirements_by_customer(reconcile.get("requirements", []))
-    comp_groups = _group_features_by_competitor(doc_map.get("features", []))
+    comp_groups = _group_features_by_competitor(reconcile.get("requirements", []))
+
+    # Merge structured capability map features (e.g. 旗茂 demo probe) whose
+    # normalized_term is already a valid cap_id (not a raw term).
+    for feat in doc_map.get("features", []):
+        if feat.get("source_type") != "competitor":
+            continue
+        term = feat.get("normalized_term", "")
+        if term and term in cap_lookup:
+            competitor = _extract_competitor_name(feat.get("source_file", ""))
+            if competitor:
+                comp_groups.setdefault(competitor, {}).setdefault(term, []).append(feat)
 
     # Determine column sets
     all_customers = sorted(cust_groups.keys())
