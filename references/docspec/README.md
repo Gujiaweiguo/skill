@@ -52,4 +52,4 @@ DocSpec 是 `/opt/code/skill` 下所有文档类 skill 与 skill 写作本身的
 - 权威规范：`/opt/code/skill/references/docspec/`
 - 跨 skill 入口：`/opt/code/skill/AGENTS.md`
 - 复利入口：`/opt/code/skill/skills/meta/compound-learning/SKILL.md`
-- 业务资料入口：`$LANLNK_BASE/knowledge/README.md` 可引用本目录，但不复制规范正文。
+- 业务资料入口：`$LANLNK_BASE/indexes/lanlnk.md` 和 `$LANLNK_BASE/config/` 可引用本目录，但不复制规范正文。
