@@ -220,6 +220,13 @@ source: "raw/原始文件.pptx.md"
 - 清理 raw 文件前 → 检查 `consumed_by` 是否为空，非空则提示用户确认
 - `unconsumed_sections` 由 AI 判断（对比 raw 文件内容 vs materials 中实际使用的部分）
 
+**索引重建**（raw/ 有大量未索引文件时批量扫描）：
+```bash
+uv run {baseDir}/scripts/scan_raw_index.py                 # 与现有索引合并
+uv run {baseDir}/scripts/scan_raw_index.py --no-merge       # 完全覆盖
+```
+扫描 raw/ 下所有 .md 文件（排除 _media/），对每个文件检测 materials/ 引用，自动推断源路径和时间戳。默认合并模式保留手动维护的字段。
+
 **证照有效期检查**：
 ```bash
 uv run {baseDir}/scripts/check_cert.py $LANLNK_BASE/materials
