@@ -265,11 +265,11 @@ cd skills/word/word-master && uv sync
 
 **症状**：匹配率突然从 17% 降到 ~12%。
 
-**根因**：`$LANLNK_BASE/knowledge/business-ontology.yaml` 文件缺失或路径错误。
+**根因**：`$LANLNK_BASE/config/ontology/business-ontology.yaml` 文件缺失或路径错误。
 
 **诊断步骤**：
 1. 检查环境变量：`echo $LANLNK_BASE`
-2. 检查文件存在：`ls $LANLNK_BASE/knowledge/business-ontology.yaml`
+2. 检查文件存在：`ls $LANLNK_BASE/config/ontology/business-ontology.yaml`
 3. doc_map 的 `_load_aliases` 会优雅退化到纯 term-aliases 匹配（不报错），但匹配率降低。
 
 ---
@@ -497,11 +497,11 @@ for kw in ['m3newcontract', 'm3modifycontract']:
 **诊断步骤**：
 
 1. **检查 SKILL.md / 命令行里写的 docs-root 路径是否与磁盘实际路径一致**
-   - 历史根因：SKILL.md 写的是 `$LANLNK_BASE/prd/商管系统/raw`，但实际路径是 `$LANLNK_BASE/raw/prd-商管系统`。`doc_map._load_aliases()` 在找不到 ontology 时**静默退化**到纯 term-aliases 匹配（不报错），导致 ontology 从未加载，匹配率从应有水平跌到 ~15%。
+   - 历史根因：SKILL.md 写的是 `$LANLNK_BASE/out/prd/商管系统/raw`，但实际路径是 `$LANLNK_BASE/raw/prd-商管系统`。`doc_map._load_aliases()` 在找不到 ontology 时**静默退化**到纯 term-aliases 匹配（不报错），导致 ontology 从未加载，匹配率从应有水平跌到 ~15%。
    - 自检：
      ```bash
      ls "$LANLNK_BASE/raw/prd-商管系统" 2>/dev/null || echo "❌ docs-root 路径错"
-     ls "$LANLNK_BASE/knowledge/ontology/business-ontology.yaml" || echo "❌ ontology 路径错"
+     ls "$LANLNK_BASE/config/ontology/business-ontology.yaml" || echo "❌ ontology 路径错"
      ```
 2. **确认 ontology 是否真的被加载**
    - 在 doc_map 里加一行临时日志，或检查 `parsed/current-doc-map.json` 的 alias 数量。ontology 没加载时 alias 数会少 60%~80%。
@@ -575,7 +575,7 @@ clean = re.sub(r'(?<=[\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5])', '', clean)
 2. **诊断命令**：
    ```bash
    # 列出 ontology 引用的所有 spec ID
-   grep -E '^\s+spec:\s' "$LANLNK_BASE/knowledge/ontology/business-ontology.yaml" | sort -u
+   grep -E '^\s+spec:\s' "$LANLNK_BASE/config/ontology/business-ontology.yaml" | sort -u
    # 列出 openspec 实际目录
    ls openspec/specs/
    # 对比差异

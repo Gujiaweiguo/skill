@@ -21,6 +21,10 @@ compatibility: >
 
 # Frontend Slides — 技术演讲与前端分享幻灯片创作
 
+## DocSpec 质量基线
+
+本 skill 生成的技术分享 PPT、架构讲解、代码示例和内容包必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md`、`PPT与Word内容包质量规范.md` 和 `文档验收清单.md`。代码、架构图、性能数据和结论必须有可复核来源。
+
 专为前端和技术场景设计的演示文稿 Skill，兼顾技术严谨性与视觉表达。
 
 ## 设计理念

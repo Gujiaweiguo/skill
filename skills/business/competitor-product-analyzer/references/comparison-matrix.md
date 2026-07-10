@@ -72,7 +72,7 @@
 
 1. 用户在 P0 显式提供
 2. `requirement-evaluator` 的客户需求汇总（频率高的能力维度加权）
-3. `$LANLNK_BASE/knowledge/sales/methodology/15-商业地产岗位病药矩阵.md`（多岗位共同痛点加权）
+3. `$LANLNK_BASE/materials/10-methodology/methodology/15-商业地产岗位病药矩阵.md`（多岗位共同痛点加权）
 4. 默认均匀分布（仅当以上都缺失，且必须在 summary 标注"权重未校准"）
 
 ## MatrixCapability 对象

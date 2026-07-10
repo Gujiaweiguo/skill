@@ -26,6 +26,10 @@ compatibility: >
 
 # Doc Generator - Web 应用操作手册生成器
 
+## DocSpec 质量基线
+
+本 skill 生成的操作手册、`chunks.jsonl` 和 `llms.txt` 必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md`、`手册与知识库文档质量规范.md` 和 `文档验收清单.md`。运行时探测、截图、操作步骤和 RAG 输出必须保持一致。
+
 为运行中的 SPA 应用（Vue3 / React / Next / Nuxt 等）自动产出图文操作手册，同步生成 LangChain RAG 友好的 `chunks.jsonl` 与 `llms.txt`。agent 负责发现、规划、协作与编排，确定性渲染交给 `scripts/render_manual.py`。
 
 ## Architecture

@@ -17,6 +17,10 @@ compatibility: >
 
 # Ops Manual Generator - 系统部署与维护手册生成器
 
+## DocSpec 质量基线
+
+本 skill 生成的部署手册、维护手册、运维 SOP 和知识库版 Markdown 必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md`、`手册与知识库文档质量规范.md` 和 `文档验收清单.md`。IaC 事实、人工经验、脱敏规则和可执行命令必须分清。
+
 为已开发的系统生成**部署手册**和**维护手册**两份运维文档。与 doc-generator（用户操作手册）并列——同一系统的用户手册、部署手册、维护手册共存于 `$USERGUIDE_BASE/{name}/`。
 
 ## 工作方式（模板填充，非 pipeline）

@@ -934,6 +934,123 @@ def _render_weak_evidence_md(rows: list[CapabilityRow]) -> str:
     return "\n".join(lines)
 
 
+def _coverage_priority(row: CapabilityRow) -> str:
+    customer_count = sum(
+        1 for cell in row.customer_cells.values()
+        if cell.strength in {"strong", "medium", "weak"} and cell.matched_count > 0
+    )
+    if row.prd_status == "missing" and customer_count >= 2:
+        return "P0"
+    if row.prd_status in {"missing", "partial"}:
+        return "P1" if customer_count >= 1 else "P2"
+    return "P2"
+
+
+def _slugify_change_id(raw: str, fallback_index: int) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", raw.lower()).strip("-")
+    if slug:
+        return slug[:64]
+    return f"coverage-gap-{fallback_index:02d}"
+
+
+def _build_suggested_changes(rows: list[CapabilityRow]) -> list[dict]:
+    candidates = [
+        row for row in rows
+        if row.prd_status in {"missing", "partial"} or row.recommendation
+    ]
+    priority_rank = {"P0": 0, "P1": 1, "P2": 2}
+    changes: list[dict] = []
+    seen_ids: set[str] = set()
+    for idx, row in enumerate(candidates, 1):
+        customers = [
+            name for name, cell in row.customer_cells.items()
+            if cell.strength in {"strong", "medium", "weak"} and cell.matched_count > 0
+        ]
+        competitors = [
+            name for name, cell in row.competitor_cells.items()
+            if cell.strength in {"strong", "medium", "weak"} and cell.matched_count > 0
+        ]
+        priority = _coverage_priority(row)
+        change_id = _slugify_change_id(row.capability_id or row.capability_name, idx)
+        base_id = change_id
+        suffix = 2
+        while change_id in seen_ids:
+            tail = f"-{suffix}"
+            change_id = f"{base_id[:64 - len(tail)]}{tail}"
+            suffix += 1
+        seen_ids.add(change_id)
+        changes.append({
+            "change_id": change_id,
+            "title": row.capability_name,
+            "priority": priority,
+            "module": row.module,
+            "prd_status": row.prd_status or "unknown",
+            "confidence": row.confidence,
+            "customer_evidence": customers,
+            "competitor_evidence": competitors,
+            "recommendation": row.recommendation,
+            "needs_review": row.needs_review,
+            "review_reasons": list(row.review_reasons),
+            "mi_action": (
+                "目标项目确认后优先进入本轮 OpenSpec"
+                if priority == "P0"
+                else "目标项目确认后进入后续 OpenSpec 或 backlog"
+            ),
+        })
+    return sorted(changes, key=lambda c: (priority_rank.get(str(c["priority"]), 9), str(c["change_id"])))
+
+
+def _write_suggested_changes_yaml(output_dir: Path, rows: list[CapabilityRow]) -> Path:
+    changes = _build_suggested_changes(rows)
+    payload = {
+        "generated_by": "product-prd-generator coverage-validate",
+        "handoff_boundary": "PRD coverage side provides evidence and suggested grouping; target project owns OpenSpec decisions and implementation.",
+        "source_files": {
+            "customer_matrix": "PRD客户需求覆盖度矩阵.md",
+            "competitor_matrix": "PRD竞品覆盖度矩阵.md",
+            "delta_report": "增量gap报告.md",
+            "weak_evidence_review": "review/evidence-weak-items.md",
+        },
+        "changes": changes,
+    }
+    path = output_dir / "suggested-openspec-changes.yaml"
+    if yaml is not None:
+        path.write_text(yaml.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    else:
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def _write_mi_consumption_prompt(output_dir: Path, suggested_path: Path) -> Path:
+    prompt = f"""# MI / 目标项目消费提示词（coverage-validate 增量）
+
+在目标项目目录（如 `/opt/code/mi`）启动 OpenCode 后使用。
+
+```text
+请先读取当前项目 AGENTS.md、openspec/specs/、相关代码和测试基线，再消费 PRD 覆盖度校验结果，不要直接创建 change。
+
+覆盖度矩阵：
+- { (output_dir / 'PRD客户需求覆盖度矩阵.md').resolve() }
+- { (output_dir / 'PRD竞品覆盖度矩阵.md').resolve() }
+增量 gap 报告：{ (output_dir / '增量gap报告.md').resolve() }
+建议 OpenSpec 拆分：{ suggested_path.resolve() }
+
+请先输出目标项目增量实施确认稿：
+1) 哪些 gap 已被现有 spec/code 覆盖，只是 PRD code_map 漏判
+2) 哪些是真缺口，按 P0/P1/P2 分级
+3) 哪些建议合并成一个 change，哪些必须拆开
+4) 建议的普通 <CHANGE_ID> 清单、验收标准、回归范围
+5) 哪些问题需要我确认
+
+如果只是单个明确缺口，请切 Sisyphus 创建普通 OpenSpec change；如果本轮有多个 P0/P1 或存在跨模块依赖，请先切 Prometheus 生成 Implementation Plan v1。
+等我确认后，再创建或更新 OpenSpec change。
+```
+"""
+    path = output_dir / "mi-consumption-prompt.md"
+    path.write_text(prompt, encoding="utf-8")
+    return path
+
+
 # --- CLI ---
 
 
@@ -1049,6 +1166,11 @@ def main(argv: list[str] | None = None) -> int:
     weak_path = review_dir / "evidence-weak-items.md"
     weak_path.write_text(weak_md, encoding="utf-8")
     print(f"  → {weak_path}")
+
+    suggested_path = _write_suggested_changes_yaml(output_dir, rows)
+    print(f"  → {suggested_path}")
+    prompt_path = _write_mi_consumption_prompt(output_dir, suggested_path)
+    print(f"  → {prompt_path}")
 
     # 4. Update baseline
     if args.update_baseline and baseline_path:

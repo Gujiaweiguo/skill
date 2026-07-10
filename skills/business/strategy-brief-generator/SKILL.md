@@ -25,6 +25,10 @@ compatibility: >
 
 # Strategy Brief Generator — 商业地产信息化战略简报 Agent Pipeline
 
+## DocSpec 质量基线
+
+本 skill 生成的战略简报、机会分析、竞品判断和路线建议必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md`、`方案与投标文档质量规范.md` 和 `文档验收清单.md`。事实、判断、建议必须分层；假设和资料缺口必须进入 review。
+
 基于 `明源战略模板（四看方法论）+ 多源资料整合 + 证据型分析 + Markdown 输出` 的方案。
 
 ## 核心定位
@@ -129,7 +133,7 @@ company-intro-generator（客户方案）/ bid-doc-master（投标）
 战略分析专用资料放在独立目录，与 PRD 资料、materials 素材库隔离：
 
 ```text
-$LANLNK_BASE/strategy/商业地产信息化战略/
+$LANLNK_BASE/out/strategy/商业地产信息化战略/
 ├── input/                         # 原始资料，只放原文件，不修改
 │   ├── 00-methodology/            # 战略方法论模板
 │   │   └── 明源战略模板/            # 明源多份战略模板资料
@@ -181,7 +185,7 @@ $LANLNK_BASE/strategy/商业地产信息化战略/
 
 1. 在对应 input 子目录放一个 `source-ref.md`，记录源码根路径
 2. 后续由 Agent 读取源码，抽取能力清单到 `parsed/self/`
-3. 商管可复用已有 PRD：`$LANLNK_BASE/prd/商管系统/output/产品PRD.md`
+3. 商管可复用已有 PRD：`$LANLNK_BASE/out/prd/商管系统/output/产品PRD.md`
 
 ## 处理流程
 
@@ -289,7 +293,7 @@ self-capability-map.json
 
 | 资产 | 来源 | 盘点内容 |
 |------|------|---------|
-| 商管 | `/opt/code/mi` 源码 + `$LANLNK_BASE/prd/商管系统/output/` | 已有模块、能力成熟度、技术栈 |
+| 商管 | `/opt/code/mi` 源码 + `$LANLNK_BASE/out/prd/商管系统/output/` | 已有模块、能力成熟度、技术栈 |
 | 会员 | `$LANLNK_BASE/materials/03-products/` + `04-cases/` | 产品功能、已交付案例、行业覆盖 |
 | AI | lnkchatbi / langchat 源码 | AI问数能力、RAG 能力、大模型集成方式 |
 
@@ -518,7 +522,7 @@ D 路线不是“长尾铺量”。如果报告同时写“长尾暂不做”和
 
 场景优先来自客户 SOP；SOP 缺失但已有 PRD/竞品资料能证明的场景（如财务出账、账龄、保证金、发票、平台券分账）可以补入，但要在说明里标注来源。
 
-> **2026-07-05 补充：岗位病药矩阵数据源**。写"客户岗位场景需求"时，优先引用 `$LANLNK_BASE/knowledge/sales/methodology/15-商业地产岗位病药矩阵.md`，它已提供 7 岗位（总经理/招商总/财务总/营运总/企划总/物业总/IT总）× 痛点/场景/功能/价值/证明的完整矩阵，可直接作为需求表的初稿来源，不必从零推导。证明列注意分级：Z1 实证/Z2 竞品行业对标/Z3 蓝联产品状态/Z4 待试点验证，避免把对标说成案例。
+> **2026-07-05 补充：岗位病药矩阵数据源**。写"客户岗位场景需求"时，优先引用 `$LANLNK_BASE/materials/10-methodology/methodology/15-商业地产岗位病药矩阵.md`，它已提供 7 岗位（总经理/招商总/财务总/营运总/企划总/物业总/IT总）× 痛点/场景/功能/价值/证明的完整矩阵，可直接作为需求表的初稿来源，不必从零推导。证明列注意分级：Z1 实证/Z2 竞品行业对标/Z3 蓝联产品状态/Z4 待试点验证，避免把对标说成案例。
 
 ### 内部汇报用蓝联整体视角
 
@@ -558,7 +562,7 @@ export LANLNK_BASE=/opt/code/docs/lanlnk
 
 | 变量 | 路径 |
 |------|------|
-| `$STRATEGY_ROOT` | `$LANLNK_BASE/strategy/商业地产信息化战略` |
+| `$STRATEGY_ROOT` | `$LANLNK_BASE/out/strategy/商业地产信息化战略` |
 | `$STRATEGY_INPUT` | `$STRATEGY_ROOT/input` |
 | `$STRATEGY_RAW` | `$STRATEGY_ROOT/raw` |
 | `$STRATEGY_PARSED` | `$STRATEGY_ROOT/parsed` |

@@ -21,6 +21,11 @@ from typing import Any
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.worksheet.page import PageMargins
+from openpyxl.worksheet.properties import PageSetupProperties
+
+# A4 纸张代码（Excel paperSize）
+PAPER_A4 = 9
 
 # === 样式常量（参考正祥报价单）===
 FONT_NAME = "微软雅黑"
@@ -68,10 +73,10 @@ MI_DATA: dict[str, Any] = {
     "optional_items": [
         ("2.1", "定制开发-线索确权规则",
          "公海池/线索保护期/首访确权判定/多渠道撞客处理/佣金结算确权规则",
-         19800, 0, "11 人天 × 1800/天；P0 首期，可选"),
+         22000, 0, "11 人天 × 2000/天；P0 首期，可选"),
         ("2.2", "定制开发-写字楼房屋售卖",
          "产权交易全流程：售卖合同/售价管理/认购记录/房款分期/业财打通",
-         54000, 0, "30 人天 × 1800/天；P1 二期，可选"),
+         60000, 0, "30 人天 × 2000/天；P1 二期，可选"),
     ],
     # 第三方集成（不报价）：集成项 / 说明 / 计费方式
     "third_party": [
@@ -138,10 +143,10 @@ MI_DATA: dict[str, Any] = {
     "service_notes": [
         "1. 服务承诺：提供首次上线的后台数据切换，包括铺位/合同/应收数据初始化、"
         "历史数据迁移、系统配置；",
-        "2. 二开单价：未来新需求，二开人天单价按 1,800 元/人天结算；",
+        "2. 二开单价：未来新需求，二开人天单价按 2,000 元/人天结算；",
         "3. SAAS 服务范围：含平台运维、安全更新、版本升级；不含定制开发和数据导出定制；",
         "4. 实施人天：首年实施含 15 人天（项目启动+方案设计+上线+验收），"
-        "超出部分按 1,800 元/人天另计；",
+        "超出部分按 2,000 元/人天另计；",
         "5. 付款方式：首年签订合同时支付 50%，验收后支付 50%；次年租用费按年续费支付。",
     ],
     "standard_first_year_total": 50000,
@@ -155,39 +160,39 @@ CRM_DATA: dict[str, Any] = {
     "standard_items": [
         ("1.1", "CRM 平台 SAAS 租用",
          "智慧商圈会员营销 CRM 平台，含电子会员/会员卡券/会员积分/会员标签/会员等级/会员资产",
-         27000, 27000, "年租用费"),
+         60000, 30000, "年租用费"),
         ("1.2", "智慧商圈",
          "开通微信/支付宝智慧商圈，实现支付即积分/支付即会员/无感积分/停车积分",
-         0, 0, "赠送"),
+         20000, 0, "必选，首年开通费"),
         ("1.3", "实施服务",
          "项目启动/方案设计/上线运行/项目验收",
-         18000, 0, "首年一次性，含 10 人天"),
+         20000, 0, "首年一次性，含 10 人天"),
         ("1.4", "年度售后服务",
          "问题排查/修复/安全漏洞修补/技术维护",
          0, 0, "首年赠送，含在租用费"),
     ],
     "optional_items": [
-        ("2.1", "集成停车",
-         "CRM 集成停车系统，在线缴费/积分/停车券优惠停车等停车营销服务",
-         9000, 9000, "可选，按年"),
-        ("2.2", "定制开发",
-         "美团及抖音平台打通等定制需求",
-         18000, 0, "可选，一次性"),
+        ("2.1", "停车对接",
+         "CRM 对接停车系统，对接在线缴费/积分/停车券优惠停车等停车营销服务",
+         10000, 0, "可选"),
+        ("2.2", "美团对接",
+         "CRM 对接美团系统，对接会员/积分/优惠券等营销服务",
+         10000, 0, "可选"),
+        ("2.3", "抖音对接",
+         "CRM 对接抖音系统，对接会员/积分/优惠券等营销服务",
+         10000, 0, "可选"),
     ],
-    "third_party": [
-        ("在线支付网关", "微信/支付宝在线缴费", "客户指定支付网关后单独计费"),
-        ("第三方电子签", "法大大/e签宝等电子合同签署", "按第三方报价 + 集成人天"),
-    ],
+    "third_party": [],
     "plans": [
         ("5.1", "方案 A：标准产品（CRM 平台 + 智慧商圈 + 实施 + 售后）",
-         45000, "", 27000, "",
+         100000, "", 30000, "",
          "标准会员营销闭环"),
-        ("5.2", "方案 B：标准 + 集成停车",
-         54000, "", 36000, "",
+        ("5.2", "方案 B：标准 + 停车对接",
+         110000, "", 30000, "",
          "含停车积分营销"),
-        ("5.3", "方案 C：标准 + 集成停车 + 定制开发",
-         72000, "", 36000, "",
-         "含美团/抖音平台打通"),
+        ("5.3", "方案 C：标准 + 全部对接（停车 + 美团 + 抖音）",
+         130000, "", 30000, "",
+         "含停车/美团/抖音平台打通"),
     ],
     "modules": [
         ("会员管理",
@@ -207,15 +212,16 @@ CRM_DATA: dict[str, Any] = {
         ("系统管理",
          "组织架构/权限管理/门店管理/数据隔离/日志审计/系统配置"),
     ],
+    "modules_xlsx": "/opt/code/docs/lanlnk/out/proposals/正祥会员系统/蓝联CRM功能清单.xlsx",
     "service_notes": [
         "1. 服务承诺：提供首次上线的后台数据切换，包括会员数据切入、积分数据切入、订单数据切入、历史会员资产备份；",
-        "2. 二开单价：未来新需求，二开人天单价按 1,800 元/人天结算；",
+        "2. 二开单价：未来新需求，二开人天单价按 2,000 元/人天结算；",
         "3. SAAS 服务范围：含平台运维、安全更新、版本升级；不含定制开发和数据导出定制；",
-        "4. 实施人天：首年实施含 10 人天（项目启动+方案设计+上线+验收），超出部分按 1,800 元/人天另计；",
+        "4. 实施人天：首年实施含 10 人天（项目启动+方案设计+上线+验收），超出部分按 2,000 元/人天另计；",
         "5. 付款方式：首年签订合同时支付 50%，验收后支付 50%；次年租用费按年续费支付。",
     ],
-    "standard_first_year_total": 45000,
-    "standard_next_year_total": 27000,
+    "standard_first_year_total": 100000,
+    "standard_next_year_total": 30000,
 }
 
 
@@ -242,7 +248,7 @@ AI_SERVICE_NOTES: list[str] = [
     "3. 次年运营服务费固定 2 万：不论购买几个岗位，次年运营服务费均为 2 万。"
     "AI 岗位 Skill 卖的是运营服务——周复盘/命中率调优/知识库更新/效果看板/SLA 保障/持续优化，"
     "确保 Skill 越用越准；",
-    "4. 新岗位 Skill 定制：如需当前 6 个以外的岗位 Skill，按 1,800 元/人天定制开发；",
+    "4. 新岗位 Skill 定制：如需当前 6 个以外的岗位 Skill，按 2,000 元/人天定制开发；",
     "5. 数据接入：客户需提供商管系统/CRM/客流等数据源接口；"
     "LnkAgent 本地部署确保数据安全；",
     "6. 退出机制：试点 90 天后效果不达预期可停止，不绑定长期合同。",
@@ -289,7 +295,7 @@ def build_ai_data(positions: int) -> dict[str, Any]:
         "optional_items": [
             ("2.1", "新岗位 Skill 定制开发",
              "当前 6 个岗位 Skill 以外的定制需求（如物业岗/招商谈判岗等），按人天结算",
-             0, 0, "1,800 元/人天；按需"),
+             0, 0, "2,000 元/人天；按需"),
         ],
         "third_party": [
             ("数据源接入", "商管系统/CRM/客流等数据接口",
@@ -318,6 +324,102 @@ def build_ai_data(positions: int) -> dict[str, Any]:
     }
 
 
+def merge_product_data(products: list[dict[str, Any]]) -> dict[str, Any]:
+    """合并多个产品的报价数据。
+
+    合并规则：
+    - standard_items: 全部合并，序号重编 1.1/1.2/...，名称加【产品标签】前缀
+    - optional_items: 按名称去重，序号重编 2.1/2.2/...
+    - third_party: 按名称去重
+    - plans: 动态生成3个方案（标准组合 / 标准组合+P0二开 / 标准组合+全部二开）
+    - modules: 全部合并，名称加【产品标签】前缀
+    - service_notes: 按内容去重
+    - totals: 首年/次年分别求和
+    """
+    merged_label = "+".join(p["product_label"] for p in products)
+    merged_name = "+".join(p["product_name"] for p in products)
+
+    standard_items: list[tuple] = []
+    seq = 1
+    for p in products:
+        for item in p["standard_items"]:
+            standard_items.append((
+                f"1.{seq}", f"【{p['product_label']}】{item[1]}",
+                item[2], item[3], item[4], item[5],
+            ))
+            seq += 1
+
+    optional_items: list[tuple] = []
+    seen_opt: set[str] = set()
+    seq = 1
+    for p in products:
+        for item in p["optional_items"]:
+            if item[1] in seen_opt:
+                continue
+            seen_opt.add(item[1])
+            optional_items.append((
+                f"2.{seq}", f"【{p['product_label']}】{item[1]}",
+                item[2], item[3], item[4], item[5],
+            ))
+            seq += 1
+
+    third_party: list[tuple] = []
+    seen_tp: set[str] = set()
+    for p in products:
+        for item in p["third_party"]:
+            if item[0] in seen_tp:
+                continue
+            seen_tp.add(item[0])
+            third_party.append(item)
+
+    modules: list[tuple] = []
+    for p in products:
+        for mod in p["modules"]:
+            modules.append((f"【{p['product_label']}】{mod[0]}", mod[1]))
+
+    service_notes: list[str] = []
+    seen_sn: set[str] = set()
+    for p in products:
+        for note in p["service_notes"]:
+            if note in seen_sn:
+                continue
+            seen_sn.add(note)
+            service_notes.append(note)
+
+    std_first = sum(p["standard_first_year_total"] for p in products)
+    std_next = sum(p["standard_next_year_total"] for p in products)
+
+    p0_first = sum(
+        it[3] for it in optional_items if "P0" in it[5] or "必需" in it[5]
+    )
+    all_opt_first = sum(it[3] for it in optional_items)
+
+    plans = [
+        ("5.1", "方案 A：标准产品组合（无二开）",
+         std_first, "", std_next, "",
+         "所有产品标准组合起步，无任何二开"),
+        ("5.2", "方案 B：标准组合 + P0 必需二开",
+         std_first + p0_first, "", std_next, "",
+         "在标准组合基础上加 P0 必需二开"),
+        ("5.3", "方案 C：标准组合 + 全部二开",
+         std_first + all_opt_first, "", std_next, "",
+         "在标准组合基础上加全部可选二开"),
+    ]
+
+    return {
+        "product_name": merged_name,
+        "product_label": merged_label,
+        "standard_items": standard_items,
+        "optional_items": optional_items,
+        "third_party": third_party,
+        "plans": plans,
+        "modules": modules,
+        "service_notes": service_notes,
+        "standard_first_year_total": std_first,
+        "standard_next_year_total": std_next,
+    }
+
+
 def get_lanlnk_base() -> Path:
     return Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk"))
 
@@ -326,7 +428,7 @@ def parse_devkit(path: Path) -> list[tuple[str, str, str, int, int, str]]:
     """解析 requirement-evaluator 的需求评估报告，提取 MI 二开清单。
 
     返回 optional_items 格式：[(序号, 名称, 说明, 首年报价, 次年报价, 备注), ...]
-    报价 = 人天 × 1800（pricing-generator 报价单价）
+    报价 = 人天 × 2000（pricing-generator 报价单价）
     """
     import re
     text = path.read_text(encoding="utf-8")
@@ -336,12 +438,12 @@ def parse_devkit(path: Path) -> list[tuple[str, str, str, int, int, str]]:
     pattern = r"\|\s*(\d+)\s*\|\s*(.+?)\s*\|.*?\|\s*\*{0,2}([SML])\*{0,2}\s*\|\s*(\d+)\s*\|"
     for m in re.finditer(pattern, text):
         num, name, complexity, days = m.group(1), m.group(2).strip(), m.group(3), int(m.group(4))
-        cost = days * 1800
+        cost = days * 2000
         seq = f"2.{num}"
         items.append((
             seq, f"定制开发-{name}",
             f"{name}（{complexity} 级，{days} 人天）",
-            cost, 0, f"{days} 人天 × 1,800/天；P{0 if complexity in ('S','M') else 1}"
+            cost, 0, f"{days} 人天 × 2,000/天；P{0 if complexity in ('S','M') else 1}"
         ))
     return items
 
@@ -402,21 +504,38 @@ def write_header_row(ws, row: int, headers: list[str]) -> None:
 
 
 def _estimate_height(values: list[Any], col_widths_chars: dict[int, int]) -> float:
-    """根据内容长度估算行高。"""
+    """根据内容显示宽度估算行高（中文/全角计 2、半角计 1）。"""
     max_lines = 1
     for i, v in enumerate(values, start=1):
         if not isinstance(v, str) or not v:
             continue
         width = col_widths_chars.get(i, 20)
-        # 中文字符宽度近似 2，估算每行可容纳字符数
-        capacity = max(8, int(width * 1.4))
-        # 显式换行也计
-        segments = str(v).split("\n")
-        lines = 0
-        for seg in segments:
-            lines += max(1, -(-len(seg) // capacity))  # ceil
-        max_lines = max(max_lines, lines)
-    return max(24.0, 16.0 * max_lines + 6.0)
+        capacity = max(6.0, width * 0.95)
+        for seg in str(v).split("\n"):
+            seg_w = sum(2 if ord(ch) > 127 else 1 for ch in seg)
+            lines = max(1, -(-seg_w // capacity))
+            max_lines = max(max_lines, int(lines))
+    return max(24.0, 17.0 * max_lines + 8.0)
+
+
+def apply_a4_print(
+    ws,
+    *,
+    orientation: str = "portrait",
+    title_rows: str | None = None,
+) -> None:
+    """配置 A4 打印：宽度压 1 页、高度自动多页、水平居中、窄边距。"""
+    ws.page_setup.paperSize = PAPER_A4
+    ws.page_setup.orientation = orientation
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.print_options.horizontalCentered = True
+    ws.page_margins = PageMargins(
+        left=0.5, right=0.5, top=0.6, bottom=0.6, header=0.3, footer=0.3
+    )
+    if title_rows:
+        ws.print_title_rows = title_rows
 
 
 def write_data_row(
@@ -483,7 +602,7 @@ def build_quote_sheet(
 
     # 二开单价
     write_info_row(ws, r,
-                   "二开单价：未来新需求，二开人天单价按 1,800 元/人天结算",
+                   "二开单价：未来新需求，二开人天单价按 2,000 元/人天结算",
                    end_col); r += 1
 
     r += 1  # 空行
@@ -508,8 +627,8 @@ def build_quote_sheet(
 
     r += 1
 
-    # 二、定制开发报价（可选）
-    write_section_title(ws, r, "二、定制开发报价（可选，单独计费）", end_col); r += 1
+    # 二、第三方对接（可选，单独计费）
+    write_section_title(ws, r, "二、第三方对接（可选，单独计费）", end_col); r += 1
     write_header_row(ws, r,
                      ["序号", "名称", "内容说明",
                       "首年报价(元)", "次年报价(元)", "备注"])
@@ -519,64 +638,44 @@ def build_quote_sheet(
 
     r += 1
 
-    # 三、第三方集成（另行计费）
-    write_section_title(ws, r,
-                        "三、第三方集成（另行计费，不在本报价内）",
-                        end_col); r += 1
-    write_header_row(ws, r,
-                     ["序号", "集成项", "说明", "", "", "备注"]); r += 1
-    for i, item in enumerate(data["third_party"], start=1):
-        write_data_row(ws, r, [f"3.{i}", item[0], item[1], "", "", item[2]]); r += 1
+    # 三、第三方集成（另行计费，仅在 non-empty 时渲染）
+    if data.get("third_party"):
+        write_section_title(ws, r,
+                            "三、第三方集成（另行计费，不在本报价内）",
+                            end_col); r += 1
+        write_header_row(ws, r,
+                         ["序号", "集成项", "说明", "", "", "备注"]); r += 1
+        for i, item in enumerate(data["third_party"], start=1):
+            write_data_row(ws, r, [f"3.{i}", item[0], item[1], "", "", item[2]]); r += 1
 
-    r += 1
+        r += 1
 
-    # 四、汇总区（含优惠价留空）
+    # 三、汇总区
     write_section_title(ws, r,
-                        "四、汇总：报价合计（优惠价留空，供销售谈判填写）",
+                        "三、汇总：报价合计",
                         end_col); r += 1
     write_header_row(ws, r,
                      ["序号", "项目", "首年汇总(元)", "首年优惠价",
                       "次年汇总(元)", "次年优惠价"]); r += 1
     write_data_row(ws, r,
-                   ["4.1", "标准产品",
+                   ["3.1", "标准产品",
                     data["standard_first_year_total"], "",
                     data["standard_next_year_total"], ""],
                    highlight=True); r += 1
     opt_first = sum(it[3] for it in data["optional_items"])
     write_data_row(ws, r,
-                   ["4.2", "+ 定制开发（全选）", opt_first, "", 0, ""],
+                   ["3.2", "+ 第三方对接（全选）", opt_first, "", 0, ""],
                    highlight=True); r += 1
     write_data_row(ws, r,
-                   ["4.3", "合计（标准 + 全部二开）",
+                   ["3.3", "合计",
                     data["standard_first_year_total"] + opt_first, "",
                     data["standard_next_year_total"], ""],
                    total=True, highlight=True); r += 1
 
     r += 1
 
-    # 五、方案对比（A/B/C）
-    write_section_title(ws, r,
-                        "五、报价方案对比（A/B/C）",
-                        end_col); r += 1
-    write_header_row(ws, r,
-                     ["序号", "方案", "首年汇总(元)", "首年优惠价",
-                      "次年汇总(元)", "次年优惠价"]); r += 1
-    for plan in data["plans"]:
-        # plan = (序号, 方案, 首年汇总, 首年优惠价, 次年汇总, 次年优惠价, 适用)
-        write_data_row(ws, r,
-                       [plan[0], plan[1], plan[2], plan[3], plan[4], plan[5]]); r += 1
-        # 适用场景说明（合并行）
-        ws.merge_cells(start_row=r, start_column=1,
-                       end_row=r, end_column=end_col)
-        c = ws.cell(r, 1, f"适用：{plan[6]}")
-        style_cell(c, size=9, color=COLOR_INFO_FG, h="left", v="center")
-        ws.row_dimensions[r].height = 20
-        r += 1
-
-    r += 1
-
-    # 六、服务说明
-    write_section_title(ws, r, "六、服务说明", end_col); r += 1
+    # 四、服务说明
+    write_section_title(ws, r, "四、服务说明", end_col); r += 1
     for note in data["service_notes"]:
         ws.merge_cells(start_row=r, start_column=1,
                        end_row=r, end_column=end_col)
@@ -593,6 +692,7 @@ def build_quote_sheet(
                 "服务说明：本报价仅供客户项目成员内部参阅，有效期 30 天，请勿外传。")
     style_cell(c, size=9, color=COLOR_FOOTER_FG, h="left", border=False)
 
+    apply_a4_print(ws, orientation="portrait", title_rows="1:4")
     # 冻结前 4 行（标题/信息/模式/单价）
     ws.freeze_panes = "A5"
 
@@ -601,11 +701,123 @@ def build_quote_sheet(
 def build_modules_sheet(wb: Workbook, data: dict[str, Any]) -> None:
     ws = wb.create_sheet(title=f"{data['product_label']}功能清单")
 
+    xlsx_path = data.get("modules_xlsx")
+    if xlsx_path and Path(xlsx_path).exists():
+        _fill_modules_from_xlsx(ws, xlsx_path, data)
+    else:
+        _fill_modules_from_data(ws, data)
+
+
+def _fill_modules_from_xlsx(ws, xlsx_path: str, data: dict[str, Any]) -> None:
+    import openpyxl as _opx
+    src_wb = _opx.load_workbook(xlsx_path, data_only=True)
+    src_ws = src_wb.active
+
+    col_widths = {"A": 4, "B": 10, "C": 13, "D": 18, "E": 50}
+    col_width_map = {i: col_widths[c] for i, c in enumerate("ABCDE", 1)}
+    for col, w in col_widths.items():
+        ws.column_dimensions[col].width = w
+
+    r = 1
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
+    c = ws.cell(r, 1, f"{data['product_name']} 功能清单")
+    style_cell(c, size=14, bold=True, h="center", v="center", border=False)
+    ws.row_dimensions[r].height = 28
+    r += 1
+
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
+    c = ws.cell(
+        r, 1,
+        "以下为标准功能清单（源自蓝联CRM功能清单.xlsx）。定价见「报价单」Sheet。",
+    )
+    style_cell(c, size=9, color=COLOR_INFO_FG, h="left", v="center", border=False)
+    ws.row_dimensions[r].height = 20
+    r += 2
+
+    header_row: int | None = None
+    data_started = False
+    group_b_rows: list[int] = []
+    group_c_rows: list[int] = []
+    section_rows: list[int] = []
+    last_data_row: int | None = None
+
+    src_rows = list(src_ws.iter_rows(min_row=1, values_only=True))
+    # 源文件第 1 行是其自带总标题，与上方生成标题重复，跳过
+    for src_idx, row in enumerate(src_rows):
+        if src_idx == 0:
+            continue
+        if all(v is None or str(v).strip() == "" for v in row):
+            continue
+        values = list(row[:5]) + [None] * (5 - len(row[:5]))
+
+        is_section_title = (
+            values[0] is not None and str(values[0]).strip() != ""
+            and all(v is None or str(v).strip() == "" for v in values[1:5])
+        )
+
+        if is_section_title:
+            section_rows.append(r)
+            ws.merge_cells(start_row=r, start_column=1,
+                           end_row=r, end_column=5)
+            cell = ws.cell(r, 1, values[0])
+            style_cell(cell, size=10, bold=True, h="left", v="center")
+            ws.row_dimensions[r].height = 22
+        else:
+            is_header = (
+                header_row is None
+                and values[0] is not None
+                and "序号" in str(values[0])
+            )
+            if is_header:
+                header_row = r
+            elif header_row is not None:
+                data_started = True
+            for col_idx in range(1, 6):
+                v = values[col_idx - 1]
+                cell = ws.cell(r, col_idx, v if v is not None else "")
+                if col_idx == 1:
+                    style_cell(cell, size=9, h="center", v="center")
+                elif col_idx in (2, 3):
+                    style_cell(cell, size=9, bold=True, h="left", v="center")
+                else:
+                    style_cell(cell, size=9, h="left", v="center")
+            ws.row_dimensions[r].height = _estimate_height(
+                [str(v) if v is not None else "" for v in values], col_width_map
+            )
+            if data_started:
+                if values[1] not in (None, ""):
+                    group_b_rows.append(r)
+                if values[2] not in (None, ""):
+                    group_c_rows.append(r)
+                last_data_row = r
+        r += 1
+
+    def _merge_group(col_idx: int, anchor_rows: list[int]) -> None:
+        for i, start in enumerate(anchor_rows):
+            next_anchor = anchor_rows[i + 1] - 1 if i + 1 < len(anchor_rows) else last_data_row
+            next_section = min(
+                (s - 1 for s in section_rows if s > start), default=last_data_row
+            )
+            end = min(next_anchor, next_section)
+            if end and end > start:
+                ws.merge_cells(
+                    start_row=start, start_column=col_idx,
+                    end_row=end, end_column=col_idx,
+                )
+
+    _merge_group(2, group_b_rows)
+    _merge_group(3, group_c_rows)
+
+    top = header_row or 4
+    apply_a4_print(ws, orientation="portrait", title_rows=f"1:{top}")
+    ws.freeze_panes = f"A{top + 1}"
+
+
+def _fill_modules_from_data(ws, data: dict[str, Any]) -> None:
     for col, w in MODULE_COL_WIDTHS.items():
         ws.column_dimensions[col].width = w
 
     r = 1
-    # 标题
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
     c = ws.cell(r, 1, f"{data['product_name']} 功能清单（按模块）")
     style_cell(c, size=14, bold=True, h="center", v="center", border=False)
@@ -621,7 +833,6 @@ def build_modules_sheet(wb: Workbook, data: dict[str, Any]) -> None:
     ws.row_dimensions[r].height = 20
     r += 2
 
-    # 表头
     for i, h in enumerate(["序号", "模块名", "功能描述"], start=1):
         c = ws.cell(r, i, h)
         style_cell(c, size=10, bold=True,
@@ -629,7 +840,6 @@ def build_modules_sheet(wb: Workbook, data: dict[str, Any]) -> None:
     ws.row_dimensions[r].height = 22
     r += 1
 
-    # 模块行
     for i, (name, desc) in enumerate(data["modules"], start=1):
         c1 = ws.cell(r, 1, i)
         style_cell(c1, size=10, h="center", v="top")
@@ -644,6 +854,7 @@ def build_modules_sheet(wb: Workbook, data: dict[str, Any]) -> None:
         )
         r += 1
 
+    apply_a4_print(ws, orientation="portrait", title_rows="1:4")
     ws.freeze_panes = "A5"
 
 
@@ -653,8 +864,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="生成报价单 Excel（参考正祥格式：深蓝表头/浅红汇总/微软雅黑）"
     )
     p.add_argument("--customer", required=True, help="客户名（用于输出目录）")
-    p.add_argument("--product", required=True, choices=["MI", "CRM", "AI"],
-                   help="产品代号（MI/CRM/AI 均已实现）")
+    p.add_argument("--product", required=True,
+                   help="产品代号，支持逗号分隔组合（如 MI,AI）")
     p.add_argument("--mode", required=True, choices=["SAAS", "私有化"],
                    help="报价模式")
     p.add_argument("--date", default=None,
@@ -663,7 +874,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="可选：requirement-evaluator 二开清单路径（v1 暂未启用）")
     p.add_argument("--positions", type=int, default=3,
                    help="AI Skills 岗位数（仅 --product AI 有效，默认 3，范围 2-6）")
-    return p.parse_args(argv)
+    args = p.parse_args(argv)
+    valid_products = {"MI", "CRM", "AI"}
+    product_codes = [c.strip().upper() for c in args.product.split(",") if c.strip()]
+    invalid = [c for c in product_codes if c not in valid_products]
+    if not product_codes or invalid:
+        p.error(
+            f"--product 不支持：{','.join(invalid) or args.product}；"
+            f"允许值为逗号分隔组合，每个值必须在 {sorted(valid_products)} 中"
+        )
+    args.product_codes = product_codes
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -671,30 +892,42 @@ def main(argv: list[str] | None = None) -> int:
 
     date_str = args.date or datetime.now().strftime("%Y%m%d")
 
-    # 数据解析：MI 硬编码；AI 按 positions 动态生成；CRM 硬编码
-    if args.product == "MI":
-        data = MI_DATA
-    elif args.product == "AI":
-        data = build_ai_data(args.positions)
-    elif args.product == "CRM":
-        data = CRM_DATA
+    product_codes = args.product_codes
+
+    products_data: list[dict[str, Any]] = []
+    for code in product_codes:
+        if code == "MI":
+            products_data.append(MI_DATA)
+        elif code == "AI":
+            products_data.append(build_ai_data(args.positions))
+        elif code == "CRM":
+            products_data.append(CRM_DATA)
+
+    if len(products_data) == 1:
+        data = products_data[0]
     else:
-        print(f"[ERROR] 不支持的产品：{args.product}", file=sys.stderr)
-        return 1
+        data = merge_product_data(products_data)
+        data["mode_desc"] = (
+            f"报价模式：{args.mode}（组合报价，"
+            f"含 {len(products_data)} 个产品：{data['product_name']}）"
+        )
 
     if args.devkit:
-        devkit_path = Path(args.devkit)
-        if devkit_path.exists():
-            dev_items = parse_devkit(devkit_path)
-            if dev_items:
-                data["optional_items"] = dev_items
-                print(f"[INFO] 从需求评估加载 {len(dev_items)} 项二开")
+        if len(products_data) > 1:
+            print(f"[WARN] --devkit 仅在单产品模式下生效，已忽略", file=sys.stderr)
         else:
-            print(f"[WARN] --devkit 文件不存在：{devkit_path}", file=sys.stderr)
+            devkit_path = Path(args.devkit)
+            if devkit_path.exists():
+                dev_items = parse_devkit(devkit_path)
+                if dev_items:
+                    data["optional_items"] = dev_items
+                    print(f"[INFO] 从需求评估加载 {len(dev_items)} 项二开")
+            else:
+                print(f"[WARN] --devkit 文件不存在：{devkit_path}", file=sys.stderr)
 
     if args.mode == "私有化":
         if not data.get("private_items"):
-            print(f"[WARN] {args.product} 私有化模式定价数据待确认，"
+            print(f"[WARN] {data['product_label']} 私有化模式定价数据待确认，"
                   f"当前输出 SAAS 结构（定价可能不准）。", file=sys.stderr)
             print(f"[WARN] 请联系产品负责人确认私有化定价后补充。", file=sys.stderr)
 
@@ -702,8 +935,9 @@ def main(argv: list[str] | None = None) -> int:
     proposals_dir = get_lanlnk_base() / "materials" / "14-proposals"
     out_dir = proposals_dir / args.customer
     out_dir.mkdir(parents=True, exist_ok=True)
+    product_str = "+".join(product_codes)
     out_file = (out_dir
-                / f"报价单_{args.product}_{args.mode}_{args.customer}_{date_str}.xlsx")
+                / f"报价单_{product_str}_{args.mode}_{args.customer}_{date_str}.xlsx")
 
     wb = Workbook()
     build_quote_sheet(wb, data, args.customer, args.mode, date_str)

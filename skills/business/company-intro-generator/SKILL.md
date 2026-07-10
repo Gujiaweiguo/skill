@@ -37,6 +37,10 @@ compatibility: >
 
 # Company Intro Generator — 公司介绍与供应商入围方案 Agent Pipeline
 
+## DocSpec 质量基线
+
+本 skill 生成的公司介绍、客户方案、功能响应表、PPT/Word 内容包必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md`、`方案与投标文档质量规范.md`、`PPT与Word内容包质量规范.md` 和 `文档验收清单.md`。案例、资质、产品能力和客户资产组合路由必须保留证据与边界。
+
 基于 `需求解析 + 标签匹配检索 + 智能编排 + 模板输出` 的方案，支持三种业务模式。
 
 ## 三种模式
@@ -56,8 +60,8 @@ compatibility: >
 
 设置以下变量（后续所有路径引用均使用）：
 - `$MATERIALS_DIR` = `$LANLNK_BASE/materials`
-- `$PROPOSALS_DIR` = `$LANLNK_BASE/materials/14-proposals`
-- `$BIDDING_DIR` = `$LANLNK_BASE/materials/15-bidding`
+- `$PROPOSALS_DIR` = `$LANLNK_BASE/out/proposals`
+- `$BIDDING_DIR` = `$LANLNK_BASE/out/bidding`
 
 ## 素材库结构
 
@@ -194,7 +198,7 @@ for name in wb.sheetnames:
 ### 0.5 模式C：客户资产组合路由（对齐战略 v7）
 
 **前置依赖**：先读取战略总报告路线定义
-`$LANLNK_BASE/strategy/商业地产信息化战略/output/战略分析总报告.md` §1.2.1 两条路线。
+`$LANLNK_BASE/out/strategy/商业地产信息化战略/output/战略分析总报告.md` §1.2.1 两条路线。
 
 **战略路线口径**（v7）：
 - **B 路线（主战场）**：中腰部客户，已有商管/会员/POS/停车等系统 → "不换系统，用 AI 把已有系统用起来，降本、提效、增收"
@@ -276,6 +280,15 @@ cd skills/business/material-importer && uv run scripts/case_matcher.py \
 ```
 匹配维度：行业（×3）、场景（×2.5）、关键词（×1.5）、规模相近度（×1）、完整度（×0.5）。
 也可用 `--list-tags` 查看所有可选行业和场景标签。
+
+### 1.4 案例"查重"——先查参考 PPT 是否已覆盖
+
+case_matcher 跑完后，**不要立刻做案例定制页**。先对比参考 PPT 已覆盖的客户清单（见 `references/reference-ppt-index.md` §"已覆盖的客户案例"），如果目标案例已经在参考 PPT 里（如时尚天河、粤海、广州城投/金沙汇、宝能、岁宝、富康城、喜街、世欧、骑楼老街、南宁轨交、彩生活、高德置地等 13 家），**直接复用参考 PPT 对应页**，不要再做定制页。
+
+判断逻辑：
+- case_matcher 匹配到的客户 ∈ 参考 PPT 13 家覆盖清单 → **复用，不做定制**
+- case_matcher 匹配到的客户 ∉ 参考 PPT 覆盖清单 → 做定制页
+- 客户需求场景与参考 PPT 主题（商圈会员CRM）完全契合 → **直接复用全量参考 PPT + 改封面**，连案例定制页都不需要
 
 ---
 
@@ -540,7 +553,7 @@ recommend: "{推荐产品组合}"
 based_on:
   - "$MATERIALS_DIR/01-company-overview/公司简介.md"
   - "$MATERIALS_DIR/03-products/{涉及产品}.md"
-  - "$LANLNK_BASE/strategy/商业地产信息化战略/output/战略分析总报告.md"
+  - "$LANLNK_BASE/out/strategy/商业地产信息化战略/output/战略分析总报告.md"
 ---
 ```
 
@@ -559,11 +572,11 @@ based_on:
 
 **适用场景**：客户已有商管和会员系统，经办人收到材料后可能转发给决策层。材料目标不是"介绍蓝联"，而是让经办人愿意转发、让决策层愿意见面。
 
-**写作方法论**：严格遵循 `knowledge/sales-methodology/11-方案汇报写作方法论.md`。
+**写作方法论**：严格遵循 `materials/10-methodology/methodology/11-方案汇报写作方法论.md`。
 
 > **2026-07-05 补充：商管/经营类方案的特殊结构**。如方案主体是商管 ERP / 经营管控平台 / 资管系统（不只是 AI 岗位增强），额外遵循：
-> - `knowledge/sales/methodology/11-方案汇报写作方法论.md` §8.3（决策层三问 + 岗位病药结构）
-> - `knowledge/sales/methodology/15-商业地产岗位病药矩阵.md`（7 岗位 × 痛点/场景/功能/价值/证明）
+> - `materials/10-methodology/methodology/11-方案汇报写作方法论.md` §8.3（决策层三问 + 岗位病药结构）
+> - `materials/10-methodology/methodology/15-商业地产岗位病药矩阵.md`（7 岗位 × 痛点/场景/功能/价值/证明）
 > - 此时 P3 改为**决策层三问**（租没租出去？能收多少？收到多少？），P4 改为**经营驾驶舱**，方案详述页**按岗位组织**（招商总/财务总/营运总/企划总/物业总/IT总），不按模块组织。
 > - **证明口径**：没有 Z1 真实实证就不放 E，方案详述页只用 PSV（痛点/场景/价值）；证明集中放能力证明页分级标注（Z1 实证/Z2 竞品行业对标/Z3 蓝联产品状态/Z4 待试点验证）。开发中产品不把关联产品案例冒充本产品实证。
 
@@ -617,6 +630,40 @@ based_on:
 ## P3: 文档生成
 
 ### 3.1 生成策略
+
+#### PPT 三路径决策树（先判断，再生成）
+
+生成 PPT 前，**先判断走哪条路径**，避免无谓的定制工作：
+
+| 路径 | 触发条件 | 做法 | 适用场景 |
+|------|---------|------|---------|
+| **路径 1：直接复用** | 客户需求场景与参考 PPT 主题（商圈会员CRM）完全契合，且目标案例已在参考 PPT 13 家覆盖清单中 | `cp` 参考 PPT → 用 python-pptx 改封面副标题/日期 → 检查目录页一致性 | "会员系统公司介绍"、"商圈CRM 方案介绍" |
+| **路径 2：复用 + 插入定制页** | 主体契合，但有 1-3 页客户专属内容（痛点/合作建议/新案例） | 路径 1 + 用 python-pptx 在合适位置插入定制页 | 大多数模式 A 场景 |
+| **路径 3：compile.py 全量编译** | 需要大量定制（模式 B 供应商入围、方案建议书、功能响应表/报价） | 输出 YAML 内容包 → 调用 proposal-pptx compile.py | 模式 B、跨主题方案 |
+
+**判断口诀**：先查参考 PPT 页码索引（`references/reference-ppt-index.md`），如果客户需求 80%+ 已被参考 PPT 覆盖，走路径 1 或 2；否则走路径 3。
+
+**路径 1 最小操作示例**（直接复用改封面）：
+```python
+from pptx import Presentation
+from shutil import copy as copy_file
+
+# 1. 复制参考 PPT 到目标位置
+copy_file(reference_ppt, target_path)
+
+# 2. 用 python-pptx 改封面文字
+prs = Presentation(target_path)
+cover = prs.slides[0]
+# 找到副标题 shape，改文字
+cover.shapes[1].text_frame.paragraphs[0].runs[0].text = "{客户名}方案汇报"
+# 找到日期 shape，改文字
+cover.shapes[2].text_frame.paragraphs[0].runs[0].text = "{YYYY.MM}"
+prs.save(target_path)
+
+# 3. 检查目录页一致性（见 references/troubleshooting.md）
+```
+
+#### 各输出格式对应的生成方式
 
 根据输出格式选择生成方式：
 
@@ -682,13 +729,14 @@ slides:              # 客户定制页（插在公司介绍+案例之后）
 - `text-bullets` — 标题+正文+要点列表
 - `feature-cards` — 标题+卡片网格（columns: 2/3/4）
 
-**输出结构（intro 模式）：**
-- P01 封面（参考 PPT cover，母版=标题幻灯片）
-- P02 目录（参考 PPT TOC，母版=节标题，文本已修改）
-- P03-P20 公司介绍+案例（参考 PPT section1 的18页，含真实产品截图/案例图）
-- P21-PN 客户定制页（YAML slides，母版=标题和内容）
-- P(N+1) 为什么选择蓝联（参考 PPT idx=35）
-- P(N+2) 感谢观看（参考 PPT idx=61，母版=标题幻灯片）
+**输出结构（intro 模式）**：
+- P01 封面（参考 PPT P01，母版=标题幻灯片）
+- P02 目录（参考 PPT P02，母版=节标题，文本已修改）
+- P03-P20 客户定制页（YAML slides，母版=标题和内容）
+- P(N+1) 为什么选择蓝联（参考 PPT P36）
+- P(N+2) 感谢观看（参考 PPT P62，母版=标题幻灯片）
+
+> **注意**：参考 PPT 的公司简介+案例段实际在 **P38-P55**（不是 P03-P20），完整页码索引见 `references/reference-ppt-index.md`。compile.py 会自动选取参考 PPT 中需要的段落拼接，YAML 编写者不需要手动指定页码。
 
 ### 3.3 Word 生成：输出结构化 Word 内容包
 

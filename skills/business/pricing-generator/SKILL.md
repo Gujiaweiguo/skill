@@ -16,7 +16,7 @@ compatibility: >
   Python + openpyxl（uv 管理），生成 .xlsx 报价单（双 sheet：报价单 + 功能清单）。
   依赖素材库 $MATERIALS_DIR（通过 LANLNK_BASE 环境变量配置）。
   依赖报价模板 references/报价模板_<模式>.md。
-  依赖产品功能清单 prd/<产品>/output/功能清单.md。
+  依赖产品功能清单 out/prd/<产品>/output/功能清单.md。
   可选接收 requirement-evaluator 的二开清单。
   Excel 格式参考正祥报价单（深蓝表头 001E5A8A / 浅红汇总 00F9E5DD / 微软雅黑）。
 
@@ -37,6 +37,10 @@ compatibility: >
 ---
 
 # Pricing Generator — 报价单生成 Agent Pipeline
+
+## DocSpec 质量基线
+
+本 skill 生成的报价单、功能报价清单、方案对比和第三方集成说明必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md`、`PPT与Word内容包质量规范.md` 和 `文档验收清单.md`。定价来源、税率、公式、优惠空位、第三方边界和待确认项必须显式保留。
 
 基于 `产品功能清单 + 标准定价 + 二开清单 + 第三方集成 + 方案对比` 的方案。
 用户说"帮我出个报价"，Agent 负责整理功能清单、套用定价、组合二开和第三方、输出可面客报价单。

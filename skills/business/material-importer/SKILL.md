@@ -29,6 +29,10 @@ change: >
 
 # Material Importer — 素材导入与结构化 Agent Pipeline
 
+## DocSpec 质量基线
+
+本 skill 生成的素材质量报告、缺口分析、入库建议和结构化素材说明必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md` 和 `文档验收清单.md`。素材来源、质量等级、缺失项和待人工确认项必须保留。
+
 基于 `原始素材 → markitdown 转换 → AI 分类 → 质量评估 → 交互确认 → 标准化入库` 的方案。
 
 ## 目录结构（三级）

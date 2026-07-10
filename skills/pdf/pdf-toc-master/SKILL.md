@@ -39,6 +39,10 @@ compatibility: >
 
 # PDF TOC Master — PDF 目录书签生成 Agent Pipeline
 
+## DocSpec 质量基线
+
+本 skill 生成的 PDF 目录、书签结构、页码映射和 OCR 说明必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md` 和 `文档验收清单.md`。目录来源、页码偏移、OCR 不确定项和验证方式必须显式说明。
+
 基于 `pdf + ocr` 方案，用户给 PDF，Agent 去识别目录结构并嵌入可导航书签，你只管 Plan 和验收。
 
 ## Architecture

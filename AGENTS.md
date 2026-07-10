@@ -18,6 +18,7 @@ Two skill types:
 | External data (business skills) | `$LANLNK_BASE` = `/opt/code/docs/lanlnk` (not in this repo) |
 | External data (user guides) | `$USERGUIDE_BASE` = `/opt/code/docs/lanlnk/UserGuide` (not in this repo) |
 | Config | `config/lanlnk.yaml` |
+| Cross-skill document quality | `references/docspec/` |
 
 **Never edit** `.opencode/skills/openspec-*/` — these are upstream artifacts.
 
@@ -128,9 +129,9 @@ uv run scripts/ocr_extract.py <input_dir> [<input_dir> ...] \
 
 # Example: extract Haiding contract table structures from PPT images
 uv run scripts/ocr_extract.py \
-  /opt/code/docs/lanlnk/prd/商管系统/raw/02-competitors/海鼎/业务逻辑 \
-  --sql-dir /opt/code/docs/lanlnk/prd/商管系统/input/02-competitors/海鼎/数据结构 \
-  --output-dir /opt/code/docs/lanlnk/prd/商管系统/raw/02-competitors/海鼎/业务逻辑/_extracted
+  /opt/code/docs/lanlnk/out/prd/商管系统/raw/02-competitors/海鼎/业务逻辑 \
+  --sql-dir /opt/code/docs/lanlnk/out/prd/商管系统/input/02-competitors/海鼎/数据结构 \
+  --output-dir /opt/code/docs/lanlnk/out/prd/商管系统/raw/02-competitors/海鼎/业务逻辑/_extracted
 ```
 
 Outputs: `slides.jsonl` (per-image OCR + bbox), `tables.jsonl` (table names + SQL calibration), `all-ocr.md` (human-readable), `manifest.json`.
@@ -186,6 +187,7 @@ LSP reports many false errors in this repo:
 - **Conventional commits**: `feat(scope): ...`, `fix(scope): ...`, `docs: ...`, `refactor: ...`
 - **No CI, no linting, no formatter** — repo is markdown + Python scripts
 - **Generated artifacts gitignore 约定**（跨 skill）：skill 仓库的 `.gitignore` 覆盖三类生成产物：(1) **统一 `output/` 目录** — 各 skill 的 `skills/<path>/<skill>/output/`；(2) **运行时状态** — `.playwright-mcp/`（Playwright 日志）、`.omo/`（OpenCode 会话）；(3) **lock 文件** — `*.lock`（匹配 `uv.lock`）和 `package-lock.json`（`*.lock` **不匹配** `package-lock.json`，因为扩展名是 `.json` 不是 `.lock`，Node skill 必须显式加这条）。新建 skill 后检查是否有未 gitignore 的生成产物（如一次性 PPT 生成脚本 `slides/compile.js`）。
+- **DocSpec 文档质量基线**（跨文档 skill）：所有生成 PRD、方案、投标、报价、Word、PPT、操作手册、部署维护手册、知识库文档，或修改 `SKILL.md` / `references/` 的任务，都必须遵守 `references/docspec/`。跨 2 个以上文档类 skill 的质量规则写入 DocSpec；只影响单个 skill 的限制或坑写入该 skill 的 `SKILL.md` 或 `references/troubleshooting.md`。
 - **文档输出路径统一在 lanlnk 下**（跨 skill）：所有 skill 的文档输出基目录都必须解析到 `/opt/code/docs/lanlnk/` 下。`$LANLNK_BASE = /opt/code/docs/lanlnk`，`$USERGUIDE_BASE = /opt/code/docs/lanlnk/UserGuide`（在 lanlnk 内）。新 skill 的默认路径不要写成独立的 `/opt/code/docs/xxx/`，必须挂到 lanlnk 子目录。
 - **Gitignored 文件中的旧路径不需要手动修正**（跨 skill）：全局路径迁移时，`openspec/changes/archive/`（历史快照，只读）和 `*/parsed/`（生成产物）中的旧路径不需要手动改——前者是不可变历史，后者下次运行自动刷新。只修 git tracked 的源文件。
 - **Domain tags** shared between `material-importer/references/domain-tags.md` and `company-intro-generator` — update both if changing tags
@@ -202,7 +204,7 @@ LSP reports many false errors in this repo:
 - **PRD→实施交接边界**（跨系统规划）：做商管/CRM/供应链等产品 PRD 后，默认只输出“目标蓝图 + PRD-vs-代码差异 + 分期 + 验收链路”交接文档，不在 PRD skill 会话里直接修改业务系统代码。业务系统（如 `/opt/code/mi`）自己基于交接文档拆 OpenSpec change、迁移、接口、前端和测试。避免 PRD 生成上下文漂移成实现上下文。
 - **分期按业务闭环而非模块名**（跨系统规划）：P0 必须是可上线运营的最小端到端闭环，不是“每个核心模块做一点”。商管例：资源→招商→合同→财务→营运/物业→退出→资源释放；CRM 例：线索→客户→商机→报价/合同→回款/服务→续约。P1 放交付可用性与管控增强（移动端、报表、流程增强、关键分析/对账），P2 放数据决策/集团管控/深度集成，P3 放非主闭环拓展能力。
 - **资源/对象 taxonomy 要先统一再分期**（跨系统规划）：不要用窄词误导阶段范围。商管“铺位/位置/资源”包含铺位、单元、场地、广告位、车位、多经点位；CRM“客户”可能包含线索、联系人、企业客户、门店、渠道伙伴、会员等。先定义统一对象模型和别名，再做差异与实施阶段。
-- **AI 产品族术语口径**（跨 skill，product-prd-generator/strategy-brief-generator/company-intro-generator 都会碰到）：蓝联 AI 产品族有 3 个产品，代号演变历史必须记住：(1) **LnkChatBI** = CREAISkill 文档里的 `mysqlbot` = 更早的 `SQLBot`，三者同一产品（rebrand-migration spec 实证，代码 header 仍保留 `X-SQLBOT-ASK-TOKEN`）。(2) **langchat** 是第三方开源 fork（git remote: `Gujiaweiguo/langchat`），蓝联零源码改造；蓝联在它之上构建岗位 AI Skill 工作流产品。(3) **mymaxkb 产品已被 langchat 取代**——OrchestratorAgent 代码里 `system: maxkb` / `MaxKBApiExecutor` 是 legacy 标识符，产品实际为 langchat。写 PRD/方案/汇报时统一用现名（LnkChatBI / langchat），代码引用保留 legacy 名并加注。术语权威来源：`$LANLNK_BASE/prd/AI产品族架构.md` §9 术语对照表。
+- **AI 产品族术语口径**（跨 skill，product-prd-generator/strategy-brief-generator/company-intro-generator 都会碰到）：蓝联 AI 产品族有 3 个产品，代号演变历史必须记住：(1) **LnkChatBI** = CREAISkill 文档里的 `mysqlbot` = 更早的 `SQLBot`，三者同一产品（rebrand-migration spec 实证，代码 header 仍保留 `X-SQLBOT-ASK-TOKEN`）。(2) **langchat** 是第三方开源 fork（git remote: `Gujiaweiguo/langchat`），蓝联零源码改造；蓝联在它之上构建岗位 AI Skill 工作流产品。(3) **mymaxkb 产品已被 langchat 取代**——OrchestratorAgent 代码里 `system: maxkb` / `MaxKBApiExecutor` 是 legacy 标识符，产品实际为 langchat。写 PRD/方案/汇报时统一用现名（LnkChatBI / langchat），代码引用保留 legacy 名并加注。术语权威来源：`$LANLNK_BASE/out/prd/AI产品族架构.md` §9 术语对照表。
 - **deep task 大产出拆分策略**（跨 skill，delegation 经验）：一个 deep task 一次性生成 8 个大文件（每个 200-8000 行）会卡住——实测 LnkChatBI PRD task 跑 31 分钟后 0 文件产出，被迫取消手工重写。**正确做法**：(1) 8 文件套件拆成 2-3 个 task（每个 3-4 文件）；(2) 或先 fire task 做简单文件（功能清单/需求清单/差距分析），再手工写核心文件（产品PRD）；(3) 给 task 明确的 per-file 行数上限（如"每个文件不超过 500 行"），避免模型在单文件上耗尽 token。
 
 ## Knowledge Persistence
@@ -234,6 +236,7 @@ AI agents don't have cross-session memory. All "memory" lives in files that are 
 | Layer | Location | Read when | Examples |
 |---|---|---|---|
 | **Cross-cutting** (applies to all skills) | This file (`AGENTS.md`) | Every session start | uv mandatory, word-master calling pattern |
+| **Document quality** (applies to document skills and skill writing) | `references/docspec/` | Before generating formal docs or editing skills | PRD evidence chain, bid response matrix, skill writing quality |
 | **Skill-specific** (only relevant to one skill) | Skill's `SKILL.md` + `references/` | Skill triggered | doc_map regex choices, reconcile stale cleanup |
 | **Shared files** (used by multiple skills) | Each skill keeps a copy + note here | Either skill triggered | domain-tags, term-aliases |
 
@@ -250,7 +253,7 @@ AI agents don't have cross-session memory. All "memory" lives in files that are 
 1. 项目内复利（只影响当前项目）→ 写入目标项目 `AGENTS.md` / docs / OpenSpec。
 2. 公共 OpenCode 使用复利（影响多个项目或人如何操作 OpenCode）→ 写入 `/opt/code/docs/opencode` 对应手册并更新更新日志。
 3. Skill 自身复利（影响某个 skill 或跨 skill 规则）→ 写入本仓库 `AGENTS.md`、对应 `SKILL.md` 或 `references/troubleshooting.md`。
-4. 项目/产品域知识 → 写入 `$LANLNK_BASE/prd/<项目>/域知识.md`。
+4. 项目/产品域知识 → 写入 `$LANLNK_BASE/out/prd/<项目>/域知识.md`。
 5. 交接模式/跨系统验收 → 写入对应 `交接包/README.md` 或模板文件。
 6. 改了共享文件（如 `domain-tags.md` / `term-aliases.yaml`）→ 检查同步另一边。
 7. 用户要求提交时，建议 commit：`docs: persist lessons via 复利工程`。
@@ -272,9 +275,9 @@ ppt-master ────────┬─← company-intro-generator (PPT genera
 
 doc-generator ─────← playwright skill          (runtime screenshots)
 
-knowledge/cre ─────← product-prd-generator     (business-ontology.yaml: 8 modules, 482 terms)
+config/ontology ─────← product-prd-generator     (business-ontology.yaml: 8 modules, 482 terms)
 
-product-prd-generator ─← word-master + material-importer + knowledge/business-ontology.yaml
+product-prd-generator ─← word-master + material-importer + config/ontology/business-ontology.yaml
 ```
 
 ### word-master calling pattern (3 consumers)
@@ -301,8 +304,8 @@ subprocess.run(
 |---|---|
 | `material-importer/references/domain-tags.md` | material-importer, company-intro-generator |
 | `product-prd-generator/references/term-aliases.yaml` | product-prd-generator (currently solo, but structure ready for sharing) |
-| `$LANLNK_BASE/prd/商管系统/域知识.md` | product-prd-generator (商管 project only; 域知识跟着项目走，不放 skill 目录) |
-| `$LANLNK_BASE/knowledge/business-ontology.yaml` | product-prd-generator (runtime dependency; ready for company-intro-generator, bid-doc-master) |
+| `$LANLNK_BASE/out/prd/商管系统/域知识.md` | product-prd-generator (商管 project only; 域知识跟着项目走，不放 skill 目录) |
+| `$LANLNK_BASE/config/ontology/business-ontology.yaml` | product-prd-generator (runtime dependency; ready for company-intro-generator, bid-doc-master) |
 
 ## OpenSpec Workflow
 

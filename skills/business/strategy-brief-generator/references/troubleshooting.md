@@ -39,7 +39,7 @@
 **处理**：
 
 1. 第一版接受模块级盘点，在 `parsed/self/` 标注盘点深度。
-2. 商管可复用已有 PRD（`$LANLNK_BASE/prd/商管系统/output/产品PRD.md`）补充能力细节。
+2. 商管可复用已有 PRD（`$LANLNK_BASE/out/prd/商管系统/output/产品PRD.md`）补充能力细节。
 3. AI 源码（lnkchatbi/langchat）盘点 README、路由、主要 service 类即可。
 4. 不要为了"盘点完整"而陷入源码细节——战略分析不需要字段级精度。
 

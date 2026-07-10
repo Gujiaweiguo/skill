@@ -115,7 +115,7 @@ compatibility: Pure prompt skill. No runtime dependency. Works inside the skill 
 |---|---|
 | 项目运行时陷阱、环境配置、测试基线 | 目标项目 `AGENTS.md` |
 | 项目排障 SOP、部署/验证步骤 | 目标项目 `docs/troubleshooting.md`、`docs/*.md` |
-| 项目领域术语、边界、验收口径 | `$LANLNK_BASE/prd/<项目>/域知识.md` 或目标项目 docs |
+| 项目领域术语、边界、验收口径 | `$LANLNK_BASE/out/prd/<项目>/域知识.md` 或目标项目 docs |
 | 需要改系统行为 | 回到目标项目 OpenSpec，不在复利工程里直接改代码 |
 
 例：LnkChatBI 的 `SECRET_KEY` 必须显式设置、`cre_bi_demo` 需要 `SET search_path`、某项目已知测试 fake 签名问题。
@@ -143,6 +143,7 @@ compatibility: Pure prompt skill. No runtime dependency. Works inside the skill 
 | 经验类型 | 写入位置 |
 |---|---|
 | 跨 skill 通用规则 | `/opt/code/skill/AGENTS.md` |
+| 跨文档类 skill 的质量规范、验收口径、证据规则 | `/opt/code/skill/references/docspec/` |
 | 某个 skill 的已知限制/设计决策/维护规则 | `/opt/code/skill/skills/<category>/<skill>/SKILL.md` |
 | 诊断、排障、修复流程 | `/opt/code/skill/skills/<category>/<skill>/references/troubleshooting.md` |
 | 共享标签/素材规则 | 对应共享文件，如 `material-importer/references/domain-tags.md`，并检查同步副本 |
@@ -154,6 +155,7 @@ compatibility: Pure prompt skill. No runtime dependency. Works inside the skill 
 - 只影响一个项目 → 项目内复利
 - 影响多个项目的 OpenCode 使用方式 → 公共 OpenCode 使用复利
 - 只影响一个 skill → skill 自身复利
+- 影响多个文档类 skill 或文档验收标准 → `/opt/code/skill/references/docspec/`
 - 影响两个以上 skill → `/opt/code/skill/AGENTS.md`
 - 需要人看见的经验，不能只写 `AGENTS.md`；至少在面向人的 README/手册加路标
 
@@ -187,7 +189,7 @@ compatibility: Pure prompt skill. No runtime dependency. Works inside the skill 
 - 是否有新的产品术语口径？
 - 是否有 PRD→实施交接的新模式？
 - 是否有新的分期原则或验收链路？
-- 是否有新的域知识要放到 `$LANLNK_BASE/prd/<项目>/域知识.md`？
+- 是否有新的域知识要放到 `$LANLNK_BASE/out/prd/<项目>/域知识.md`？
 - 是否有代码实现边界需要写入交接包？
 
 ### 战略简报
@@ -261,6 +263,14 @@ compatibility: Pure prompt skill. No runtime dependency. Works inside the skill 
 - 是否需要调整 `description`、不触发场景或输出格式？
 - 是否需要新增 `references/troubleshooting.md`？
 - 是否有跨 skill 通用规则应 promote 到 `/opt/code/skill/AGENTS.md`？
+
+### DocSpec / 文档质量规范
+
+- 是否新增了适用于多个文档类 skill 的质量红线？
+- 是否新增了通用证据等级、状态词、响应矩阵、验收清单或内容包约束？
+- 是否某类文档反复出现相同待确认、格式、渲染或证据问题？
+- 是否应更新 `/opt/code/skill/references/docspec/`，而不是只写进单个 skill？
+- DocSpec 规则是否已经稳定到可以后续抽象成 `docspec-reviewer` skill？
 
 ## 输出格式
 

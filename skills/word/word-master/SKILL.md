@@ -30,6 +30,10 @@ compatibility: >
 
 # Word Master — 专业文档创作 Agent Pipeline
 
+## DocSpec 质量基线
+
+本 skill 渲染的 Word 内容包、正式 Word 文档和模板说明必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `PPT与Word内容包质量规范.md` 和 `文档验收清单.md`。内容包解析、模板选择、表格、图片、目录和降级产物必须可检查。
+
 基于 `结构化内容包 + python-docx 模板引擎` 方案，上游 Skill 负责"说什么"，
 word-master 负责"怎么排"——格式规范、章节管理、表格样式、页眉页脚。
 
@@ -48,8 +52,8 @@ export LANLNK_BASE=/opt/code/docs/lanlnk
 | 变量 | 路径 |
 |------|------|
 | `$WORD_TEMPLATES_DIR` | `/opt/code/skill/skills/word/word-master/templates` |
-| `$PROPOSALS_DIR` | `$LANLNK_BASE/materials/14-proposals` |
-| `$BIDDING_DIR` | `$LANLNK_BASE/materials/15-bidding` |
+| `$PROPOSALS_DIR` | `$LANLNK_BASE/out/proposals` |
+| `$BIDDING_DIR` | `$LANLNK_BASE/out/bidding` |
 
 ---
 
@@ -143,7 +147,7 @@ export LANLNK_BASE=/opt/code/docs/lanlnk
 uv run scripts/validate_package.py <内容包.word-content.md>
 
 # 校验目录下所有内容包
-uv run scripts/validate_package.py $LANLNK_BASE/materials/14-proposals/
+uv run scripts/validate_package.py $LANLNK_BASE/out/proposals/
 
 # 详细输出（显示警告）
 uv run scripts/validate_package.py <路径> --verbose

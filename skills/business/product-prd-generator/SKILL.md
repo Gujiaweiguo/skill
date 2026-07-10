@@ -31,8 +31,8 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 - 需要保留界面截图、流程图、表单图等视觉参考
 
 > **域知识隔离**：本文件只记录**通用 PRD 方法论**。各业务系统的域专属知识（术语/单据流/算法/竞品基线）存放在**各项目目录**下的 `域知识.md`。当前已有：
-> - `$LANLNK_BASE/prd/商管系统/域知识.md` — 商管系统域知识
-> - 未来新增会员/CRM 时创建 `$LANLNK_BASE/prd/会员系统/域知识.md`
+> - `$LANLNK_BASE/out/prd/商管系统/域知识.md` — 商管系统域知识
+> - 未来新增会员/CRM 时创建 `$LANLNK_BASE/out/prd/会员系统/域知识.md`
 
 ## 不做什么
 
@@ -51,18 +51,18 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 
 ### 2. 原始文档
 
-- `$LANLNK_BASE/prd/商管系统/input/00-current-product/`
-- `$LANLNK_BASE/prd/商管系统/input/01-customer-requirements/`
-- `$LANLNK_BASE/prd/商管系统/input/02-competitors/`
+- `$LANLNK_BASE/out/prd/商管系统/input/00-current-product/`
+- `$LANLNK_BASE/out/prd/商管系统/input/01-customer-requirements/`
+- `$LANLNK_BASE/out/prd/商管系统/input/02-competitors/`
 
 ### 3. 转换后的中间资料
 
-- `$LANLNK_BASE/prd/商管系统/raw/`
+- `$LANLNK_BASE/out/prd/商管系统/raw/`
 
 ## 目录规范
 
 ```text
-/opt/code/docs/lanlnk/prd/商管系统/
+/opt/code/docs/lanlnk/out/prd/商管系统/
 ├── input/
 │   ├── 00-current-product/
 │   ├── 01-customer-requirements/
@@ -135,12 +135,12 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 - 术语变体多的域（如商管合同条款），只在**精确章节标题**命中时才标记为特殊结构类型，避免噪音扩散。
 - 多来源合并时，选定一个**权威结构模板来源**（如商管的海鼎），其他来源只补证据，不做平均融合。
 
-> **商管域专属补充要求**（条款组识别/海鼎家族合并/家族别名归一）见 `$LANLNK_BASE/prd/商管系统/域知识.md`。
+> **商管域专属补充要求**（条款组识别/海鼎家族合并/家族别名归一）见 `$LANLNK_BASE/out/prd/商管系统/域知识.md`。
 
 ### Step 4: 术语归一
 把不同材料里的说法统一映射到标准功能名。每个域有自己的术语别名表。
 
-> **商管术语归一实例**（租户服务/资产管理/合同管理等）见 `$LANLNK_BASE/prd/商管系统/域知识.md`。
+> **商管术语归一实例**（租户服务/资产管理/合同管理等）见 `$LANLNK_BASE/out/prd/商管系统/域知识.md`。
 
 ### Step 5: 当前产品映射
 对每个功能标记状态：
@@ -246,7 +246,10 @@ output/
 ├── 功能清单.md
 ├── 竞品功能清单.md
 ├── 差距分析.md
-└── 需求证据表.md
+├── 需求证据表.md
+├── PRD实施交接包.md
+├── suggested-openspec-changes.yaml
+└── mi-consumption-prompt.md
 ```
 
 ## PRD 结构
@@ -273,7 +276,54 @@ output/
 
 ## 运行方式
 
-### generate 模式（默认）
+### OpenCode 对话调用（默认给用户）
+
+用户不需要手工复制 CLI。日常建议在 `/opt/code/docs` 启动 OpenCode，让 agent 使用本 skill；需要运行 CLI 时，由 agent 自行进入 `/opt/code/skill/skills/business/product-prd-generator` 执行内部命令。
+
+首版 PRD：
+
+```text
+请使用 product-prd-generator 为“商管系统”生成首版 PRD、功能清单、差距分析和 PRD 实施交接包。
+
+上下文：
+- 当前产品代码基线：/opt/code/mi
+- PRD 原始/转换资料根：$LANLNK_BASE/raw/prd-商管系统
+- PRD 输出目录：$LANLNK_BASE/out/prd/商管系统/output
+- parsed 目录：$LANLNK_BASE/raw/prd-商管系统/parsed
+
+要求：
+1) 先读取 /opt/code/skill/skills/business/product-prd-generator/SKILL.md 和 DocSpec PRD 质量规范
+2) 自动执行需要的内部命令，不要让我手工复制长命令
+3) 输出完成后列出关键产物路径
+4) 确认生成 PRD实施交接包.md、suggested-openspec-changes.yaml、mi-consumption-prompt.md
+5) 不修改 /opt/code/mi，不创建 MI 的 OpenSpec change
+```
+
+增量覆盖度校验：
+
+```text
+请使用 product-prd-generator 对“商管系统”运行 coverage-validate，检查新材料带来的覆盖度变化和增量 gap。
+
+上下文：
+- 当前产品代码基线：/opt/code/mi
+- PRD 资料根：$LANLNK_BASE/raw/prd-商管系统
+- PRD 输出目录：$LANLNK_BASE/out/prd/商管系统/output
+- parsed 目录：$LANLNK_BASE/raw/prd-商管系统/parsed
+- baseline：$LANLNK_BASE/raw/prd-商管系统/parsed/coverage-baseline.json
+
+要求：
+1) 先读取 /opt/code/skill/skills/business/product-prd-generator/SKILL.md，再自动执行 coverage-validate 并更新 baseline
+2) 输出客户需求覆盖度矩阵、竞品覆盖度矩阵、增量gap报告
+3) 生成 suggested-openspec-changes.yaml 和 mi-consumption-prompt.md
+4) 汇总本轮 P0/P1/P2 缺口、待复核项和是否适合直接交给 MI
+5) 不修改 /opt/code/mi，不创建 MI 的 OpenSpec change
+```
+
+### CLI 执行参考（agent 内部）
+
+以下命令是 OpenCode agent 的内部执行参考，不作为用户日常操作入口。
+
+#### generate 模式（默认）
 
 全量生成 PRD + 功能清单 + 差距分析。
 
@@ -288,7 +338,7 @@ uv run product-prd-generator --project 商管系统 \
   --output-dir output
 ```
 
-### coverage-validate 模式
+#### coverage-validate 模式
 
 新材料（客户需求/竞品资料）入库后，对照现有 PRD + 代码做覆盖度校验，输出矩阵和增量 gap，不重跑全量 PRD。适用于 PRD v1.x 持续完善。
 
@@ -299,7 +349,7 @@ uv run product-prd-generator --project 商管系统 \
   --docs-root $LANLNK_BASE/raw/prd-商管系统 \
   --skill-root /opt/code/skill/skills/business/product-prd-generator \
   --parsed-dir $LANLNK_BASE/raw/prd-商管系统/parsed \
-  --output-dir $LANLNK_BASE/prd/商管系统/output \
+  --output-dir $LANLNK_BASE/out/prd/商管系统/output \
   --mode coverage-validate \
   --baseline $LANLNK_BASE/raw/prd-商管系统/parsed/coverage-baseline.json \
   --update-baseline
@@ -319,6 +369,8 @@ uv run product-prd-generator --project 商管系统 \
 | `output/PRD客户需求覆盖度矩阵.md` | 人类可读矩阵 |
 | `output/PRD竞品覆盖度矩阵.json` / `.md` | 同上，竞品维度 |
 | `output/增量gap报告.md` | 本次新材料带来的新缺口（已匹配 + 未匹配分开） |
+| `output/suggested-openspec-changes.yaml` | 按 P0/P1/P2 给目标项目消费的建议 change 清单 |
+| `output/mi-consumption-prompt.md` | 到 `/opt/code/mi` 或目标项目后可直接粘贴的消费提示词 |
 | `review/evidence-weak-items.md` | 机器无法确定的证据强度，需人工确认 |
 
 两种模式对比：
@@ -342,7 +394,7 @@ uv run product-prd-generator --project 商管系统 \
 2. **放入正确目录**：
    - 竞品操作手册/蓝图/功能手册 → `$LANLNK_BASE/raw/prd-商管系统/02-competitors/{竞品名}/`
    - 竞品数据结构/PRD 草案 → `$LANLNK_BASE/materials/13-competitors/{竞品名}/`
-   - demo 探测数据 → `$LANLNK_BASE/prd/商管系统/competitor-analysis/{竞品名}/`
+   - demo 探测数据 → `$LANLNK_BASE/out/prd/商管系统/competitor-analysis/{竞品名}/`
 3. **跑覆盖度校验**：`--mode coverage-validate` 会自动扫描上述三个目录
 4. **看 gap 报告**：`增量gap报告.md` 的"竞品未匹配能力汇总"会列出新增竞品有多少能力被识别
 5. **扩 ontology**：如果新竞品术语未归一，在 `references/term-aliases.yaml` 中补充别名映射
@@ -359,11 +411,29 @@ uv run product-prd-generator --project 商管系统 \
 - 找 gap
 - 再生成 PRD
 
+### PRD→目标项目实施交接
+
+`generate` 模式会额外输出三份实施交接产物：
+
+| 文件 | 用途 |
+|---|---|
+| `PRD实施交接包.md` | 面向目标项目团队的人类可读交接包，包含边界、状态概览、建议拆分、回写要求 |
+| `suggested-openspec-changes.yaml` | 结构化建议 change 清单，供目标项目会话读取和二次确认 |
+| `mi-consumption-prompt.md` | 在 `/opt/code/mi` 或其他目标项目 OpenCode 会话中直接粘贴的提示词 |
+
+交接规则：
+
+1. PRD 侧只提供证据、优先级和建议拆分，不在目标项目仓库创建 change。
+2. 目标项目会话必须重新读取自己的 `AGENTS.md`、`openspec/specs/`、代码和测试基线。
+3. 首版 PRD / 大差异 / 多 change 先用 `Prometheus` 输出 Implementation Plan v1。
+4. 单个明确增量 gap 用 `Sisyphus` 创建普通 OpenSpec change。
+5. 执行用 `Atlas`；verify 失败或根因复杂时再切 `Hephaestus - Deep Agent`。
+
 ## 已知限制
 
 - **PDF 转换需要 poppler-utils**：`apt install poppler-utils`。无 sudo 权限时，PDF 无法用 markitdown 转换，需要 LibreOffice 预转换或手动转 md。当前项目有 6 个竞品 PDF 受此影响（政策文件，影响小）。
 - **匹配率 ~19%**：瓶颈是**术语覆盖率**（ontology 572+ 术语），不是匹配策略。两阶段匹配提升精确度但不提升召回率。继续扩 ontology 术语是唯一提升路径。
-- **business-ontology.yaml 运行时依赖**：doc_map 从 `$LANLNK_BASE/knowledge/business-ontology.yaml` 加载。文件缺失时退化为纯 term-aliases 匹配（匹配率回到 ~12%）。
+- **business-ontology.yaml 运行时依赖**：doc_map 从 `$LANLNK_BASE/config/ontology/business-ontology.yaml` 加载。文件缺失时退化为纯 term-aliases 匹配（匹配率回到 ~12%）。
 - **YAML OrderedDict 序列化陷阱**：在 ontology/specs 中使用 `OrderedDict` 后 `yaml.dump` 会写入 Python 特有的 tag（`!!python/object/apply:collections.OrderedDict`），导致 `yaml.safe_load` 报 ConstructorError。**必须用普通 dict**。详见 troubleshooting.md。
 - **field-specs YAML 完整性**：`module-field-specs.yaml` 在多次编辑后可能丢失实体（如 OrderedDict 序列化失败导致 yaml.safe_load 无法读取→数据丢失）。每次大改后应验证实体数量：`len(mfs['招商管理'])` 等。
 - **噪音过滤可能误判**：`_is_noise_text` 过滤编号、元数据、表格残留、图片路径、JSON 块、句子型文本。极端情况下可能误杀合法标题。
@@ -375,8 +445,8 @@ uv run product-prd-generator --project 商管系统 \
 - **YAML 部分重写致命陷阱**：**永远不要用 `yaml.safe_dump` 部分重写大 YAML 文件中的某个模块**。原因：`safe_dump` 会重新格式化整段内容，且用正则查找下一个模块边界时 `\n[a-zA-Z]` 不匹配中文字符（如 `\n合同管理:` 的 `合` 不是 ASCII 字母），导致 `end` 定位到文件末尾，后续所有模块被截断删除。**正确做法**：用纯文本操作（`str.index("模块名:")` 精确匹配中文字符串），或对整个文件 `safe_load → safe_dump`（全量重写）。已在一次事故中丢失合同管理+财务管理+运营+物业+系统+推广共 6 个模块约 5000 行 YAML。
 - **Ontology sub_functions 必须与 field-specs 全局同步**：ontology 的 `sub_functions` 有旧名称而 field-specs 没有对应实体时，渲染器会产生**空 `####` 标题**（有标题无内容）。这不是报错而是静默问题。每次大改后应做全局同步检查：`ont_subs == spec_keys` for all modules。
 
-> 商管域专属已知限制（资产管理空壳/集团驾驶舱图表库缺失/销售五源模型）见 `$LANLNK_BASE/prd/商管系统/域知识.md`。
-- **AI 产品 PRD 适配说明**（非商管系统场景）：本 skill 的 `term-aliases.yaml`、`business-ontology.yaml`、CLI（`uv run product-prd-generator`）**硬编码商管域**（8模块：招商/合同/财务/营运/物业/系统/推广 + 商管术语），对 AI 产品（LnkChatBI/OrchestratorAgent/langchat 等）会产生严重噪音。**AI 产品 PRD 必须手工生成**，不要运行 CLI。手工生成时遵循 SKILL.md 的**通用方法论**（7步流程/状态规则/置信度/review机制/分期方法论/PRD→代码术语映射），但**忽略商管域专属内容**（ontology/term-aliases/单据驱动渲染/三层架构/移动端一体化）。AI 产品的功能域按产品实际组织（如 ChatBI 的功能域 = 对话问数/Text-to-SQL/RAG校准/数据源/嵌入/MCP/系统管理），不是商管的招商/合同/财务。已完成的 AI 产品 PRD 样板：`$LANLNK_BASE/prd/{LnkChatBI,OrchestratorAgent,langchat}/output/`。
+> 商管域专属已知限制（资产管理空壳/集团驾驶舱图表库缺失/销售五源模型）见 `$LANLNK_BASE/out/prd/商管系统/域知识.md`。
+- **AI 产品 PRD 适配说明**（非商管系统场景）：本 skill 的 `term-aliases.yaml`、`business-ontology.yaml`、CLI（`uv run product-prd-generator`）**硬编码商管域**（8模块：招商/合同/财务/营运/物业/系统/推广 + 商管术语），对 AI 产品（LnkChatBI/OrchestratorAgent/langchat 等）会产生严重噪音。**AI 产品 PRD 必须手工生成**，不要运行 CLI。手工生成时遵循 SKILL.md 的**通用方法论**（7步流程/状态规则/置信度/review机制/分期方法论/PRD→代码术语映射），但**忽略商管域专属内容**（ontology/term-aliases/单据驱动渲染/三层架构/移动端一体化）。AI 产品的功能域按产品实际组织（如 ChatBI 的功能域 = 对话问数/Text-to-SQL/RAG校准/数据源/嵌入/MCP/系统管理），不是商管的招商/合同/财务。已完成的 AI 产品 PRD 样板：`$LANLNK_BASE/out/prd/{LnkChatBI,OrchestratorAgent,langchat}/output/`。
 
 ## 设计决策
 
@@ -478,13 +548,13 @@ PRD 中的实体/单据名称必须满足：
 
 当客户需求文档已有清晰的模块归类时，**遵循客户的结构**，不要自创分类。**原则**：source documents 的结构 IS the requirements。
 
-> 商管模块结构实例（中旅/海鼎/华侨城具体归类）见 `$LANLNK_BASE/prd/商管系统/域知识.md`。
+> 商管模块结构实例（中旅/海鼎/华侨城具体归类）见 `$LANLNK_BASE/out/prd/商管系统/域知识.md`。
 
 ### 业务单据流：上游导入支持
 
 业务流程中的单据不是孤岛——每个单据应支持从前序单据导入数据。实现模式：下游单据有 `来源` 字段（直接新建/从前序单据转入），选择后联动 `来源单号`。被导入的字段标注"自动带出"，且可修改覆盖。
 
-> 商管单据链实例（招商洽谈→报价→意向→条件报批→合同→应收）见 `$LANLNK_BASE/prd/商管系统/域知识.md`。
+> 商管单据链实例（招商洽谈→报价→意向→条件报批→合同→应收）见 `$LANLNK_BASE/out/prd/商管系统/域知识.md`。
 
 ### 复杂模块三层架构：实体库 + 配置矩阵 + 操作差异矩阵
 
@@ -496,7 +566,7 @@ PRD 中的实体/单据名称必须满足：
 第三层：操作差异矩阵 — 每种操作类型只列"能改什么/锁定什么/触发什么"（差异表），不列字段定义
 ```
 
-> 商管合同/财务的具体实例见 `$LANLNK_BASE/prd/商管系统/域知识.md`。
+> 商管合同/财务的具体实例见 `$LANLNK_BASE/out/prd/商管系统/域知识.md`。
 
 ### `markdown` 字段支持矩阵渲染
 
@@ -506,7 +576,7 @@ PRD 中的实体/单据名称必须满足：
 
 做模块 PRD 优化前，先对全部竞品/客户做横向对比分析，提取架构共识和独特概念，按 P0/P1/P2/P3 分层。
 
-> 商管竞品对比基线（12家来源）见 `$LANLNK_BASE/prd/商管系统/域知识.md`。
+> 商管竞品对比基线（12家来源）见 `$LANLNK_BASE/out/prd/商管系统/域知识.md`。
 
 ### 模块 PRD 优化方法论（可执行清单）
 
@@ -589,11 +659,11 @@ PRD 是中文业务单据与流程，代码 OpenSpec/能力名是英文工程 ID
 
 修改本 skill 时，如发现新的非显而易见行为或踩到新坑：
 
-1. **判断归属**：通用方法论 → 留在本文件；域专属知识 → 写入项目目录下 `域知识.md`（如 `$LANLNK_BASE/prd/商管系统/域知识.md`）
+1. **判断归属**：通用方法论 → 留在本文件；域专属知识 → 写入项目目录下 `域知识.md`（如 `$LANLNK_BASE/out/prd/商管系统/域知识.md`）
 2. **更新本文件**的「已知限制」和「设计决策（通用方法论）」章节
 3. **如是诊断流程**，更新 `references/troubleshooting.md`
 4. **修改 term-aliases.yaml 时**，同时检查 `material-importer/references/domain-tags.md` 是否需要同步
-5. **修改 business-ontology.yaml 时**，它是共享文件（`$LANLNK_BASE/knowledge/`），其他 skill 也依赖
+5. **修改 business-ontology.yaml 时**，它是共享文件（`$LANLNK_BASE/config/ontology/`），其他 skill 也依赖
 6. **新增实体时**，必须同时更新 field-specs 和 ontology 的 `sub_functions`。每次大批量修改后做全局同步检查
 7. **新增域知识文件时**（如会员系统），在项目目录下创建 `域知识.md`，并在本文件「适用场景」下添加引用
 

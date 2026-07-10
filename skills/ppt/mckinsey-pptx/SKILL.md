@@ -19,6 +19,10 @@ compatibility: >
 
 # McKinsey PPT — 麦肯锡风格专业演示文稿创作
 
+## DocSpec 质量基线
+
+本 skill 生成的战略咨询类 PPT、内容包和数据化叙事必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md`、`方案与投标文档质量规范.md`、`PPT与Word内容包质量规范.md` 和 `文档验收清单.md`。结论、证据、图表和建议必须可追溯。
+
 严格遵循麦肯锡视觉规范与咨询叙事逻辑。用户给需求，Agent 去结构化 + 设计 + 生成。
 
 ## 麦肯锡风格三核心

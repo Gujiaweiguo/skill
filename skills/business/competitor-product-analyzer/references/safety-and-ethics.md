@@ -56,7 +56,7 @@ Agent 在 P0 阶段必须确认：
 
 ### .auth.json 规范
 
-**位置**：`$ANALYSIS_ROOT/.auth.json`（即 `$LANLNK_BASE/prd/商管系统/competitor-analysis/<vendor>/.auth.json`）
+**位置**：`$ANALYSIS_ROOT/.auth.json`（即 `$LANLNK_BASE/out/prd/商管系统/competitor-analysis/<vendor>/.auth.json`）
 
 **权限**：mode 0600（仅所有者可读写）
 
@@ -75,7 +75,7 @@ Agent 在 P0 阶段必须确认：
 
 **强制规则**：
 
-- 首次写入时打印：`"请确保 .auth.json 已加入 .gitignore：$LANLNK_BASE/prd/商管系统/competitor-analysis/**/.auth.json"`
+- 首次写入时打印：`"请确保 .auth.json 已加入 .gitignore：$LANLNK_BASE/out/prd/商管系统/competitor-analysis/**/.auth.json"`
 - 二次运行复用，不重复询问
 - `.gitignore` 必须覆盖：在 `$LANLNK_BASE/.gitignore` 或仓库根 `.gitignore` 添加 `**/competitor-analysis/**/.auth.json`
 - **禁止**：把凭据写入 SKILL.md、references、报告、日志、截图文件名、git commit message

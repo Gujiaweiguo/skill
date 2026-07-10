@@ -27,8 +27,12 @@ import yaml
 
 
 # --- 配置（可按需调整） ---
-VALID_TYPES = {"公司概况", "资质荣誉", "产品方案", "案例", "实施方法论", "服务体系", "人员", "竞品资料", "客户资料"}
-VALID_DOMAINS = {"商管", "会员", "AI客服", "AI问数", "通用", "资管"}
+VALID_TYPES = {
+    "公司概况", "资质荣誉", "产品方案", "案例", "实施方法论", "服务体系",
+    "人员", "竞品资料", "客户资料",
+    "业务知识", "方法论", "工具模板", "市场洞察",
+}
+VALID_DOMAINS = {"商管", "会员", "AI客服", "AI问数", "ChatBI", "通用", "资管"}
 VALID_STATUSES = {"complete", "incomplete"}
 
 REQUIRED_FIELDS = {"id", "type", "name", "domain", "status", "created"}
@@ -72,14 +76,38 @@ def validate_date(value: str, field_name: str) -> str | None:
     if not isinstance(value, str):
         return f"{field_name} 必须是字符串（当前: {type(value).__name__}）"
 
-    # 日期范围可以是一个区间如 "2025.1-2026.1"
-    if field_name == "contract_period" and "-" in value:
-        parts = value.split("-")
-        if len(parts) == 2:
-            for p in parts:
-                if not re.match(r"\d{4}\.\d{1,2}", p.strip()):
-                    return f"{field_name} 格式错误: {value}（期望如 2025.1-2026.1）"
+    # permanent 用于永久有效的资质（如软著）
+    if value.strip().lower() == "permanent" and field_name in ("expires",):
+        return None
+
+    # contract_period 特殊处理
+    if field_name == "contract_period":
+        # 接受占位符（不报格式错误）
+        if value.strip() in ("待补充", "有待补充", "待确认"):
             return None
+        # 接受 "至" 分隔的日期范围
+        if "至" in value:
+            parts = value.split("至")
+            if len(parts) == 2:
+                for p in parts:
+                    p = p.strip()
+                    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d"):
+                        try:
+                            datetime.strptime(p, fmt)
+                            break
+                        except ValueError:
+                            continue
+                    else:
+                        return f"{field_name} 格式错误: {value}"
+                return None
+        # 接受 "-" 分隔的旧格式 YYYY.MM-YYYY.MM
+        if "-" in value:
+            parts = value.split("-")
+            if len(parts) == 2:
+                for p in parts:
+                    if not re.match(r"\d{4}\.\d{1,2}", p.strip()):
+                        return f"{field_name} 格式错误: {value}（期望如 2025.1-2026.1）"
+                return None
 
     formats = [
         "%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d",

@@ -18,6 +18,10 @@ compatibility: >
 
 # PPT Master — 专业演示文稿创作 Agent Pipeline
 
+## DocSpec 质量基线
+
+本 skill 生成的 PPT、PPT 内容包、视觉素材引用和渲染说明必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `PPT与Word内容包质量规范.md` 和 `文档验收清单.md`。每页观点、数据来源、素材路径、编译结果和文本溢出必须可检查。
+
 基于 `slides + imagegen` 方案，用户给需求，Agent 去设计 + 生成，你只管 Plan 和验收。
 
 ## Architecture

@@ -31,6 +31,10 @@ compatibility: >
 
 # Project Proposal Generator — 立项报告生成 Agent Pipeline
 
+## DocSpec 质量基线
+
+本 skill 生成的立项建议书、Word 内容包、PPT 内容包和方案对比材料必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md`、`方案与投标文档质量规范.md`、`PPT与Word内容包质量规范.md` 和 `文档验收清单.md`。立项结论必须区分事实、假设、风险和推荐方案。
+
 基于 `需求解析 + 竞品对标 + 素材匹配 + 标准结构编排 + 文档输出` 的方案。
 用户说"XX客户要做XX，帮我立项"，Agent 负责调研对标、匹配素材、生成报告。
 
@@ -43,7 +47,7 @@ compatibility: >
 | 变量 | 路径 |
 |------|------|
 | `$MATERIALS_DIR` | `$LANLNK_BASE/materials` |
-| `$PROPOSALS_DIR` | `$LANLNK_BASE/materials/14-proposals`（立项 + 方案统一存放） |
+| `$PROPOSALS_DIR` | `$LANLNK_BASE/out/proposals`（立项 + 方案统一存放） |
 | `$CASES_DIR` | `$MATERIALS_DIR/04-cases` |
 | `$PRODUCTS_DIR` | `$MATERIALS_DIR/03-products` |
 | `$COMPANY_DIR` | `$MATERIALS_DIR/01-company-overview` |
@@ -281,7 +285,7 @@ Agent 搜索后整理为结构化对标报告：
 | 痛点开篇 | 功能语言（"合同到期漏""应收乱"） | **决策层三问**：租没租出去？能收多少？收到多少？ | 11 号 §8.3 |
 | 证明/证据 | 统一引用案例 | **证明口径分级**：Z1 实证/Z2 竞品行业对标/Z3 蓝联产品状态/Z4 待试点验证；没有 Z1 不硬凑 | 15 号矩阵 §1.3 |
 
-**岗位病药数据来源**：`$LANLNK_BASE/knowledge/sales/methodology/15-商业地产岗位病药矩阵.md`（7 岗位 × 痛点/场景/功能/价值/证明完整矩阵）。
+**岗位病药数据来源**：`$LANLNK_BASE/materials/10-methodology/methodology/15-商业地产岗位病药矩阵.md`（7 岗位 × 痛点/场景/功能/价值/证明完整矩阵）。
 
 **结构参考**：`$PROPOSALS_DIR/商管系统方案汇报/蓝联商管ERP系统方案汇报_客户版.pptx`（v2 岗位病药结构，18 页：P3 决策层三问 → P4 经营驾驶舱 → P5 多项目对标 → P6-P11 六岗位病药 → P15 能力证明分级 → P16 模块全景作为能力地图）。
 

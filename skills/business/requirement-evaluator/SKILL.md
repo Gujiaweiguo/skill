@@ -16,7 +16,7 @@ description: |-
 compatibility: >
   依赖素材库 $MATERIALS_DIR（通过 LANLNK_BASE 环境变量配置）。
   依赖 markitdown 转化需求文档（docx/pdf → md）。
-  依赖产品功能清单（product-prd-generator 产物，位于 prd/<产品>/output/功能清单.md）。
+  依赖产品功能清单（product-prd-generator 产物，位于 out/prd/<产品>/output/功能清单.md）。
   纯提示词 skill，无 Python 依赖。
 
   Quick start:
@@ -31,6 +31,10 @@ compatibility: >
 ---
 
 # Requirement Evaluator — 需求满足度与二开成本评估 Agent Pipeline
+
+## DocSpec 质量基线
+
+本 skill 生成的需求满足度评估、覆盖矩阵、二开清单、成本估算和打单建议必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md`、`方案与投标文档质量规范.md` 和 `文档验收清单.md`。覆盖率、二开范围、成本基准、报价基准必须分开表达。
 
 基于 `需求解析 + 产品功能匹配 + 二开复杂度分级 + 成本估算 + 应标建议` 的方案。
 用户说"评估一下这个需求"，Agent 负责转化需求、匹配产品、识别二开、算成本、给应标建议。

@@ -295,6 +295,217 @@ def _render_risks(capabilities: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
     return "\n".join(lines) + "\n"
 
 
+def _md_cell(value: object) -> str:
+    return str(value or "—").replace("|", "／").replace("\n", " ").strip() or "—"
+
+
+def _customer_refs(cap: dict[str, Any]) -> list[str]:  # noqa: ANY_OK
+    refs: list[str] = []
+    for ev in cap.get("evidence", []):
+        if ev.get("kind") != "doc":
+            continue
+        ref = str(ev.get("ref", "")).strip()
+        if ref.startswith("customer:"):
+            ref = ref.replace("customer:", "", 1).strip()
+        if ref and ref not in refs:
+            refs.append(ref)
+    return refs
+
+
+def _handoff_priority(cap: dict[str, Any]) -> str:  # noqa: ANY_OK
+    status = str(cap.get("reconciled_status", "missing"))
+    customers = _customer_refs(cap)
+    evidence_count = len(cap.get("evidence", []))
+    if status == "missing" and len(customers) >= 2:
+        return "P0"
+    if status == "partial" and len(customers) >= 2:
+        return "P1"
+    if status == "missing" and evidence_count >= 1:
+        return "P1"
+    if status == "partial":
+        return "P1"
+    return "P2"
+
+
+def _slugify_change_id(raw: str, fallback_index: int) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", raw.lower()).strip("-")
+    if slug:
+        return slug[:64]
+    return f"prd-gap-{fallback_index:02d}"
+
+
+def _build_handoff_changes(capabilities: list[dict[str, Any]]) -> list[dict[str, Any]]:  # noqa: ANY_OK
+    candidates = [
+        cap for cap in capabilities
+        if cap.get("gaps") and str(cap.get("reconciled_status", "")) in {"missing", "partial"}
+    ]
+    priority_rank = {"P0": 0, "P1": 1, "P2": 2}
+    changes: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for idx, cap in enumerate(candidates, 1):
+        cap_id = str(cap.get("id") or cap.get("name") or "")
+        name = str(cap.get("name") or cap_id or f"gap-{idx}")
+        priority = _handoff_priority(cap)
+        change_id = _slugify_change_id(cap_id or name, idx)
+        base_id = change_id
+        suffix = 2
+        while change_id in seen_ids:
+            tail = f"-{suffix}"
+            change_id = f"{base_id[:64 - len(tail)]}{tail}"
+            suffix += 1
+        seen_ids.add(change_id)
+        changes.append({
+            "change_id": change_id,
+            "title": name,
+            "priority": priority,
+            "current_status": str(cap.get("reconciled_status", "missing")),
+            "confidence": str(cap.get("confidence", "low")),
+            "customers": _customer_refs(cap),
+            "evidence_count": len(cap.get("evidence", [])),
+            "gaps": [str(g) for g in cap.get("gaps", [])],
+            "mi_action": (
+                "目标项目确认后优先进入本轮 OpenSpec"
+                if priority == "P0"
+                else "目标项目确认后进入后续 OpenSpec 或 backlog"
+            ),
+        })
+    return sorted(changes, key=lambda c: (priority_rank.get(str(c["priority"]), 9), str(c["change_id"])))
+
+
+def _render_prd_handoff(inputs: RenderInputs, output_dir: Path) -> str:
+    project = str(inputs.reconcile.get("project", "商管系统"))
+    capabilities = inputs.reconcile.get("capabilities", [])
+    stats = _status_stats(capabilities)
+    changes = _build_handoff_changes(capabilities)
+    by_priority: dict[str, list[dict[str, Any]]] = {"P0": [], "P1": [], "P2": []}
+    for change in changes:
+        by_priority.setdefault(str(change["priority"]), []).append(change)
+
+    lines = [
+        f"# {project} PRD 实施交接包",
+        "",
+        "> 本文件由 product-prd-generator 自动生成，供目标业务系统项目（如 `/opt/code/mi`）评估并拆 OpenSpec change。PRD 侧只提供证据、优先级和建议拆分；最终是否新建 change、如何实现、如何验证，由目标项目会话决定。",
+        "",
+        "## 1. 交接边界",
+        "",
+        "- PRD 侧负责：目标蓝图、客户/竞品证据、当前能力差距、建议优先级、建议 change 粒度。",
+        "- 目标项目侧负责：读取本项目 `AGENTS.md`、`openspec/specs/`、代码和测试基线，确认是否已有覆盖，创建并执行 OpenSpec change。",
+        "- 禁止在 PRD 会话中直接修改目标项目代码或创建目标项目 change。",
+        "",
+        "## 2. 源产物",
+        "",
+        f"- `产品PRD.md`：{(output_dir / '产品PRD.md').resolve()}",
+        f"- `功能清单.md`：{(output_dir / '功能清单.md').resolve()}",
+        f"- `差距分析.md`：{(output_dir / '差距分析.md').resolve()}",
+        f"- `需求证据表.md`：{(output_dir / '需求证据表.md').resolve()}",
+        f"- `suggested-openspec-changes.yaml`：{(output_dir / 'suggested-openspec-changes.yaml').resolve()}",
+        f"- `mi-consumption-prompt.md`：{(output_dir / 'mi-consumption-prompt.md').resolve()}",
+        "",
+        "## 3. 当前能力概览",
+        "",
+        "| 状态 | 数量 |",
+        "|---|---:|",
+        f"| existing | {stats.get('existing', 0)} |",
+        f"| partial | {stats.get('partial', 0)} |",
+        f"| missing | {stats.get('missing', 0)} |",
+        f"| explicitly-not-do | {stats.get('explicitly-not-do', 0)} |",
+        "",
+        "## 4. 目标项目执行入口",
+        "",
+        "| 场景 | 目标项目 Agent | 做法 |",
+        "|---|---|---|",
+        "| 首版 PRD / 大差异 / 多 change | Prometheus | 先输出 Implementation Plan v1，不直接 `/opsx-ff` |",
+        "| 增量 gap / 单个明确缺口 | Sisyphus | 先核对现有 spec/code，再创建一个普通 change |",
+        "| change 执行 | Atlas | `/opsx-apply` 后补齐实现、测试、证据 |",
+        "| verify 失败 / 根因复杂 | Hephaestus - Deep Agent | 只修当前 change 的失败项 |",
+        "",
+        "## 5. 建议 OpenSpec 拆分",
+        "",
+    ]
+    if not changes:
+        lines.append("当前未发现需要交接给目标项目的 missing/partial gap。")
+    for priority in ("P0", "P1", "P2"):
+        items = by_priority.get(priority, [])
+        lines.extend([f"### {priority}（{len(items)} 项）", ""])
+        if not items:
+            lines.extend(["- （无）", ""])
+            continue
+        lines.append("| 建议 change id | 能力 | 当前状态 | 客户证据 | gap 摘要 |")
+        lines.append("|---|---|---|---|---|")
+        for item in items:
+            customers = ", ".join(item["customers"][:4]) if item["customers"] else "—"
+            gap_summary = "; ".join(item["gaps"])[:120] or "—"
+            lines.append(
+                f"| `{_md_cell(item['change_id'])}` | {_md_cell(item['title'])} | {_md_cell(item['current_status'])} | {_md_cell(customers)} | {_md_cell(gap_summary)} |"
+            )
+        lines.append("")
+    lines.extend([
+        "## 6. 回写要求",
+        "",
+        "目标项目 change 归档后，PRD 侧应回写：",
+        "",
+        "1. 更新 `功能清单.md` / 覆盖度矩阵中的状态。",
+        "2. 在 `差距分析.md` 或增量 gap 报告中标注已处理、合并、暂缓或误判。",
+        "3. 如发现 code_map 漏扫，优先修 code_map / ontology 映射，不把漏扫误写成新需求。",
+        "",
+    ])
+    return "\n".join(lines)
+
+
+def _render_mi_consumption_prompt(project: str, output_dir: Path) -> str:
+    handoff = (output_dir / "PRD实施交接包.md").resolve()
+    changes = (output_dir / "suggested-openspec-changes.yaml").resolve()
+    return f"""# MI / 目标项目消费提示词
+
+在目标项目目录（如 `/opt/code/mi`）启动 OpenCode 后使用。
+
+```text
+请先读取当前项目 AGENTS.md、openspec/specs/、相关代码和测试基线，再消费 PRD 交接包，不要直接创建 change。
+
+PRD 项目：{project}
+PRD 实施交接包：{handoff}
+建议 OpenSpec 拆分：{changes}
+
+请先输出目标项目 Implementation Plan v1：
+1) 哪些 gap 已被现有 spec/code 覆盖，只是 PRD code_map 漏判
+2) 哪些是真缺口，按 P0/P1/P2 分级
+3) 哪些建议合并成一个 change，哪些必须拆开
+4) 建议的普通 <CHANGE_ID> 清单、依赖顺序、验收标准和回归范围
+5) 哪些问题需要我确认
+
+如果 P0/P1 项超过 3 个、存在跨模块依赖或需要多轮迁移，请使用 Prometheus 先规划；如果只是单个明确缺口，请切 Sisyphus 创建普通 OpenSpec change。
+等我确认 Plan 后，再创建或更新 OpenSpec change。
+```
+"""
+
+
+def _write_handoff_outputs(inputs: RenderInputs, output_dir: Path) -> None:
+    project = str(inputs.reconcile.get("project", "商管系统"))
+    capabilities = inputs.reconcile.get("capabilities", [])
+    changes = _build_handoff_changes(capabilities)
+    payload = {
+        "project": project,
+        "generated_by": "product-prd-generator",
+        "handoff_boundary": "PRD side provides evidence and suggested grouping; target project owns OpenSpec decisions and implementation.",
+        "source_files": {
+            "prd": "产品PRD.md",
+            "feature_list": "功能清单.md",
+            "gap_analysis": "差距分析.md",
+            "evidence_table": "需求证据表.md",
+        },
+        "changes": changes,
+    }
+    (output_dir / "PRD实施交接包.md").write_text(
+        _render_prd_handoff(inputs, output_dir), encoding="utf-8"
+    )
+    (output_dir / "suggested-openspec-changes.yaml").write_text(
+        yaml.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
+    (output_dir / "mi-consumption-prompt.md").write_text(
+        _render_mi_consumption_prompt(project, output_dir), encoding="utf-8"
+    )
+
+
 def _render_unmatched_requirements(capabilities: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
     missing = [cap for cap in capabilities if cap.get("reconciled_status") == "missing"]
     if not missing:
@@ -971,8 +1182,9 @@ def main() -> int:
     (output_dir / "需求证据表.md").write_text(_render_evidence_table(capabilities), encoding="utf-8")
     (output_dir / "需求清单.md").write_text(_render_requirement_list_file(requirements), encoding="utf-8")
     (output_dir / "高优先级需求review清单.md").write_text(_render_priority_review(requirements), encoding="utf-8")
+    _write_handoff_outputs(inputs, output_dir)
 
-    print(f"rendered 6 files to {output_dir}/")
+    print(f"rendered 9 files to {output_dir}/")
     return 0
 
 
