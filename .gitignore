@@ -11,6 +11,7 @@ package-lock.json
 
 # OpenCode runtime state (sessions, continuation, etc.)
 .omo/
+.opencode/
 
 # OpenSpec transient artifacts
 openspec/changes/*/proposal.md
