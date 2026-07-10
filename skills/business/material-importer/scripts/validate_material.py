@@ -27,8 +27,8 @@ import yaml
 
 
 # --- 配置（可按需调整） ---
-VALID_TYPES = {"公司概况", "资质荣誉", "产品方案", "案例", "实施方法论", "服务体系", "人员"}
-VALID_DOMAINS = {"商管", "会员", "AI客服", "AI问数", "通用"}
+VALID_TYPES = {"公司概况", "资质荣誉", "产品方案", "案例", "实施方法论", "服务体系", "人员", "竞品资料", "客户资料"}
+VALID_DOMAINS = {"商管", "会员", "AI客服", "AI问数", "通用", "资管"}
 VALID_STATUSES = {"complete", "incomplete"}
 
 REQUIRED_FIELDS = {"id", "type", "name", "domain", "status", "created"}
