@@ -125,7 +125,7 @@ def process(target: str, root: str, dry_run: bool):
                     f'status: "complete"\n'
                     f'created: "{date.today().isoformat()}"\n'
                 )
-                new_content = f"---\n{fm}---\n{after}"
+                new_content = f"---\n{fm}---\n{before}"
                 mode = "insert"
             else:
                 # === 模式B patch：补缺失必填字段 ===
