@@ -613,7 +613,7 @@ def _render_requirement_list_file(requirements: list[dict[str, Any]]) -> str:  #
 
 
 def _load_ontology() -> dict[str, Any]:  # noqa: ANY_OK
-    ontology_path = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "knowledge" / "business-ontology.yaml"
+    ontology_path = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "config" / "ontology" / "business-ontology.yaml"
     if not ontology_path.is_file():
         return {}
     return yaml.safe_load(ontology_path.read_text(encoding="utf-8")) or {}
@@ -989,7 +989,7 @@ def _render_blueprint_modules(
 
 def _load_field_specs() -> dict[str, Any]:  # noqa: ANY_OK
     import os
-    base = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "knowledge"
+    base = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "config" / "field-specs"
     specs: dict[str, Any] = {}  # noqa: ANY_OK
     # Source 1: resource-field-specs.yaml (flat entity keys)
     p1 = base / "resource-field-specs.yaml"

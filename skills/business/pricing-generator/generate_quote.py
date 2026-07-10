@@ -931,9 +931,9 @@ def main(argv: list[str] | None = None) -> int:
                   f"当前输出 SAAS 结构（定价可能不准）。", file=sys.stderr)
             print(f"[WARN] 请联系产品负责人确认私有化定价后补充。", file=sys.stderr)
 
-    # 输出路径：$PROPOSALS_DIR/<客户>/报价单_<产品>_<模式>_<客户>_<日期>.xlsx
-    proposals_dir = get_lanlnk_base() / "materials" / "14-proposals"
-    out_dir = proposals_dir / args.customer
+    # 输出路径：$LANLNK_BASE/out/quotes/<客户>/报价单_<产品>_<模式>_<客户>_<日期>.xlsx
+    quotes_dir = get_lanlnk_base() / "out" / "quotes"
+    out_dir = quotes_dir / args.customer
     out_dir.mkdir(parents=True, exist_ok=True)
     product_str = "+".join(product_codes)
     out_file = (out_dir

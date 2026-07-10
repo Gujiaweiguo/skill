@@ -409,7 +409,7 @@ def _extract_roles_w(text: str) -> str:
 
 def _load_ontology_w() -> dict[str, Any]:
     import os
-    p = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "knowledge" / "business-ontology.yaml"
+    p = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "config" / "ontology" / "business-ontology.yaml"
     if not p.is_file():
         return {}
     return yaml.safe_load(p.read_text(encoding="utf-8")) or {}

@@ -59,7 +59,7 @@ def _load_aliases(skill_root: Path) -> tuple[dict[str, str], dict[str, Any]]:
 
     # Source 2: business-ontology.yaml (broad, shared industry knowledge)
     import os
-    ontology_path = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "knowledge" / "ontology" / "business-ontology.yaml"
+    ontology_path = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "config" / "ontology" / "business-ontology.yaml"
     if ontology_path.is_file():
         ontology = yaml.safe_load(ontology_path.read_text(encoding="utf-8")) or {}
         if isinstance(ontology, dict):
