@@ -242,11 +242,13 @@ AI agents don't have cross-session memory. All "memory" lives in files that are 
 
 **Promote up, don't duplicate.** If a lesson applies to 2+ skills, move it to `AGENTS.md`. If it only matters to one skill, keep it local.
 
+**纯提示词 skill 的契约分层**（跨 skill 通用）：复杂纯提示词 skill（如 compound-learning）应把 schema / 枚举 / 门槛 / 算法契约放到独立 `references/` 文件作为**唯一权威源**，`SKILL.md` 只保留入口行为、触发场景与链接，不复制 schema/枚举/门槛正文。变更只改 reference 一处，避免两处复制导致漂移。分层原则：入口文件回答"何时用、怎么路由"，reference 回答"具体字段、状态机、算法"。
+
 ### 「复利工程」触发词
 
 当用户在完成 OpenCode/skill/OpenSpec 工作后说「复利工程」「沉淀这次经验」「把这次 OpenCode/PRD/投标/方案经验沉淀一下」时，**优先加载 `compound-learning` skill**。
 
-`compound-learning` 是纯提示词 meta-skill，负责开发、调试、部署、文档、方案、PRD、投标、手册、交接包工作的经验复盘与分流写入。它不生成业务文档或代码本身，而是在工作完成后判断哪些经验值得沉淀、写到哪里、哪些不应写入。
+`compound-learning` 是纯提示词 meta-skill，负责开发、调试、部署、文档、方案、PRD、投标、手册、交接包工作的经验复盘与分流写入。它不生成业务文档或代码本身，而是在工作完成后判断哪些经验值得沉淀、写到哪里、哪些不应写入。采用事件驱动的 `capture`（登记 hypothesis/candidate 到临时收件箱）/ `consolidate`（过门槛写入唯一权威位置）双模式，默认先 capture 后 consolidate；不内置 daemon/scheduler。OpenCode 会话分散且无原生定时器，因此用 watermark 增量扫描而非定时循环。详细生命周期契约（三状态、回执 schema、晋升门槛、扫描算法、度量）见 `skills/meta/compound-learning/references/event-driven-lifecycle.md`。
 
 兜底分流规则：
 
