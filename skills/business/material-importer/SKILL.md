@@ -18,9 +18,23 @@ compatibility: >
 
   Falls back from markitdown → python-pptx/python-docx/openpyxl if unavailable.
   Excel complexity routing: convert_excel.py (PEP 723, needs openpyxl + libreoffice for .xls).
-  OCR: DeepSeek-OCR-2 (VLM) for image-heavy docs via `scripts/ocr_extract.py` (PEP 723 inline deps, ~8GB VRAM).
+  OCR (optional, heavy): DeepSeek-OCR-2 (VLM) for image-heavy docs via `scripts/ocr_extract.py`.
+    GPU deps (torch, transformers, etc.) are NOT in pyproject.toml — install at user level:
+    ```
+    pip install --user torch transformers einops addict easydict accelerate matplotlib torchvision
+    # Model auto-caches to ~/.cache/huggingface/ on first run (~8GB VRAM, ~5GB disk)
+    ```
+    Run with system python3 (NOT `uv run` — uv venv lacks torch by design):
+    ```
+    python3 scripts/ocr_extract.py <media_dir> --output <output_dir>
+    ```
+    PEP 723 inline deps in the script header document requirements but are not the primary run path.
   Cert expiry: pytesseract (optional, CPU-only, lightweight).
 change: >
+  v4 — 2026-07-11
+  • OCR 环境说明修正：明确 GPU 依赖（torch/transformers）装在 ~/.local 用户级，不在 skill venv
+  • OCR 调用方式修正：用 python3 scripts/ocr_extract.py（非 uv run）
+  • batch_competitor_import.py 新增 read_text_auto()：UTF-8→GB18030→UTF-16 自动编码检测
   v3 — 2026-07-11
   • P1 Excel 转换按复杂度分流：简单表→Markdown，复杂表→CSV
   • 新增 convert_excel.py：合并传播、双行表头展平、日期转换、.xls 自动转换

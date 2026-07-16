@@ -14,6 +14,21 @@ import sys
 from datetime import date
 from pathlib import Path
 
+
+def read_text_auto(path: Path) -> str:
+    """自动探测编码读取文本文件。
+
+    优先级：UTF-8 → GB18030（GBK 超集，覆盖中文 Windows 文件）→ UTF-16 → 兜底 replace。
+    避免 GBK 等非 UTF-8 源文件被强制按 UTF-8 读取产生乱码（U+FFFD）。
+    """
+    raw = path.read_bytes()
+    for enc in ("utf-8", "gb18030", "utf-16", "utf-16-le", "utf-16-be"):
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
 LANLNK_BASE = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk"))
 RAW_COMPETITORS = LANLNK_BASE / "raw" / "prd-商管系统" / "02-competitors"
 MATERIALS_COMPETITORS = LANLNK_BASE / "materials" / "13-competitors"
@@ -118,7 +133,7 @@ def process_vendor(vendor_cn: str, vendor_en: str, domain: str) -> int:
         if mat_file.exists():
             continue
 
-        content = raw_file.read_text(encoding="utf-8", errors="replace")
+        content = read_text_auto(raw_file)
         if not has_content(content):
             print(f"  [SKIP] 内容太少: {rel}")
             continue
