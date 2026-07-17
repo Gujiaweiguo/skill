@@ -5,4 +5,5 @@ description = "报价单生成工具 - 基于 openpyxl 生成 Excel 报价单（
 requires-python = ">=3.10"
 dependencies = [
     "openpyxl>=3.1",
+    "pyyaml>=6.0",
 ]

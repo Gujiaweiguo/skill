@@ -51,6 +51,32 @@ PROVIDER = {
     "contact": "顾为国 / 13711775158",
 }
 
+
+def get_lanlnk_base() -> Path:
+    return Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk"))
+
+
+def _load_devkit_rate() -> int:
+    """从共享定价基准配置读取二开报价单价（元/人天）。
+
+    配置文件：$LANLNK_BASE/config/pricing/pricing-basis.yaml
+    回退：配置缺失或解析失败时回退到 2000 并打印警告。
+    """
+    config_path = get_lanlnk_base() / "config" / "pricing" / "pricing-basis.yaml"
+    fallback = 2000
+    try:
+        import yaml
+        with open(config_path, encoding="utf-8") as f:
+            config = yaml.safe_load(f) or {}
+        return int(config.get("devkit_rate", fallback))
+    except (FileNotFoundError, ValueError, TypeError) as e:
+        print(f"[WARN] 共享定价配置读取失败({e})，二开单价回退到 {fallback}/天", file=sys.stderr)
+        return fallback
+
+
+# 二开报价单价 — 唯一权威源：$LANLNK_BASE/config/pricing/pricing-basis.yaml
+DEVKIT_RATE = _load_devkit_rate()
+
 # === MI 商管系统数据（v1 硬编码，用于验证；后续版本改为读模板动态生成）===
 MI_DATA: dict[str, Any] = {
     "product_name": "MI 商管系统",
@@ -73,10 +99,10 @@ MI_DATA: dict[str, Any] = {
     "optional_items": [
         ("2.1", "定制开发-线索确权规则",
          "公海池/线索保护期/首访确权判定/多渠道撞客处理/佣金结算确权规则",
-         22000, 0, "11 人天 × 2000/天；P0 首期，可选"),
+         11 * DEVKIT_RATE, 0, f"11 人天 × {DEVKIT_RATE:,}/天；P0 首期，可选"),
         ("2.2", "定制开发-写字楼房屋售卖",
          "产权交易全流程：售卖合同/售价管理/认购记录/房款分期/业财打通",
-         60000, 0, "30 人天 × 2000/天；P1 二期，可选"),
+         30 * DEVKIT_RATE, 0, f"30 人天 × {DEVKIT_RATE:,}/天；P1 二期，可选"),
     ],
     # 第三方集成（不报价）：集成项 / 说明 / 计费方式
     "third_party": [
@@ -93,10 +119,10 @@ MI_DATA: dict[str, Any] = {
          50000, "", 20000, "",
          "客户首期只要标准招商经营闭环，确权规则用标准配置，无售卖业务"),
         ("5.2", "方案 B：标准 + 确权规则（P0）",
-         69800, "", 20000, "",
+         50000 + 11 * DEVKIT_RATE, "", 20000, "",
          "客户有多渠道招商（代理/中介/经纪人），需要标准化判客确权和佣金结算规则"),
         ("5.3", "方案 C：标准 + 确权 + 售卖（P0+P1）",
-         123800, "", 20000, "",
+         50000 + 11 * DEVKIT_RATE + 30 * DEVKIT_RATE, "", 20000, "",
          "客户写字楼既有租赁又有产权售卖，需要完整租售管理"),
     ],
     # 功能模块（Sheet2）：模块名 / 功能描述
@@ -143,10 +169,10 @@ MI_DATA: dict[str, Any] = {
     "service_notes": [
         "1. 服务承诺：提供首次上线的后台数据切换，包括铺位/合同/应收数据初始化、"
         "历史数据迁移、系统配置；",
-        "2. 二开单价：未来新需求，二开人天单价按 2,000 元/人天结算；",
+        f"2. 二开单价：未来新需求，二开人天单价按 {DEVKIT_RATE:,} 元/人天结算；",
         "3. SAAS 服务范围：含平台运维、安全更新、版本升级；不含定制开发和数据导出定制；",
         "4. 实施人天：首年实施含 15 人天（项目启动+方案设计+上线+验收），"
-        "超出部分按 2,000 元/人天另计；",
+        f"超出部分按 {DEVKIT_RATE:,} 元/人天另计；",
         "5. 付款方式：首年签订合同时支付 50%，验收后支付 50%；次年租用费按年续费支付。",
     ],
     "standard_first_year_total": 50000,
@@ -215,9 +241,9 @@ CRM_DATA: dict[str, Any] = {
     "modules_xlsx": "/opt/code/docs/lanlnk/out/proposals/正祥会员系统/蓝联CRM功能清单.xlsx",
     "service_notes": [
         "1. 服务承诺：提供首次上线的后台数据切换，包括会员数据切入、积分数据切入、订单数据切入、历史会员资产备份；",
-        "2. 二开单价：未来新需求，二开人天单价按 2,000 元/人天结算；",
+        f"2. 二开单价：未来新需求，二开人天单价按 {DEVKIT_RATE:,} 元/人天结算；",
         "3. SAAS 服务范围：含平台运维、安全更新、版本升级；不含定制开发和数据导出定制；",
-        "4. 实施人天：首年实施含 10 人天（项目启动+方案设计+上线+验收），超出部分按 2,000 元/人天另计；",
+        f"4. 实施人天：首年实施含 10 人天（项目启动+方案设计+上线+验收），超出部分按 {DEVKIT_RATE:,} 元/人天另计；",
         "5. 付款方式：首年签订合同时支付 50%，验收后支付 50%；次年租用费按年续费支付。",
     ],
     "standard_first_year_total": 100000,
@@ -248,7 +274,7 @@ AI_SERVICE_NOTES: list[str] = [
     "3. 次年运营服务费固定 2 万：不论购买几个岗位，次年运营服务费均为 2 万。"
     "AI 岗位 Skill 卖的是运营服务——周复盘/命中率调优/知识库更新/效果看板/SLA 保障/持续优化，"
     "确保 Skill 越用越准；",
-    "4. 新岗位 Skill 定制：如需当前 6 个以外的岗位 Skill，按 2,000 元/人天定制开发；",
+    f"4. 新岗位 Skill 定制：如需当前 6 个以外的岗位 Skill，按 {DEVKIT_RATE:,} 元/人天定制开发；",
     "5. 数据接入：客户需提供商管系统/CRM/客流等数据源接口；"
     "LnkAgent 本地部署确保数据安全；",
     "6. 退出机制：试点 90 天后效果不达预期可停止，不绑定长期合同。",
@@ -295,7 +321,7 @@ def build_ai_data(positions: int) -> dict[str, Any]:
         "optional_items": [
             ("2.1", "新岗位 Skill 定制开发",
              "当前 6 个岗位 Skill 以外的定制需求（如物业岗/招商谈判岗等），按人天结算",
-             0, 0, "2,000 元/人天；按需"),
+             0, 0, f"{DEVKIT_RATE:,} 元/人天；按需"),
         ],
         "third_party": [
             ("数据源接入", "商管系统/CRM/客流等数据接口",
@@ -420,15 +446,11 @@ def merge_product_data(products: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def get_lanlnk_base() -> Path:
-    return Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk"))
-
-
 def parse_devkit(path: Path) -> list[tuple[str, str, str, int, int, str]]:
     """解析 requirement-evaluator 的需求评估报告，提取 MI 二开清单。
 
     返回 optional_items 格式：[(序号, 名称, 说明, 首年报价, 次年报价, 备注), ...]
-    报价 = 人天 × 2000（pricing-generator 报价单价）
+    报价 = 人天 × DEVKIT_RATE（pricing-generator 报价单价，来自 pricing-basis.yaml）
     """
     import re
     text = path.read_text(encoding="utf-8")
@@ -438,12 +460,12 @@ def parse_devkit(path: Path) -> list[tuple[str, str, str, int, int, str]]:
     pattern = r"\|\s*(\d+)\s*\|\s*(.+?)\s*\|.*?\|\s*\*{0,2}([SML])\*{0,2}\s*\|\s*(\d+)\s*\|"
     for m in re.finditer(pattern, text):
         num, name, complexity, days = m.group(1), m.group(2).strip(), m.group(3), int(m.group(4))
-        cost = days * 2000
+        cost = days * DEVKIT_RATE
         seq = f"2.{num}"
         items.append((
             seq, f"定制开发-{name}",
             f"{name}（{complexity} 级，{days} 人天）",
-            cost, 0, f"{days} 人天 × 2,000/天；P{0 if complexity in ('S','M') else 1}"
+            cost, 0, f"{days} 人天 × {DEVKIT_RATE:,}/天；P{0 if complexity in ('S','M') else 1}"
         ))
     return items
 
@@ -602,7 +624,7 @@ def build_quote_sheet(
 
     # 二开单价
     write_info_row(ws, r,
-                   "二开单价：未来新需求，二开人天单价按 2,000 元/人天结算",
+                   f"二开单价：未来新需求，二开人天单价按 {DEVKIT_RATE:,} 元/人天结算",
                    end_col); r += 1
 
     r += 1  # 空行
