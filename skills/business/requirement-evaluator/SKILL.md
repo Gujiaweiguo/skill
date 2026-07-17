@@ -48,9 +48,9 @@ compatibility: >
 | 变量 | 路径 | 说明 |
 |------|------|------|
 | `$MATERIALS_DIR` | `$LANLNK_BASE/materials` | 素材库根 |
-| `$PROPOSALS_DIR` | `$MATERIALS_DIR/14-proposals` | 评估报告输出位置 |
+| `$PROPOSALS_DIR` | `$LANLNK_BASE/out/proposals` | 评估报告输出位置 |
 | `$INCOMING_DIR` | `$LANLNK_BASE/incoming` | 需求文档暂存区 |
-| `$PRD_DIR` | `$LANLNK_BASE/prd` | 产品 PRD 套件根（功能清单来源）|
+| `$PRD_DIR` | `$LANLNK_BASE/out/prd` | 产品 PRD 套件根（功能清单来源）|
 
 ### 产品功能清单定位
 
@@ -428,7 +428,7 @@ $PROPOSALS_DIR/<客户名>/
 >
 > 用户："对，MI。客户是XX资产公司"
 >
-> Agent → markitdown 转化需求 → 读 MI 功能清单 → 逐条匹配 → 识别二开 → 算成本 → 输出报告到 `14-proposals/XX资产公司/需求评估_MI_20260705.md`
+> Agent → markitdown 转化需求 → 读 MI 功能清单 → 逐条匹配 → 识别二开 → 算成本 → 输出报告到 `$PROPOSALS_DIR/XX资产公司/需求评估_MI_20260705.md`
 
 ### 示例 2：快速判断
 

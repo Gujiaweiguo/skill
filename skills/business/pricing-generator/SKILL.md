@@ -54,9 +54,9 @@ compatibility: >
 | 变量 | 路径 | 说明 |
 |------|------|------|
 | `$MATERIALS_DIR` | `$LANLNK_BASE/materials` | 素材库根 |
-| `$PROPOSALS_DIR` | `$MATERIALS_DIR/14-proposals` | 报价单输出位置 |
+| `$PROPOSALS_DIR` | `$LANLNK_BASE/out/proposals` | 报价单输出位置 |
 | `$REFERENCES_DIR` | `$MATERIALS_DIR/references` | 报价模板存放处 |
-| `$PRD_DIR` | `$LANLNK_BASE/prd` | 产品功能清单来源 |
+| `$PRD_DIR` | `$LANLNK_BASE/out/prd` | 产品功能清单来源 |
 
 ### 报价模板定位
 
@@ -443,7 +443,7 @@ Excel 输出含 **2 个 Sheet**：报价单 + 功能清单。
 
 ### 5.3 Excel 格式规范（参考正祥报价单）
 
-为保持面客报价单的视觉一致性，所有 Excel 输出遵循以下格式规范（参考 `14-proposals/正祥会员系统/报价单_SAAS_正祥_20260618.xlsx`）：
+为保持面客报价单的视觉一致性，所有 Excel 输出遵循以下格式规范（参考 `$PROPOSALS_DIR/正祥会员系统/报价单_SAAS_正祥_20260618.xlsx`）：
 
 | 元素 | 规范 | 说明 |
 |---|---|---|
@@ -520,7 +520,7 @@ SAAS：
 > 确认：SAAS 模式，首年5万（软件2万+实施3万），次年2万，二开单价1800/天。
 > ```
 >
-> Agent → 整理 MI 9 模块功能清单 → 套用定价 → 二开作为可选项 → 输出方案 A/B/C → 报价单到 `14-proposals/XX资产公司/`
+> Agent → 整理 MI 9 模块功能清单 → 套用定价 → 二开作为可选项 → 输出方案 A/B/C → 报价单到 `$PROPOSALS_DIR/XX资产公司/`
 
 ### 示例 2：纯标准产品报价（无二开）
 
