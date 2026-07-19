@@ -37,11 +37,12 @@ materials_backup_*/
 # User data is at /opt/code/docs/lanlnk/, not in this repo
 
 # Generated artifacts
+# (1) 统一 output/ 目录 — 各 skill 的 skills/<path>/<skill>/output/（AGENTS.md 跨 skill 约定）
+#     用 glob 而非写死路径，自动覆盖未来新增 skill；已确认无 skill 故意提交 output/ 到 git
+skills/**/output/
+# (2) product-prd-generator 的 parsed/ 和 review/ 也是生成产物
+skills/**/parsed/
+skills/**/review/
+# (3) skill 特定的生成文件（路径写死，因为不是目录模式）
 skills/word/word-master/templates/_analysis_report.json
 skills/word/word-master/test/*.docx
-skills/word/word-master/output/
-skills/ppt/ppt-master/output/
-skills/ppt/mckinsey-pptx/slides/output/
-skills/business/product-prd-generator/output/
-skills/business/product-prd-generator/parsed/
-skills/business/product-prd-generator/review/

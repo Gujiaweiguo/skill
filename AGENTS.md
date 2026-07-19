@@ -206,6 +206,8 @@ LSP reports many false errors in this repo:
 - **资源/对象 taxonomy 要先统一再分期**（跨系统规划）：不要用窄词误导阶段范围。商管“铺位/位置/资源”包含铺位、单元、场地、广告位、车位、多经点位；CRM“客户”可能包含线索、联系人、企业客户、门店、渠道伙伴、会员等。先定义统一对象模型和别名，再做差异与实施阶段。
 - **AI 产品族术语口径**（跨 skill，product-prd-generator/strategy-brief-generator/company-intro-generator 都会碰到）：蓝联 AI 产品族有 3 个产品，代号演变历史必须记住：(1) **LnkChatBI** = CREAISkill 文档里的 `mysqlbot` = 更早的 `SQLBot`，三者同一产品（rebrand-migration spec 实证，代码 header 仍保留 `X-SQLBOT-ASK-TOKEN`）。(2) **langchat** 是第三方开源 fork（git remote: `Gujiaweiguo/langchat`），蓝联零源码改造；蓝联在它之上构建岗位 AI Skill 工作流产品。(3) **mymaxkb 产品已被 langchat 取代**——OrchestratorAgent 代码里 `system: maxkb` / `MaxKBApiExecutor` 是 legacy 标识符，产品实际为 langchat。写 PRD/方案/汇报时统一用现名（LnkChatBI / langchat），代码引用保留 legacy 名并加注。术语权威来源：`$LANLNK_BASE/out/prd/AI产品族架构.md` §9 术语对照表。
 - **deep task 大产出拆分策略**（跨 skill，delegation 经验）：一个 deep task 一次性生成 8 个大文件（每个 200-8000 行）会卡住——实测 LnkChatBI PRD task 跑 31 分钟后 0 文件产出，被迫取消手工重写。**正确做法**：(1) 8 文件套件拆成 2-3 个 task（每个 3-4 文件）；(2) 或先 fire task 做简单文件（功能清单/需求清单/差距分析），再手工写核心文件（产品PRD）；(3) 给 task 明确的 per-file 行数上限（如"每个文件不超过 500 行"），避免模型在单文件上耗尽 token。
+- **Skill 生态审计**（跨 skill，治理动作）：每次批量新增/重命名 skill 后，必须跑一次生态一致性扫描：每个 `skills/<*>/<*>/SKILL.md` 都要有对应 `.opencode/skills/<name>` 软链、每个软链都解析到存在的目录、根 `.gitignore` 覆盖 `skills/**/output/` 等 glob、AGENTS.md 「Dependency graph」同步更新。**最新审计报告**：`references/skill-审计-2026-07.md`（含 P0/P1/P2 分级、修复批次、可复现命令）。**根治"一直 deferred"**：审计报告必须是磁盘上可被 grep 的文件，不能只存在于某个会话的 TODO 里——本次（2026-07-19）审计就是从一条长期 deferred 的关注点落地的，根因之一就是历史上没有这份文件。
+- **新 skill 上线 checklist**（跨 skill，治理动作）：在 `skills/<category>/<name>/` 写完 SKILL.md 后，依次：(1) `ln -s ../../skills/<category>/<name> .opencode/skills/<name>`（相对路径）；(2) 在新 OpenCode 会话里确认出现在 `available_skills` 列表；(3) 更新 AGENTS.md 「Dependency graph」一节；(4) 若是 Python skill，`cd` 进去跑 `uv sync`；(5) 复杂 skill（多模块包）必写 `references/troubleshooting.md`；(6) **跑 `references/scripts/check_skill_ecosystem.sh`** 自动验证 P0（软链完整、SKILL.md 可解析）+ P1（复杂 skill 治理、依赖图同步、YAML 合法）+ P2（description 长度、frontmatter 风格）。脚本 0 退出码 = 全绿，1 = 必修问题。**P0 教训**：2026-07-05 上线 pricing-generator 和后续上线 requirement-evaluator 都漏了第 1 步，导致两个 skill 在 OpenCode 运行时长期不可见（详见 `references/skill-审计-2026-07.md` P0-1/P0-2）。
 
 ## Knowledge Persistence
 
@@ -265,24 +267,81 @@ AI agents don't have cross-session memory. All "memory" lives in files that are 
 ### Dependency graph
 
 ```
-material-importer ─┬─← product-prd-generator  (doc→md conversion, image extraction)
-                   └─← company-intro-generator (case retrieval, cert check)
+═══════════════════════════════════════════════════════════════════
+基础设施层（被多个 business / docs skill 复用）
+═══════════════════════════════════════════════════════════════════
 
-word-master ───────┬─← product-prd-generator  (.docx export)
-                   ├─← company-intro-generator (.docx export)
-                   └─← bid-doc-master          (technical/commercial bid .docx)
+material-importer ─┬─← product-prd-generator       (doc→md, image extraction)
+                   ├─← company-intro-generator     (case retrieval, cert check)
+                   ├─← competitor-product-analyzer (markitdown + 图片提取 + OCR)
+                   ├─← strategy-brief-generator    (markitdown + 图片提取)
+                   ├─← project-proposal-generator  (素材库匹配)
+                   └─← requirement-evaluator       (需求材料转换)
 
-ppt-master ────────┬─← company-intro-generator (PPT generation)
-/proposal-pptx     └─← bid-doc-master          (slide content .pptx)
+word-master ───────┬─← product-prd-generator       (.docx export)
+                   ├─← company-intro-generator     (.docx export)
+                   ├─← bid-doc-master              (technical/commercial bid .docx)
+                   ├─← project-proposal-generator  (立项建议书 .docx)
+                   └─← strategy-brief-generator    (战略简报 .docx)
 
-doc-generator ─────← playwright skill          (runtime screenshots)
+ppt-master ────────┬─← company-intro-generator     (proposal/intro PPT)
+/proposal-pptx     ├─← bid-doc-master              (mode=tender 述标 PPT)
+                   └─← project-proposal-generator  (立项 PPT)
 
-config/ontology ─────← product-prd-generator     (business-ontology.yaml: 8 modules, 482 terms)
+═══════════════════════════════════════════════════════════════════
+独立工具层（不依赖其它自定义 skill）
+═══════════════════════════════════════════════════════════════════
 
-product-prd-generator ─← word-master + material-importer + config/ontology/business-ontology.yaml
+doc-generator ─────← playwright skill (builtin)    (runtime screenshots)
+                      └ 产出被下游 RAG 系统消费（chunks.jsonl + llms.txt）
+
+pdf-toc-master ───── 独立（pypdf + easyocr，自带 PEP 723 依赖）
+mckinsey-pptx ────── 独立（PptxGenJS），与 ppt-master 平级（不同视觉规范）
+frontend-slides ──── 独立（PptxGenJS），技术分享场景，与 ppt-master 平级
+crela-daily-skill ── 独立（websearch + 文本格式化）
+winshang-crawler ─── 独立（自含 src/ + pyproject.toml，独立 git history）
+
+ops-manual-generator  独立（纯模板，读项目 IaC 文件输出 Markdown 部署/维护手册）
+
+═══════════════════════════════════════════════════════════════════
+业务决策层（business skill 之间的衔接）
+═══════════════════════════════════════════════════════════════════
+
+requirement-evaluator ──→ pricing-generator        (二开清单流转到报价单)
+                         (pricing-generator P0.3 检测前置 requirement-evaluator 输出，
+                          缺失则自动先跑 requirement-evaluator)
+
+competitor-product-analyzer ─→ product-prd-generator  (改进建议交给 PRD 落地)
+                              (复用 doc-generator 的运行时探测/locator 规范，不直接调用)
+
+strategy-brief-generator ─→ product-prd-generator / company-intro-generator / bid-doc-master
+                            (战略结论指导下游产品规划/客户方案/投标，但不直接调用)
+
+product-prd-generator ─→ word-master + material-importer + config/ontology/business-ontology.yaml
+                         (运行时依赖；不反向被 ontology 调用)
+
+═══════════════════════════════════════════════════════════════════
+共享配置层
+═══════════════════════════════════════════════════════════════════
+
+config/ontology ────────← product-prd-generator            (business-ontology.yaml: 8 modules, 482 terms)
+                         ← company-intro-generator, bid-doc-master (read-only 消费 ontology)
+
+$LANLNK_BASE/materials/ ← material-importer                (写入)
+                         ← 所有 business skill              (读取)
+
+═══════════════════════════════════════════════════════════════════
+元治理层（不产生业务文档，治理 skill 生态本身）
+═══════════════════════════════════════════════════════════════════
+
+compound-learning ──→ AGENTS.md / SKILL.md / references/troubleshooting.md
+                      (经验回灌到任意 skill 或 /opt/code/docs/opencode 手册)
+openspec-practice ──→ 项目 OpenSpec (mi / langchat 等目标项目)
+                      (短口令路由到目标项目的 OpenSpec change 工作流)
+docs-archive-manager  独立 (rsync/sha256sum 操作 /opt/code/docs 备份策略)
 ```
 
-### word-master calling pattern (3 consumers)
+### word-master calling pattern (5 consumers)
 
 ```python
 # MUST run in word-master dir with uv — NOT python3 (venv mismatch)

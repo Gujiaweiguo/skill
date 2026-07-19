@@ -1,7 +1,17 @@
 ---
 name: product-prd-generator
-description: 通用产品 PRD 生成 Skill。以现有代码库作为产品基线，结合客户需求、竞品资料、手册、蓝图、截图和图片证据，生成统一功能清单、差距分析和内部产品 PRD。适用于商管/会员/CRM/供应链等多业务系统。
-compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to-md conversion and image extraction. Reads code from specified code-root.
+description: |-
+  通用产品 PRD 生成 Skill。以现有代码库作为产品基线，结合客户需求、竞品资料、手册、蓝图、截图和图片证据，
+  生成统一功能清单、差距分析和内部产品 PRD。适用于商管/会员/CRM/供应链等多业务系统。
+  支持两种模式：
+  - `--mode generate`（默认）：全量生成 PRD + 功能清单 + 差距分析 + 版本规划 + 实施分期，用于首次生成或主干重构。
+  - `--mode coverage-validate`：新材料入库后对照现有 PRD + 代码做覆盖度校验，输出客户×竞品覆盖度矩阵和增量 gap 报告，不重跑全量 PRD，适用于 PRD v1.x 持续完善。
+  触发场景："做一份商管 PRD"、"出产品 PRD"、"整理客户需求和竞品资料出 PRD"、"客户/竞品资料入库了看增量 gap"、
+  "新材料入库后做覆盖度校验"、"PRD v1.x 持续完善"、"功能清单"、"差距分析"、"版本规划与实施分期"、
+  "商管/会员/CRM/供应链产品规划"、"基于现有产品做版本规划"。
+  仅面向内部产品规划与决策，不生成报价/方案/投标文件（那些交给 company-intro-generator / pricing-generator / bid-doc-master），
+  不直接修改业务系统代码（业务系统自己基于本 skill 输出的交接文档拆 OpenSpec change）。
+compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to-md conversion and image extraction. Reads code from specified code-root (default /opt/code/mi). Outputs to $LANLNK_BASE/out/prd/<项目>/output/.
 ---
 
 # Product PRD Generator
@@ -9,6 +19,18 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 ## DocSpec 质量基线
 
 本 skill 生成的 PRD、功能清单、差距分析、需求证据表和 review 清单必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md`、`PRD质量规范.md` 和 `文档验收清单.md`。跨 PRD/方案/投标等多个文档类 skill 的质量经验，通过 `compound-learning` 回流到 DocSpec；只影响本 skill 的限制写入本 skill references。
+
+## References 索引（按需读，不要全读）
+
+| 文件 | 何时读 |
+|---|---|
+| `references/troubleshooting.md` | 第一次跑本 skill、踩坑时、修改 SKILL.md 前。必读 |
+| `references/coverage-validate-mode.md` | 跑 `--mode coverage-validate` 模式时。覆盖度矩阵评分规则、增量 gap 检测逻辑 |
+| `references/feature-taxonomy.md` | 抽取功能清单时。功能分类与命名规范 |
+| `references/prd-template.md` | 渲染 PRD 时。PRD 章节骨架模板 |
+| `references/reconciliation-schema.json` | 写 `parsed/capability-reconciliation.json` 时。中闯产物的 schema |
+| `references/review-template.md` | 写 `review/pending-items.md` 时。待确认事项模板 |
+| `references/term-aliases.yaml` | 跑术语归一（Step 4）时。术语别名表，扩充覆盖率靠加这个文件 |
 
 ## 目标
 

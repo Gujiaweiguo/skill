@@ -1,7 +1,10 @@
 ---
 name: docs-archive-manager
-description: 资料归档与备份治理 Skill。用于把“输入资料 + skill 生成资料 + 轻量索引 GitHub 仓库 + 百度同步盘完整资料库”分层管理。触发场景：“整理备份策略”、“归档这些生成文件”、“扫描哪些该进 GitHub 哪些该进百度云盘”、“更新资料索引”、“同步百度云盘”、“做资料恢复演练”、“docs archive manager”。适合 /opt/code/docs 这类非代码型资料仓库，不负责生成业务内容。
-compatibility: Pure prompt skill. No runtime dependency. Assumes Linux/WSL2 shell with git, rg, rsync, sha256sum. Default docs root: /opt/code/docs. Default Baidu Sync target: /mnt/d/BaiduSyncdisk/docs.
+description: 资料归档与备份治理 Skill。用于把"输入资料 + skill 生成资料 + 轻量索引 GitHub 仓库 + 百度同步盘完整资料库"分层管理。触发场景："整理备份策略"、"归档这些生成文件"、"扫描哪些该进 GitHub 哪些该进百度云盘"、"更新资料索引"、"同步百度云盘"、"做资料恢复演练"、"docs archive manager"。适合 /opt/code/docs 这类非代码型资料仓库，不负责生成业务内容。
+compatibility: |-
+  Pure prompt skill. No runtime dependency.
+  Assumes Linux/WSL2 shell with git, rg, rsync, sha256sum.
+  Default docs root: /opt/code/docs. Default Baidu Sync target: /mnt/d/BaiduSyncdisk/docs.
 ---
 
 # Docs Archive Manager / 资料归档与备份治理

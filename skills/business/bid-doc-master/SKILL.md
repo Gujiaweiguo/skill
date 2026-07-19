@@ -40,6 +40,14 @@ compatibility: >
 
 基于 `招标文件解析 + 模板素材复用 + 响应性校验` 的方案，用户给招标文件和已有投标模板，Agent 负责拆解要求、编制内容、生成文件、检查响应完整性。
 
+## References 索引（按需读，不要全读）
+
+| 文件 | 何时读 |
+|---|---|
+| `references/troubleshooting.md` | 第一次跑本 skill、踩坑时、修改 SKILL.md 前。必读 |
+| `references/case-example.md` | 第一次跑、不确定完整流程时。演示一个投标案例从招标文件到交付的完整路径 |
+| `../../word/word-master/reference/word-content-package-spec.md` | 写 `.word-content.md` 内容包时。word-master 的字段规范（注意路径是单数 `reference/`） |
+
 默认示例素材目录：
 
 ```text

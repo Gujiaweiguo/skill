@@ -32,6 +32,20 @@ compatibility: >
 
 为运行中的 SPA 应用（Vue3 / React / Next / Nuxt 等）自动产出图文操作手册，同步生成 LangChain RAG 友好的 `chunks.jsonl` 与 `llms.txt`。agent 负责发现、规划、协作与编排，确定性渲染交给 `scripts/render_manual.py`。
 
+## References 索引（按需读，不要全读）
+
+| 文件 | 何时读 |
+|---|---|
+| `references/troubleshooting.md` | 第一次跑本 skill、踩坑时、修改 SKILL.md 前。必读 |
+| `references/limitations.md` | 决定要不要等 v2、规划 workaround 时。v1 已知限制清单 + v2 路线图 |
+| `references/analysis-schema.md` | 写 P1 探测代码、改 `analysis.json` 结构时。P1 输出 schema |
+| `references/screenshot-plan-schema.md` | 写 P2 规划、改 `screenshot-plan.json` 结构时。P2 输出 schema |
+| `references/style-fingerprint.md` | 传入参考手册影响输出风格时。风格参考 schema |
+| `references/chunks-jsonl-schema.md` | 下游 RAG 集成时。`chunks.jsonl` 的 LangChain Document 格式 |
+| `references/llms-txt-format.md` | llmstxt.org 集成时。`llms.txt` 规范 |
+| `references/config-yaml-schema.md` | 写 `_input/{name}/config.yaml` 时。per-app 配置字段 |
+| `references/manual-template.md` | 改 P4 输出格式时。P4 内置 Jinja2 模板（v2 才支持 per-app 覆盖） |
+
 ## Architecture
 
 ```text
