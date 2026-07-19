@@ -582,3 +582,131 @@ clean = re.sub(r'(?<=[\u4e00-\u9fa5])\s+(?=[\u4e00-\u9fa5])', '', clean)
    ```
 
 **修复**：扩 ontology 时新增的 spec ID 必须 `ls openspec/specs/` 校验。已存在但命名不一致的，**优先改 ontology 对齐 openspec**（不要反向改 openspec 目录名，会破坏 change 引用）。
+
+## 如何为新项目设计 ontology
+
+当一个新产品（CRM / 会员系统 / 财务系统等）首次接入本 skill 时，需要为它写一份 `ontology.yaml`。本章节给出设计原则与反例。
+
+### 设计原则
+
+1. **按功能聚合切模块，不按架构层切**
+
+   错的：按 v2-strategy 风格的「Business Domain / Supply Chain / Runtime / Operations」4 层切。PRD 读者不熟悉这种架构层划分。
+
+   对的：按业务功能切 7-8 个模块，对齐商管 8 模块规模。例：
+   - langchat 8 模块：数字员工与契约 / 能力治理与发布 / 工作流与蓝图 / 构建管道 / 运行时执行 / 部署与流量治理 / 知识治理 / 策略与评估
+   - LnkChatBI 8 模块：数据源管理 / 问数会话 / 术语库 / SQL 训练数据 / 自定义提示词 / 分析记录 / 向量化校准 / OpenClaw 集成
+
+2. **模块数控制在 7-8 个**
+
+   太少（< 5）：模块太大，PRD 单章节过长，读者疲劳。
+   太多（> 12）：模块太碎，PRD 章节切换频繁，缺乏整体感。
+   商管 12 个已是上限，新产品建议 7-8 个起步，后续按需扩。
+
+3. **每个 sub_function 必填 4 字段**
+
+   ```yaml
+   <sub_function_name>:
+     capabilities: [<spec-id-1>, <spec-id-2>]   # 英文 kebab-case
+     role: <负责角色>                              # 中文，如「平台架构 / 产品」
+     scenarios:
+     - name: <场景名>
+       description: <场景描述，含状态机/边界/与v1差异>
+       source: <权威来源，如 v2-strategy/02 §6.1 BD-01>
+     terms: [<CN 术语 1>, <CN 术语 2>, ...]      # 用于术语归一
+   ```
+
+4. **capability ID 用英文 kebab-case**
+
+   - 对的：`digital-employee-definition` / `application-contract` / `text-to-sql`
+   - 错的：`DigitalEmployeeDefinition` / `数字员工定义` / `digitalEmployeeDefinition`
+
+   英文 kebab-case 与 OpenSpec spec 目录命名一致，便于交叉引用。
+
+5. **状态混排可以接受**
+
+   新产品 ontology 通常同时包含「当前事实」和「v2 目标态」。例如 langchat 「工作流与蓝图」模块下：
+   - `WorkflowSpec`（当前事实，ADR-001 文档事实）
+   - `BlueprintCandidate` / `BlueprintVersion`（v2 目标态）
+
+   不要试图只放 v2 目标态（PRD 会与现实脱节）或只放当前事实（PRD 无法呈现路线图）。
+
+### 反例警告
+
+**反例 1**：langchat ontology 含商管模块
+
+```yaml
+# ❌ 错的：langchat 不涉及招商/合同/财务
+modules:
+  数字员工与契约: ...
+  招商管理: ...        # ← 删除！langchat 完全不涉及
+  合同管理: ...        # ← 删除！
+```
+
+后果：跑 `--project langchat` 时，PRD 章节会出现空的「招商管理」「合同管理」（因为 langchat 客户需求里没人提招商/合同，但 ontology 强制渲染章节）。
+
+**反例 2**：LnkChatBI ontology 含 langchat 概念
+
+```yaml
+# ❌ 错的：LnkChatBI 不做工作流
+modules:
+  数据源管理: ...
+  工作流定义: ...      # ← 删除！这是 langchat 的概念
+  SkillRelease: ...   # ← 删除！
+```
+
+后果：跑 `--project LnkChatBI` 时，术语归一会把 langchat 域关键词（如「工作流」）误归到 LnkChatBI 模块。
+
+**反例 3**：用架构层名作模块名
+
+```yaml
+# ❌ 错的：「Supply Chain」对 PRD 读者不友好
+modules:
+  Business Domain Layer: ...
+  Supply Chain Layer: ...
+  Runtime Layer: ...
+```
+
+PRD 是给业务方/产品经理看的，不是给架构师看的。模块名应该是业务名词。
+
+### 验证方式
+
+写完 ontology 后，用以下命令验证：
+
+```bash
+cd <skill>
+uv run python -c "
+from product_prd_generator._paths import ontology_path_for_project
+import yaml
+p = ontology_path_for_project('<project>')
+print(f'ontology path: {p}')
+print(f'exists: {p.is_file()}')
+data = yaml.safe_load(p.read_text(encoding='utf-8'))
+modules = list(data.get('modules', {}).keys())
+print(f'modules ({len(modules)}): {modules}')
+# 检查不应含的模块（针对新产品定义）
+forbidden = ['资源管理', '招商管理']  # 按需调整
+for mod in forbidden:
+    assert mod not in modules, f'forbidden module present: {mod}'
+print('ontology OK')
+"
+```
+
+进一步跑端到端 generate 验证（参考 SKILL.md「添加新产品的步骤」Step 6）。
+
+### 持续维护
+
+- **加新对象**：v2 战略迭代出新对象（如 langchat v2 加了 BuildRun），在对应模块的 sub_functions 加一项
+- **改 capability ID**：必须同步改 term-aliases.yaml 的 key（否则术语归一失效）
+- **删 sub_function**：检查是否被 term-aliases 引用，被引用的不能直接删（先清掉引用）
+- **跨产品复用**：如果一个 capability 在多个产品出现（如 `api-key-auth` 在 langchat 和 LnkChatBI 都有），各产品的 ontology 独立列即可，不需要建跨产品 ontology
+
+### 样板参考
+
+| 产品 | 路径 | 模块数 | 行数 | 权威源 |
+|---|---|---|---|---|
+| 商管（基线） | `$LANLNK_BASE/config/ontology/business-ontology.yaml` | 12 | 1572 | materials + 历史 PRD |
+| langchat | `$LANLNK_BASE/out/prd/langchat/output/ontology.yaml` | 8 | ~270 | v2-strategy/02（Frozen 2026-07-19） |
+| LnkChatBI | `$LANLNK_BASE/out/prd/LnkChatBI/output/ontology.yaml` | 8 | ~200 | 域知识.md + AI产品族架构.md |
+
+读这些样板时，注意每个的 `source:` 字段标注了权威源，是设计判断的依据。

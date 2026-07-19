@@ -452,6 +452,106 @@ uv run product-prd-generator --project 商管系统 \
 4. 单个明确增量 gap 用 `Sisyphus` 创建普通 OpenSpec change。
 5. 执行用 `Atlas`；verify 失败或根因复杂时再切 `Hephaestus - Deep Agent`。
 
+## 添加新产品的步骤
+
+当一个新产品（如 CRM / 会员系统 / 财务系统）需要接入本 skill 时，按以下 6 步 onboarding。整个流程通常 1-2 小时（不含 ontology 设计时间）。
+
+### Step 1：设计并创建 ontology
+
+**路径**：`$LANLNK_BASE/out/prd/<project>/output/ontology.yaml`
+
+设计原则详见 `references/troubleshooting.md` 「如何为新项目设计 ontology」章节。要点：
+
+- 按功能聚合切模块（7-8 个，对齐商管 8 模块规模），**不**按架构层切
+- 每个模块必填字段：`description` / `aliases`（用于术语归一）/ `sub_functions`（含 capabilities + role + scenarios + terms）
+- capability ID 用英文 kebab-case（如 `digital-employee-definition`），同时作为 term-aliases key
+- **反例警告**：langchat ontology 不能含商管模块（资源/招商/合同/财务等）；LnkChatBI ontology 不能含 langchat 概念（Workflow/Capability/SkillRelease）
+
+**样板参考**：
+- 商管（基线）：`$LANLNK_BASE/config/ontology/business-ontology.yaml`（1572 行，12 模块）
+- langchat（v2 战略）：`$LANLNK_BASE/out/prd/langchat/output/ontology.yaml`（8 模块，源自 v2-strategy/02）
+- LnkChatBI（问数）：`$LANLNK_BASE/out/prd/LnkChatBI/output/ontology.yaml`（8 模块）
+
+### Step 2：创建 term-aliases
+
+**路径**：`$LANLNK_BASE/out/prd/<project>/output/term-aliases.yaml`
+
+key = capability ID（与 ontology.sub_functions.capabilities 一致），value = 该 capability 的 CN/EN 别名列表。doc_map 加载时会按长度倒序匹配，最长的 alias 优先归一。
+
+**样板参考**：
+- 商管（基线）：`<skill>/references/term-aliases.yaml`
+- langchat：`$LANLNK_BASE/out/prd/langchat/output/term-aliases.yaml`（38 keys，含 v2 对象 + legacy OrchestratorAgent 术语）
+- LnkChatBI：`$LANLNK_BASE/out/prd/LnkChatBI/output/term-aliases.yaml`（14 keys，含 legacy 产品名 mysqlbot/SQLBot）
+
+### Step 3：创建 raw 目录（用户素材入口）
+
+```bash
+mkdir -p $LANLNK_BASE/raw/prd-<project>/{00-current-product,01-customer-requirements,02-competitors}
+touch $LANLNK_BASE/raw/prd-<project>/{00-current-product,01-customer-requirements,02-competitors}/.gitkeep
+```
+
+**用途**：放 markitdown 转换后的 .md 文件（来自 incoming/ 的 docx/pptx/xlsx）。`.gitkeep` 是为了 rsync 到百度盘时保留空目录（`raw/` 整体被 `.gitignore` 排除）。
+
+### Step 4：创建 incoming 目录（原始素材入口）
+
+```bash
+mkdir -p $LANLNK_BASE/incoming/prd-<project>/
+touch $LANLNK_BASE/incoming/prd-<project>/.gitkeep
+```
+
+**用途**：放原始 docx/pptx/xlsx/pdf（用户手工或邮件收集）。用 `material-importer` skill 转换到 Step 3 的 raw 目录。
+
+### Step 5：创建 code-map-rules
+
+**路径**：`<skill>/references/code-map-rules-<project>.yaml`
+
+定义该项目的代码扫描规则。必填字段：
+
+- `specs.path`：默认 `openspec/specs`（所有 OpenSpec 项目通用，几乎不需要改）
+- `matrix.enabled`：商管 = true，其他产品 = false（商管独有的 product-definition-matrix.md）
+- `matrix.path`：当 enabled=true 时必填，默认 `artifacts/alignment/product-definition-matrix.md`
+- `future_scanners`：占位字段，Phase B 不实现，但定义 schema 让未来激活不需要改 yaml
+- `exclude_paths`：全局排除规则（node_modules / .venv / __pycache__ 等）
+
+**样板参考**：
+- 商管：`<skill>/references/code-map-rules-商管系统.yaml`
+- langchat：`<skill>/references/code-map-rules-langchat.yaml`（含上游 fork 排除规则）
+- LnkChatBI：`<skill>/references/code-map-rules-LnkChatBI.yaml`（含 g2-ssr / demo SQL 排除规则）
+
+### Step 6：跑 generate 验证
+
+```bash
+cd <skill>
+uv run product-prd-generator --project <project> \
+  --code-root /opt/code/<project> \
+  --docs-root $LANLNK_BASE/raw/prd-<project> \
+  --skill-root $(pwd) \
+  --output-dir /tmp/test-<project> \
+  --parsed-dir /tmp/test-<project>-parsed \
+  --mode generate
+```
+
+**验收要点**：
+1. exit 0
+2. `/tmp/test-<project>/产品PRD.md` 存在
+3. PRD 中 `### 3.N <模块名>` 出现的是新产品的模块（不是商管的 资源管理/招商管理/合同管理/...）
+4. `客户需求未覆盖` 章节列出的 spec IDs 来自新产品的 ontology（不是商管的 `lease-contract-management` 等）
+
+如发现问题：
+- 模块仍是商管的 → 检查 Step 1 ontology.yaml 路径是否正确（`$LANLNK_BASE/out/prd/<project>/output/ontology.yaml`）
+- 术语不归一 → 检查 Step 2 term-aliases.yaml 的 key 是否与 ontology.sub_functions.capabilities 中的 ID 一致
+- spec IDs 不对 → 检查 Step 5 code-map-rules 的 `specs.path`
+
+### 跑测试套件（可选）
+
+```bash
+cd <skill>
+uv sync --extra dev  # 一次性安装 pytest
+uv run pytest tests/ -v
+```
+
+测试套件覆盖 `_paths.py` / `_load_code_map_rules` 的 fallback 语义 + 5 个端到端场景（商管/langchat/LnkChatBI × generate/coverage-validate）。新产品 onboarding 后，可在 `tests/test_integration_e2e.py` 加一个对应场景，确保不退化。
+
 ## 已知限制
 
 - **PDF 转换需要 poppler-utils**：`apt install poppler-utils`。无 sudo 权限时，PDF 无法用 markitdown 转换，需要 LibreOffice 预转换或手动转 md。当前项目有 6 个竞品 PDF 受此影响（政策文件，影响小）。
@@ -469,7 +569,7 @@ uv run product-prd-generator --project 商管系统 \
 - **Ontology sub_functions 必须与 field-specs 全局同步**：ontology 的 `sub_functions` 有旧名称而 field-specs 没有对应实体时，渲染器会产生**空 `####` 标题**（有标题无内容）。这不是报错而是静默问题。每次大改后应做全局同步检查：`ont_subs == spec_keys` for all modules。
 
 > 商管域专属已知限制（资产管理空壳/集团驾驶舱图表库缺失/销售五源模型）见 `$LANLNK_BASE/out/prd/商管系统/域知识.md`。
-- **AI 产品 PRD 适配说明**（非商管系统场景）：本 skill 的 `term-aliases.yaml`、`business-ontology.yaml`、CLI（`uv run product-prd-generator`）**硬编码商管域**（8模块：招商/合同/财务/营运/物业/系统/推广 + 商管术语），对 AI 产品（LnkChatBI/OrchestratorAgent/langchat 等）会产生严重噪音。**AI 产品 PRD 必须手工生成**，不要运行 CLI。手工生成时遵循 SKILL.md 的**通用方法论**（7步流程/状态规则/置信度/review机制/分期方法论/PRD→代码术语映射），但**忽略商管域专属内容**（ontology/term-aliases/单据驱动渲染/三层架构/移动端一体化）。AI 产品的功能域按产品实际组织（如 ChatBI 的功能域 = 对话问数/Text-to-SQL/RAG校准/数据源/嵌入/MCP/系统管理），不是商管的招商/合同/财务。已完成的 AI 产品 PRD 样板：`$LANLNK_BASE/out/prd/{LnkChatBI,OrchestratorAgent,langchat}/output/`。
+- **多产品支持（2026-07-19 起）**：CLI 已支持 langchat / LnkChatBI / 未来的 CRM 等非商管产品自动生成 PRD。每个产品通过 `$LANLNK_BASE/out/prd/<project>/output/{ontology.yaml,term-aliases.yaml}` + `<skill>/references/code-map-rules-<project>.yaml` 三组配置实现项目级覆盖，缺失时回退到商管默认。新产品的 onboarding 流程见下方「添加新产品的步骤」章节。已落地的非商管样板：`$LANLNK_BASE/out/prd/{langchat,LnkChatBI}/output/`。
 
 ## 设计决策
 
