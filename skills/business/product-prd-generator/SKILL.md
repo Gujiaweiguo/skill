@@ -30,6 +30,7 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 | `references/prd-template.md` | 渲染 PRD 时。PRD 章节骨架模板 |
 | `references/reconciliation-schema.json` | 写 `parsed/capability-reconciliation.json` 时。中闯产物的 schema |
 | `references/review-template.md` | 写 `review/pending-items.md` 时。待确认事项模板 |
+| `references/rollout-plan-template.md` | S10-A 战略级架构调整 / S5 高复杂度增量 PRD 时产出"建议实施切片"。WP/Gate/跨仓库所有权表/START-RESUME prompt 模板 |
 | `references/term-aliases.yaml` | 跑术语归一（Step 4）时。术语别名表，扩充覆盖率靠加这个文件 |
 
 ## 目标
