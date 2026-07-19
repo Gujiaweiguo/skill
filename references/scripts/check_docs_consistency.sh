@@ -63,10 +63,10 @@ print_result() {
 # NOTE: this hardcoded list is the authoritative contract AGENTS.md table must match;
 # update both sides together. Any drift flagged by the script indicates one side is stale.
 SHARED_FILES=(
-  "skills/business/material-importer/references/domain-tags.md|material-importer,company-intro-generator"
+  "skills/business/material-importer/references/domain-tags.md|material-importer,product-prd-generator,compound-learning"
   "skills/business/product-prd-generator/references/term-aliases.yaml|product-prd-generator,competitor-product-analyzer"
   "$LANLNK_BASE/out/prd/商管系统/域知识.md|product-prd-generator,competitor-product-analyzer,strategy-brief-generator,compound-learning"
-  "$LANLNK_BASE/config/ontology/business-ontology.yaml|product-prd-generator,competitor-product-analyzer,company-intro-generator,bid-doc-master"
+  "$LANLNK_BASE/config/ontology/business-ontology.yaml|product-prd-generator,competitor-product-analyzer"
 )
 
 echo "=== Docs Cross-Skill Consistency Audit ==="

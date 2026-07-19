@@ -190,7 +190,7 @@ LSP reports many false errors in this repo:
 - **DocSpec 文档质量基线**（跨文档 skill）：所有生成 PRD、方案、投标、报价、Word、PPT、操作手册、部署维护手册、知识库文档，或修改 `SKILL.md` / `references/` 的任务，都必须遵守 `references/docspec/`。跨 2 个以上文档类 skill 的质量规则写入 DocSpec；只影响单个 skill 的限制或坑写入该 skill 的 `SKILL.md` 或 `references/troubleshooting.md`。
 - **文档输出路径统一在 lanlnk 下**（跨 skill）：所有 skill 的文档输出基目录都必须解析到 `/opt/code/docs/lanlnk/` 下。`$LANLNK_BASE = /opt/code/docs/lanlnk`，`$USERGUIDE_BASE = /opt/code/docs/lanlnk/UserGuide`（在 lanlnk 内）。新 skill 的默认路径不要写成独立的 `/opt/code/docs/xxx/`，必须挂到 lanlnk 子目录。
 - **Gitignored 文件中的旧路径不需要手动修正**（跨 skill）：全局路径迁移时，`openspec/changes/archive/`（历史快照，只读）和 `*/parsed/`（生成产物）中的旧路径不需要手动改——前者是不可变历史，后者下次运行自动刷新。只修 git tracked 的源文件。
-- **Domain tags** shared between `material-importer/references/domain-tags.md` and `company-intro-generator` — update both if changing tags
+- **Domain tags** in `material-importer/references/domain-tags.md` are read by material-importer (owner), product-prd-generator, and compound-learning — update the owner and notify readers when changing tags. (Historical note: company-intro-generator was originally planned as a reader but doesn't currently reference the file; if it starts consuming domain tags, update the §「Shared files」 table below.)
 - **winshang-crawler** is self-contained (own `src/`, `pyproject.toml`, separate git history)
 - **YAML OrderedDict 陷阱**（跨 skill）：Python 代码中 **永远不要把 `OrderedDict` 直接 `yaml.dump` 到文件**。`yaml.dump(OrderedDict(...))` 会写入 `!!python/object/apply:collections.OrderedDict` tag，导致 `yaml.safe_load` 报 `ConstructorError`。Python 3.7+ 普通 `dict` 已保序，直接用 `dict`。如需恢复已被污染的文件，用 `yaml.unsafe_load` 读取→转 `dict`→重写。详见 product-prd-generator `references/troubleshooting.md`。
 - **YAML 双引号嵌套陷阱**（跨 skill）：YAML 双引号字符串内含英文双引号会断解析。例如 `- "| 铺位状态 | 解约后铺位状态变为「空置」 | 悦商 |"` 如果写成 `"空置"`（英文双引号）会导致 YAML parser 在 `"空置"` 处认为字符串结束。**修复**：YAML 列表项内的 markdown 表格行如果含引号含义的中文词，用 `「」` 替代英文 `""`。
@@ -366,10 +366,12 @@ subprocess.run(
 
 | File | Skills sharing it |
 |---|---|
-| `material-importer/references/domain-tags.md` | material-importer, company-intro-generator |
-| `product-prd-generator/references/term-aliases.yaml` | product-prd-generator (currently solo, but structure ready for sharing) |
-| `$LANLNK_BASE/out/prd/商管系统/域知识.md` | product-prd-generator (商管 project only; 域知识跟着项目走，不放 skill 目录) |
-| `$LANLNK_BASE/config/ontology/business-ontology.yaml` | product-prd-generator (runtime dependency; ready for company-intro-generator, bid-doc-master) |
+| `material-importer/references/domain-tags.md` | material-importer (owner), product-prd-generator, compound-learning |
+| `product-prd-generator/references/term-aliases.yaml` | product-prd-generator (owner), competitor-product-analyzer |
+| `$LANLNK_BASE/out/prd/商管系统/域知识.md` | product-prd-generator (商管 project only; 域知识跟着项目走，不放 skill 目录), competitor-product-analyzer, strategy-brief-generator, compound-learning |
+| `$LANLNK_BASE/config/ontology/business-ontology.yaml` | product-prd-generator (runtime dependency), competitor-product-analyzer |
+
+> 此表与 `references/scripts/check_docs_consistency.sh` 的 `SHARED_FILES` 数组是**双 source of truth**——改一边必须同步另一边，跑 `check_docs_consistency.sh` 验证。Aspirational readers（"将来应该读但还没接"）不要写进此表，写到 skill 自身的 roadmap/TODO 里，避免 agent 读了做错误假设。
 
 ## OpenSpec Workflow
 
