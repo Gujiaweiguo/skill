@@ -25,6 +25,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from ._paths import term_aliases_path_for_project
+
 try:
     import yaml
 except ImportError:
@@ -55,8 +57,8 @@ _BOLD_ITEM = re.compile(r"^-\s+\*\*(.+?)\*\*\s*(.*)$")
 _SECTION = re.compile(r"^##\s+\d+\.\s*(.+?)（")
 
 
-def _load_term_aliases(skill_root: Path) -> dict[str, str]:
-    aliases_path = skill_root / "references" / "term-aliases.yaml"
+def _load_term_aliases(skill_root: Path, project: str = "商管系统") -> dict[str, str]:
+    aliases_path = term_aliases_path_for_project(project, skill_root)
     if not aliases_path.exists() or yaml is None:
         return {}
     with aliases_path.open(encoding="utf-8") as f:
@@ -1084,6 +1086,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--competitors", default="")
     parser.add_argument("--skill-root", default="")
     parser.add_argument("--capability-map-dir", action="append", default=[])
+    parser.add_argument("--project", default="商管系统")
     return parser.parse_args(argv)
 
 
@@ -1113,7 +1116,7 @@ def main(argv: list[str] | None = None) -> int:
         if not map_dir.is_dir():
             continue
         skill_root = Path(args.skill_root) if args.skill_root else None
-        aliases = _load_term_aliases(skill_root) if skill_root else {}
+        aliases = _load_term_aliases(skill_root, args.project) if skill_root else {}
         map_features = load_capability_map(map_dir, aliases)
         if map_features:
             existing_features = doc_map.get("features", [])

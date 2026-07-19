@@ -11,6 +11,7 @@ from typing import Any
 
 import yaml
 
+from ._paths import ontology_path_for_project
 from .data_model import (
     get_unmatched,
     group_by_module,
@@ -407,9 +408,8 @@ def _extract_roles_w(text: str) -> str:
     return "、".join(found[:3]) if found else "—"
 
 
-def _load_ontology_w() -> dict[str, Any]:
-    import os
-    p = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "config" / "ontology" / "business-ontology.yaml"
+def _load_ontology_w(project: str = "商管系统") -> dict[str, Any]:
+    p = ontology_path_for_project(project)
     if not p.is_file():
         return {}
     return yaml.safe_load(p.read_text(encoding="utf-8")) or {}
@@ -436,9 +436,10 @@ def _render_blueprint_section(
     requirements: list[dict[str, Any]],
     capabilities: list[dict[str, Any]],
     docs_root: str = "",
+    project: str = "商管系统",
 ) -> list[str]:
     """Blueprint-style module breakdown for Word export."""
-    ontology = _load_ontology_w()
+    ontology = _load_ontology_w(project)
     modules = ontology.get("modules", {})
     if not isinstance(modules, dict) or not modules:
         return _render_requirement_section(requirements)
@@ -655,7 +656,7 @@ def build_content_package(reconcile_path: str | Path, doc_map_path: str | Path |
         "",
         *_render_baseline_section(stats, capabilities),
         *_render_customer_section(doc_map),
-        *_render_blueprint_section(requirements, capabilities, docs_root),
+        *_render_blueprint_section(requirements, capabilities, docs_root, project=project),
         *_render_approval_flow_section(docs_root),
         *_render_feature_section(capabilities),
         *_render_unmatched_section(capabilities),

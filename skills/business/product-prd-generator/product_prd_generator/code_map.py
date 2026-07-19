@@ -8,6 +8,9 @@ from dataclasses import asdict, dataclass
 from enum import Enum, unique
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 from .models import CapabilityId, CapabilityStatus, CodeCapability, CodeMap, EvidenceKind, EvidenceRef, MatrixRow, Priority
 
@@ -25,6 +28,18 @@ _STATUS_BY_LABEL = {
     "explicitly-not-do": CapabilityStatus.EXPLICITLY_NOT_DO,
 }
 _PRIORITY_BY_LABEL = {"P0": Priority.P0, "P1": Priority.P1, "P2": Priority.P2, "P3": Priority.P3}
+
+_LEGACY_RULES: dict[str, Any] = {
+    "project": "商管系统",
+    "description": "Legacy hardcoded rules (pre-Phase-B). Used when project-specific yaml missing.",
+    "specs": {"path": "openspec/specs"},
+    "matrix": {
+        "enabled": True,
+        "path": "artifacts/alignment/product-definition-matrix.md",
+    },
+    "future_scanners": {},
+    "exclude_paths": [],
+}
 
 
 @lru_cache(maxsize=1)
@@ -126,15 +141,57 @@ def _iter_matrix_rows(matrix_path: Path) -> tuple[MatrixRow, ...]:
     return tuple(rows)
 
 
-def extract(code_root: Path, project: str = "商管系统") -> CodeMap:
-    specs_root = code_root / "openspec" / "specs"
-    matrix_path = code_root / "artifacts" / "alignment" / "product-definition-matrix.md"
+def _load_code_map_rules(project: str, skill_root: Path | None) -> dict[str, Any]:
+    """Load project-specific code-map scanning rules.
+
+    Returns dict with keys: project, description, specs, matrix, future_scanners, exclude_paths.
+    Falls back to ``_LEGACY_RULES`` (商管 hardcoded defaults) when:
+      - skill_root is None, OR
+      - ``<skill_root>/references/code-map-rules-<project>.yaml`` does not exist, OR
+      - yaml parsing fails
+
+    Legacy fallback preserves byte-identical behavior to pre-Phase-B code_map.
+    """
+    if skill_root is None:
+        return dict(_LEGACY_RULES)
+    yaml_path = skill_root / "references" / f"code-map-rules-{project}.yaml"
+    if not yaml_path.is_file():
+        return dict(_LEGACY_RULES)
+    try:
+        data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        return dict(_LEGACY_RULES)
+    if not isinstance(data, dict):
+        return dict(_LEGACY_RULES)
+    data.setdefault("project", project)
+    data.setdefault("description", "")
+    data.setdefault("specs", {"path": "openspec/specs"})
+    data.setdefault("matrix", {"enabled": True, "path": "artifacts/alignment/product-definition-matrix.md"})
+    data.setdefault("future_scanners", {})
+    data.setdefault("exclude_paths", [])
+    return data
+
+
+def extract(
+    code_root: Path,
+    project: str = "商管系统",
+    skill_root: Path | None = None,
+) -> CodeMap:
+    rules = _load_code_map_rules(project, skill_root)
+    specs_root = code_root / rules["specs"]["path"]
+    matrix_cfg = rules.get("matrix", {})
+    matrix_rows: tuple[MatrixRow, ...] = ()
+    if matrix_cfg.get("enabled", True):
+        matrix_path = code_root / matrix_cfg.get(
+            "path", "artifacts/alignment/product-definition-matrix.md"
+        )
+        matrix_rows = _iter_matrix_rows(matrix_path)
     return CodeMap(
         project=project,
         source_path=str(code_root),
         commit_sha=_git_head_sha(str(code_root)),
         spec_capabilities=_iter_spec_capabilities(specs_root, code_root),
-        matrix_rows=_iter_matrix_rows(matrix_path),
+        matrix_rows=matrix_rows,
     )
 
 
@@ -176,10 +233,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Extract code-side capability map from OpenSpec specs + alignment matrix.")
     parser.add_argument("--code-root", default="/opt/code/mi")
     parser.add_argument("--project", default="商管系统")
+    parser.add_argument("--skill-root", default="")
     parser.add_argument("--output", default="-")
     args = parser.parse_args()
 
-    code_map = extract(Path(args.code_root), args.project)
+    skill_root = Path(args.skill_root) if args.skill_root else None
+    code_map = extract(Path(args.code_root), args.project, skill_root=skill_root)
     payload = json.dumps(to_json(code_map), ensure_ascii=False, indent=2)
     if args.output == "-":
         print(payload)

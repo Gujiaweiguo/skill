@@ -11,6 +11,7 @@ from typing import Any
 
 import yaml
 
+from ._paths import ontology_path_for_project, term_aliases_path_for_project
 from .models import DocFeature, DocMap, EvidenceKind, EvidenceRef, Requirement
 
 # --- Extraction regexes ---------------------------------------------------
@@ -37,15 +38,17 @@ class SourceType(str, Enum):
     UNKNOWN = "unknown"
 
 
-def _load_aliases(skill_root: Path) -> tuple[dict[str, str], dict[str, Any]]:
-    """Load aliases from term-aliases.yaml + business-ontology.yaml.
-    Returns (flat_aliases_dict, ontology_structure_dict).
+def _load_aliases(skill_root: Path, project: str = "商管系统") -> tuple[dict[str, str], dict[str, Any]]:
+    """Load (flat_aliases, ontology_structure). Project-scoped with 商管 fallback.
+
+    See ``_paths.ontology_path_for_project`` / ``_paths.term_aliases_path_for_project``
+    for fallback semantics.
     """
     aliases: dict[str, str] = {}
     ontology: dict[str, object] = {}
 
-    # Source 1: term-aliases.yaml (specific, skill-local)
-    aliases_path = skill_root / "references" / "term-aliases.yaml"
+    # Source 1: term-aliases.yaml (specific, skill-local or project-scoped)
+    aliases_path = term_aliases_path_for_project(project, skill_root)
     if aliases_path.is_file():
         data = yaml.safe_load(aliases_path.read_text(encoding="utf-8"))
         if isinstance(data, dict):
@@ -57,9 +60,8 @@ def _load_aliases(skill_root: Path) -> tuple[dict[str, str], dict[str, Any]]:
                     if isinstance(item, str):
                         aliases[item] = standard
 
-    # Source 2: business-ontology.yaml (broad, shared industry knowledge)
-    import os
-    ontology_path = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "config" / "ontology" / "business-ontology.yaml"
+    # Source 2: ontology.yaml (broad, shared industry knowledge, project-scoped)
+    ontology_path = ontology_path_for_project(project)
     if ontology_path.is_file():
         ontology = yaml.safe_load(ontology_path.read_text(encoding="utf-8")) or {}
         if isinstance(ontology, dict):
@@ -903,7 +905,7 @@ def extract(
     project: str = "商管系统",
     extra_roots: list[Path] | None = None,
 ) -> DocMap:
-    aliases, ontology = _load_aliases(skill_root)
+    aliases, ontology = _load_aliases(skill_root, project)
     md_files = _iter_markdown_files(docs_root)
     features: dict[str, DocFeature] = {}
     requirements: dict[tuple[str, str], Requirement] = {}

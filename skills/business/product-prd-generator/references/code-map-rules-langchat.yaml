@@ -1,0 +1,72 @@
+# code-map-rules-langchat.yaml
+#
+# Code scanning rules for langchat (蓝联工作流产品). langchat 仓库是第三方 fork
+# (Gujiaweiguo/langchat)，蓝联零源码改造。本配置覆盖：
+#   - specs_path: openspec/specs/ (121 spec directories, 蓝联工作流相关)
+#   - matrix: 不适用（langchat 无商管-style product-definition-matrix）
+#   - future_scanners: langchat 域 scanner 占位（FastAPI routes / workflows / 等）
+#
+# IMPORTANT: future_scanners 字段在 Phase B 不实现，仅配置 schema。所有 enabled: false。
+# 未来 Phase B+ 激活时改 enabled: true + 在 code_map.py 加 scanner 函数。
+#
+# Upstream fork exclusion: 蓝联零源码改造，所以扫描聚焦蓝联自有的 OpenSpec specs。
+# 上游代码（Gujiaweiguo/langchat 个人 fork）不在 PRD 边界内。
+
+project: langchat
+description: langchat（蓝联工作流产品）代码扫描规则。仓库为第三方 fork，蓝联零源码改造；扫描聚焦 OpenSpec specs。
+
+specs:
+  path: openspec/specs
+
+matrix:
+  enabled: false
+  # langchat 无商管-style product-definition-matrix 文件。
+  # 上游 langchat fork 不维护此类 alignment artifact。
+
+# Future scanner placeholders for langchat domain.
+# 这些规则反映 langchat v2 目标态扫描意图，但 Phase B 不激活。
+# Phase B 输出仍来自 specs_path 下的 121 个 spec.md 文件。
+future_scanners:
+  fastapi_routes:
+    enabled: false
+    include_patterns:
+      - "apps/backend/**/api/*.py"
+      - "apps/server/**/api/*.py"
+    exclude_patterns:
+      - "apps/backend/upstream_fork/**"
+    note: "langchat 后端 FastAPI 路由扫描；上游 fork 代码不归蓝联维护"
+  workflow_definitions:
+    enabled: false
+    include_patterns:
+      - "**/workflows/*.yaml"
+      - "**/workflow-templates/*.yaml"
+    note: "langchat 工作流定义（W01-W07 岗位 Skill 工作流）"
+  capability_registration:
+    enabled: false
+    include_patterns:
+      - "**/capabilities/*.py"
+      - "**/capability_registry/*.py"
+    note: "Capability 注册中心（v2 目标态）"
+  skill_release:
+    enabled: false
+    include_patterns:
+      - "**/skill_release/*.py"
+      - "**/skill-release/*.yaml"
+    note: "SkillRelease 发布记录（v2 目标态 OCI 制品）"
+  adr_documents:
+    enabled: false
+    include_patterns:
+      - "docs/adr/*.md"
+      - "openspec/changes/archive/**/design.md"
+    note: "ADR + OpenSpec archived changes 作为决策证据"
+
+exclude_paths:
+  - "**/node_modules/**"
+  - "**/.venv/**"
+  - "**/__pycache__/**"
+  # langchat-specific: 排除上游 fork 个人代码（非蓝联维护）
+  - "packages/langchain-chat/**"
+  - "packages/chatchat-server/**"
+  # 排除 demo 数据
+  - "data/**"
+  - "**/test-data/**"

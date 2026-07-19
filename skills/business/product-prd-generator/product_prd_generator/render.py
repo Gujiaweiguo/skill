@@ -11,6 +11,7 @@ from typing import Any
 
 import yaml
 
+from ._paths import ontology_path_for_project
 from .data_model import (
     TableMeta,
     get_unmatched,
@@ -612,8 +613,8 @@ def _render_requirement_list_file(requirements: list[dict[str, Any]]) -> str:  #
     return "\n".join(lines) + "\n"
 
 
-def _load_ontology() -> dict[str, Any]:  # noqa: ANY_OK
-    ontology_path = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "config" / "ontology" / "business-ontology.yaml"
+def _load_ontology(project: str = "商管系统") -> dict[str, Any]:  # noqa: ANY_OK
+    ontology_path = ontology_path_for_project(project)
     if not ontology_path.is_file():
         return {}
     return yaml.safe_load(ontology_path.read_text(encoding="utf-8")) or {}
@@ -640,8 +641,8 @@ def _classify_module(req: dict[str, Any], ontology: dict[str, Any]) -> str:  # n
     return best_module
 
 
-def _render_module_summary(requirements: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
-    ontology = _load_ontology()
+def _render_module_summary(requirements: list[dict[str, Any]], project: str = "商管系统") -> str:  # noqa: ANY_OK
+    ontology = _load_ontology(project)
     if not ontology:
         return ""
     module_stats: dict[str, dict[str, int]] = defaultdict(
@@ -1122,7 +1123,7 @@ def render_prd(inputs: RenderInputs) -> str:
     capabilities = inputs.reconcile.get("capabilities", [])
     requirements = inputs.reconcile.get("requirements", [])
     stats = _status_stats(capabilities)
-    ontology = _load_ontology()
+    ontology = _load_ontology(str(project))
     all_tables = parse_data_dict_files(inputs.docs_root)
     tables_by_mod = group_by_module(all_tables)
     unmatched_tables = get_unmatched(all_tables)
@@ -1142,7 +1143,7 @@ def render_prd(inputs: RenderInputs) -> str:
         _render_blueprint_modules(requirements, capabilities, ontology, tables_by_mod) if ontology else _render_requirement_list(requirements),
         _render_data_model_index(tables_by_mod, unmatched_tables),
         _render_approval_flow_evidence(requirements, inputs.docs_root),
-        _render_module_summary(requirements),
+        _render_module_summary(requirements, project=str(project)),
         "## 4. 功能清单",
         "",
         f"共 {len(capabilities)} 项能力，详见 [功能清单.md](功能清单.md)。",

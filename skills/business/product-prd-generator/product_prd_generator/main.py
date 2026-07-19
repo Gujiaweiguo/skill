@@ -22,8 +22,11 @@ def _doc_map_args(args: argparse.Namespace, output: str) -> list[str]:
         "--output", output,
     ]
     if args.mode == "coverage-validate":
-        docs_root = Path(args.docs_root)
-        extra = docs_root.parent.parent.parent / "materials" / "13-competitors"
+        if args.competitors_root:
+            extra = Path(args.competitors_root)
+        else:
+            docs_root = Path(args.docs_root)
+            extra = docs_root.parent.parent.parent / "materials" / "13-competitors"
         if extra.is_dir():
             cmd.extend(["--extra-docs-root", str(extra)])
     return cmd
@@ -44,6 +47,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--update-baseline", action="store_true")
     parser.add_argument("--customers", default="")
     parser.add_argument("--competitors", default="")
+    parser.add_argument(
+        "--competitors-root",
+        default="",
+        help=(
+            "Competitor materials root for coverage-validate extra-docs-root. "
+            "Default empty: legacy three-hop path <docs-root>/../../../materials/13-competitors/ "
+            "(商管系统 convention). Set explicitly for non-商管 projects."
+        ),
+    )
     return parser
 
 
@@ -56,7 +68,7 @@ def main() -> int:
     doc_map_path = parsed_dir / "current-doc-map.json"
     reconcile_path = parsed_dir / "capability-reconciliation.json"
 
-    if _run("product_prd_generator.code_map", ["--code-root", args.code_root, "--project", args.project, "--output", str(code_map_path)]) != 0:
+    if _run("product_prd_generator.code_map", ["--code-root", args.code_root, "--project", args.project, "--skill-root", args.skill_root, "--output", str(code_map_path)]) != 0:
         return 1
     if _run("product_prd_generator.doc_map", _doc_map_args(args, str(doc_map_path))) != 0:
         return 1

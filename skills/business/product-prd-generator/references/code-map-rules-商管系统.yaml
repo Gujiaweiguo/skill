@@ -1,0 +1,49 @@
+# code-map-rules-商管系统.yaml
+#
+# Code scanning rules for 商管系统 (MI - mall ERP). This is the baseline config
+# that mirrors the legacy hardcoded behavior in code_map.py before Phase B.
+#
+# Authoritative paths verified at /opt/code/mi:
+#   - openspec/specs/ (125 spec directories)
+#   - artifacts/alignment/product-definition-matrix.md (MI-specific)
+#
+# future_scanners fields are PLACEHOLDERS for potential Phase B+ activation.
+# All entries have enabled: false. Phase B does NOT implement these scanners;
+# the schema exists so future activation doesn't require yaml schema changes.
+
+project: 商管系统
+description: 商管系统（MI - mall ERP）代码扫描规则。基线配置，对齐 legacy 硬编码行为。
+
+specs:
+  path: openspec/specs
+
+matrix:
+  enabled: true
+  path: artifacts/alignment/product-definition-matrix.md
+  # 列名假设保留 code_map.py 当前默认（MI Status / MI landing point 等）。
+  # 商管 matrix 列名稳定多年，无需 header_pattern_override。
+  # 未来若商管 matrix 列名变化，再加 header_pattern_override 字段。
+
+# Future scanner placeholders (Phase B does not implement these).
+# Documenting intent for future Phase B+ activation.
+future_scanners:
+  fastapi_routes:
+    enabled: false
+    include_patterns:
+      - "backend/internal/router/**/*.go"
+      - "backend/internal/api/**/*.go"
+    note: "MI 是 Go 后端，FastAPI 规则不适用；保留 schema 占位"
+  workflow_definitions:
+    enabled: false
+    include_patterns: []
+    note: "MI 无独立 workflow 定义文件，业务流程在 OpenSpec specs 中"
+  capability_registration:
+    enabled: false
+    include_patterns: []
+
+exclude_paths:
+  - "**/node_modules/**"
+  - "**/.venv/**"
+  - "**/__pycache__/**"
+  - "**/legacy_code/**"
+  - "**/e2e/test-data/**"

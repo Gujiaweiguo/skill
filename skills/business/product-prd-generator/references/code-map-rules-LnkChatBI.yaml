@@ -1,0 +1,81 @@
+# code-map-rules-LnkChatBI.yaml
+#
+# Code scanning rules for LnkChatBI (自然语言问数引擎). LnkChatBI = mysqlbot =
+# SQLBot（rebrand-migration 实证，三者同一产品）。
+#
+# 本配置覆盖：
+#   - specs_path: openspec/specs/ (55 spec directories, 问数相关)
+#   - matrix: 不适用（LnkChatBI 无商管-style product-definition-matrix）
+#   - future_scanners: LnkChatBI 域 scanner 占位
+#
+# IMPORTANT: future_scanners 字段在 Phase B 不实现，仅配置 schema。所有 enabled: false。
+#
+# 范围：覆盖 LnkChatBI 自身能力面（Datasource / Chat / Terminology / DataTraining /
+# CustomPrompt / AnalysisRecord / Embedding / OpenClaw 集成）。
+# 不覆盖：langchat 工作流（那是 langchat ontology 范围）；
+#         OrchestratorAgent 路由（已退役）。
+
+project: LnkChatBI
+description: LnkChatBI（自然语言问数引擎）代码扫描规则。LnkChatBI = mysqlbot = SQLBot 同一产品（rebrand-migration）。
+
+specs:
+  path: openspec/specs
+
+matrix:
+  enabled: false
+  # LnkChatBI 无商管-style product-definition-matrix 文件。
+
+# Future scanner placeholders for LnkChatBI domain.
+# Phase B 不激活；激活后扫描 FastAPI 路由、datasource 同步逻辑、术语库、SQL 训练数据等。
+future_scanners:
+  fastapi_routes:
+    enabled: false
+    include_patterns:
+      - "backend/apps/**/api/*.py"
+      - "backend/apps/**/apis/*.py"
+    exclude_patterns:
+      - "backend/apps/chat/orchestration/**"
+    note: "LnkChatBI 后端 FastAPI 路由；orchestration 是内部 Text-to-SQL 流水线（非外部 Agent 依赖，不扫描）"
+  datasource_sync:
+    enabled: false
+    include_patterns:
+      - "backend/apps/datasource/**/*.py"
+    note: "数据源同步逻辑（schema 同步、表关联配置）"
+  terminology:
+    enabled: false
+    include_patterns:
+      - "backend/apps/terminology/**/*.py"
+      - "**/terminology*.py"
+    note: "术语库管理（RAG 校准核心数据源之一）"
+  data_training:
+    enabled: false
+    include_patterns:
+      - "backend/apps/data_training/**/*.py"
+      - "**/data_training*.py"
+    note: "SQL 训练数据管理（RAG 校准核心数据源之二）"
+  custom_prompt:
+    enabled: false
+    include_patterns:
+      - "backend/apps/custom_prompt/**/*.py"
+      - "**/prompt*.py"
+    note: "自定义提示词模板"
+  openclaw_integration:
+    enabled: false
+    include_patterns:
+      - "backend/apps/openclaw/**/*.py"
+      - "**/openclaw*.py"
+    note: "OpenClaw v1 契约实现（4 个端点 + JWT 鉴权 + UnifiedEnvelope）"
+
+exclude_paths:
+  - "**/node_modules/**"
+  - "**/.venv/**"
+  - "**/__pycache__/**"
+  # 排除前端构建产物
+  - "frontend/dist/**"
+  - "frontend/node_modules/**"
+  # 排除 demo / seed 数据
+  - "**/mallcre*.sql"
+  - "**/gs_scrm*.sql"
+  - "**/postgres_demo*.sql"
+  # g2-ssr 是第三方图表 SSR 服务
+  - "g2-ssr/**"
