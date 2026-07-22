@@ -3,7 +3,9 @@ name = "content-operations"
 version = "1.0.0"
 description = "Deterministic, draft-only content operations for lnkwebsite"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "markdown>=3.7,<4.0",
+]
 
 [dependency-groups]
 dev = [

@@ -18,6 +18,7 @@ from scripts.contracts import (  # noqa: E402
     validate_payload_file,
 )
 from scripts.import_artifacts import ImportPaths  # noqa: E402
+from scripts.markdown_to_html import convert_markdown_to_html  # noqa: E402
 from scripts.write_receipt import main as write_receipt_main  # noqa: E402
 
 if TYPE_CHECKING:
@@ -222,3 +223,27 @@ def test_write_receipt_rejects_invalid_artifact(
 
     assert exit_code == 1
     assert not paths.receipt.exists()
+
+
+def test_markdown_to_html_converts_headers() -> None:
+    html = convert_markdown_to_html("## 定义\n\n这是一段说明。\n")
+    assert "<h2>定义</h2>" in html
+    assert "<p>这是一段说明。</p>" in html
+
+
+def test_markdown_to_html_converts_lists() -> None:
+    html = convert_markdown_to_html("1. 第一项\n2. 第二项\n")
+    assert "<ol>" in html
+    assert "<li>第一项</li>" in html
+
+
+def test_markdown_to_html_converts_bold() -> None:
+    html = convert_markdown_to_html("**重点内容**")
+    assert "<strong>重点内容</strong>" in html
+
+
+def test_markdown_to_html_strips_whitespace() -> None:
+    html = convert_markdown_to_html("  \n## 标题\n\n  ")
+    assert html.startswith("<h2>")
+    assert not html.startswith(" ")
+    assert not html.endswith(" ")
