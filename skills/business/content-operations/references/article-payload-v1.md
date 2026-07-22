@@ -17,7 +17,11 @@ Contract version: `1.0.0`
 
 Unknown fields are rejected. Fields expressing publication intent, including `publish`, `published`, `publish_at`, `published_at`, `is_published`, and `publication_status`, are rejected explicitly before model validation.
 
-The CMS request contains only the Article create fields. The validator-only `status` field is never sent. The endpoint must return a JSON object containing `id` and `status`; additional Article response fields are allowed, but `status` must equal `draft`.
+## MCP tool
+
+After deterministic validation succeeds, the agent calls MCP `article_create(title, body, slug, category, summary, source_name, commentary)` with the validated Article fields. Optional fields are omitted when absent. The validator-only `status` field is never passed to the tool. `article_create` always creates the Article with `status=draft` and returns its article ID and draft status.
+
+The Skill scripts do not implement MCP transport. OpenCode connects to the lnkwebsite Streamable HTTP MCP server at `http://127.0.0.1:5580/mcp` with MCP Bearer authentication.
 
 ## Validation report
 
@@ -35,10 +39,3 @@ Issues are sorted by field and code, and JSON keys are sorted. Revalidating iden
 ## Import receipt
 
 The receipt contains exactly `contract_version`, `source_draft`, `payload_sha256`, `cms_article_id`, `slug`, `category`, and `status`. It cannot contain the configured token.
-
-## Endpoint configuration
-
-- `CONTENT_CMS_DRAFT_ENDPOINT`: complete HTTP(S) URL for the configured internal draft-creation adapter.
-- `CONTENT_CMS_TOKEN`: bearer token injected into the process environment.
-
-Both variables are runtime configuration. Do not place token values in shell history, templates, receipts, reports, or version control.

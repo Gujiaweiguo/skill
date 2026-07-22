@@ -9,12 +9,9 @@ from typing import TYPE_CHECKING, Final
 from scripts.article_payload import (
     ArticleCategory,
     ArticlePayload,
-    CmsCreateFields,
-    CmsRequiredFields,
     JsonValue,
     PayloadValidationError,
     ValidationIssue,
-    cms_create_fields,
     parse_article_payload,
 )
 
@@ -27,12 +24,9 @@ __all__ = [
     "CONTRACT_VERSION",
     "ArticleCategory",
     "ArticlePayload",
-    "CmsCreateFields",
-    "CmsRequiredFields",
     "JsonValue",
     "PayloadValidationError",
     "ValidationIssue",
-    "cms_create_fields",
     "parse_article_payload",
     "payload_sha256",
     "validate_payload_file",

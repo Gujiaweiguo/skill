@@ -9,7 +9,7 @@ description: |-
 compatibility: |-
   Requires Python 3.10+ and uv. Runtime scripts use only the Python standard library.
   Runtime artifacts use CONTENT_OUTPUT_BASE (default /opt/code/docs/lanlnk/lnkwebsite/content).
-  Draft Import requires CONTENT_CMS_DRAFT_ENDPOINT and CONTENT_CMS_TOKEN in the environment.
+  Draft Import requires OpenCode MCP Streamable HTTP transport to the lnkwebsite MCP server.
 ---
 
 # Content Operations
@@ -26,17 +26,20 @@ compatibility: |-
 
 ```bash
 export CONTENT_OUTPUT_BASE="${CONTENT_OUTPUT_BASE:-/opt/code/docs/lanlnk/lnkwebsite/content}"
-export CONTENT_CMS_DRAFT_ENDPOINT="https://configured-internal-endpoint.example/article-create"
-export CONTENT_CMS_TOKEN="<injected-at-runtime>"
 
 cd /opt/code/skill/skills/business/content-operations
 uv sync --group dev
 ```
 
 - `CONTENT_OUTPUT_BASE` 未设置时使用 `/opt/code/docs/lanlnk/lnkwebsite/content`。
-- endpoint 可以记录在部署配置中；token 只能通过环境注入，不得写入模板、回执、日志或仓库文件。
 - 固定目录和文件契约见 `references/runtime-artifacts-v1.md`。
 - Article 字段、栏目和错误契约见 `references/article-payload-v1.md`。
+
+### MCP server 配置
+
+OpenCode 必须配置一个 Streamable HTTP MCP server，连接 `http://127.0.0.1:5580/mcp`，并通过 `Authorization: Bearer <MCP token>` 请求头认证。Bearer token 由 OpenCode 的 MCP 配置管理，不传给 Skill 脚本，也不得写入模板、回执、日志或仓库文件。
+
+Draft Import 由 agent 直接调用该 MCP server 的 `article_create`；Skill 脚本不实现 MCP 协议，也不发起 HTTP 请求。
 
 ## 阶段
 
@@ -74,26 +77,38 @@ uv run python -m scripts.validate_article \
 
 **输出**：同一 `publish-jobs/<slug>/` 下的 Article JSON 和 `validation-report.json`。
 
-**交接条件**：命令退出码为 0；报告 `valid=true`；报告 SHA-256 与 Article JSON 当前字节一致；审阅记录批准同一 source draft 和 payload digest。任一失败时不得发起 CMS 请求。
+**交接条件**：命令退出码为 0；报告 `valid=true`；报告 SHA-256 与 Article JSON 当前字节一致；审阅记录批准同一 source draft 和 payload digest。任一失败时不得调用 MCP `article_create`。
 
 ### 4. Draft Import
 
-**输入**：已批准 source draft、匹配的 review record、Article JSON、有效 validation report、环境中的 endpoint/token。
+**输入**：已批准 source draft、匹配的 review record、Article JSON、有效 validation report，以及可用的 lnkwebsite MCP 连接。
 
-**动作**：调用唯一的草稿导入命令：
+**Step 1（Validation）**：在 MCP 调用前运行确定性校验：
 
 ```bash
-uv run python -m scripts.import_draft \
+uv run python -m scripts.validate_article \
   "$CONTENT_OUTPUT_BASE/publish-jobs/<slug>/article.json" \
+  --report "$CONTENT_OUTPUT_BASE/publish-jobs/<slug>/validation-report.json"
+```
+
+**Step 2（MCP call）**：agent 从已校验的 Article JSON 读取 `title`、`body`、`slug`、`category`、`summary`、`source_name`、`commentary`，直接调用 MCP `article_create(title, body, slug, category, summary, source_name, commentary)`。不传 `status`；该工具始终创建 `status=draft`。记录 MCP 返回的 article ID。
+
+**Step 3（Receipt）**：使用 MCP 返回值写入确定性回执：
+
+```bash
+uv run python -m scripts.write_receipt \
+  "$CONTENT_OUTPUT_BASE/publish-jobs/<slug>/article.json" \
+  --cms-article-id <id-from-mcp> \
+  --cms-status draft \
   --source-draft "$CONTENT_OUTPUT_BASE/drafts/<content-id>.md" \
   --review-record "$CONTENT_OUTPUT_BASE/review/<content-id>.json" \
   --validation-report "$CONTENT_OUTPUT_BASE/publish-jobs/<slug>/validation-report.json" \
   --receipt "$CONTENT_OUTPUT_BASE/publish-jobs/<slug>/import-receipt.json"
 ```
 
-**输出**：CMS 草稿和 `import-receipt.json`。回执记录 source draft、payload SHA-256、CMS article id、slug、category、status，不记录 token。
+**输出**：MCP 创建的 CMS 草稿和 `import-receipt.json`。回执记录 source draft、payload SHA-256、CMS article id、slug、category、status，不记录 MCP token。
 
-**完成条件**：CMS 响应明确为 `status=draft`，且回执已原子写入。非草稿响应会失败且不生成回执。
+**完成条件**：MCP `article_create` 返回 article ID，返回状态为 `draft`，且回执已原子写入。
 
 ## 质量门禁
 
@@ -101,9 +116,9 @@ uv run python -m scripts.import_draft \
 2. Article JSON 只含 v1 契约字段，必填 `title/body/slug/category`；`body` 为 HTML。
 3. `category` 只能为 `ai-trends`、`industry-insights`、`case-studies`、`community`。
 4. `status` 省略或为 `draft`；任何其他状态、发布意图字段或未知字段均阻塞。
-5. 导入前重新校验 payload，并核对 validation report、review record 和 source draft。
-6. endpoint 和 token 只从环境读取；任何运行时文件均不得包含 token。
-7. 运行 `uv run pytest -q`，确认本地 HTTP test double 覆盖无请求失败路径、草稿响应检查和回执安全。
+5. MCP 调用前重新校验 payload；写回执时再次核对 validation report、review record 和 source draft。
+6. MCP token 只由 OpenCode MCP 配置管理；任何运行时文件均不得包含 token。
+7. 运行 `uv run pytest -q`，确认 receipt CLI 覆盖成功、非草稿状态和无效 artifact 路径。
 
 ## 失败模式
 
@@ -112,8 +127,8 @@ uv run python -m scripts.import_draft \
 | 研究证据不足 | 停在 Research，列出缺口，不生成确定性主张 |
 | Draft 未批准或 slug 未确认可用 | 停在 Validation，不调用 CMS |
 | Article JSON 无效或 digest 漂移 | 重跑 validator，重新审阅变更后的 payload |
-| endpoint/token 未配置 | 阻塞并提示缺失的环境变量，不打印 token |
-| CMS 请求失败或返回非草稿 | 不写回执；保留输入和校验报告供重试 |
+| MCP 连接或认证失败 | 不写回执；检查 OpenCode MCP server URL、backend 状态和 Bearer token 配置后重试 |
+| MCP 未返回 article ID | 不写回执；保留输入和校验报告并排查 MCP 调用结果 |
 | 回执路径不在 `publish-jobs/` | 阻塞，改用固定 runtime taxonomy |
 
 ## 维护规则
@@ -125,5 +140,5 @@ uv run python -m scripts.import_draft \
 ## References
 
 - `references/runtime-artifacts-v1.md`：运行时目录、交接条件和留存契约。
-- `references/article-payload-v1.md`：Article JSON、校验报告、CMS 响应和回执契约。
-- `references/troubleshooting.md`：digest、slug、CMS 响应和凭据排障。
+- `references/article-payload-v1.md`：Article JSON、校验报告、MCP tool 和回执契约。
+- `references/troubleshooting.md`：digest、slug 和 MCP 连接排障。

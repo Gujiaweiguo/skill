@@ -1,4 +1,4 @@
-"""Versioned Article payload schema, parsing, and CMS request projection."""
+"""Versioned Article payload schema and parsing."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Final, Literal, TypedDict
+from typing import Final, Literal
 
 _HTML_TAG: Final = re.compile(r"<[A-Za-z][^>]*>")
 _SLUG: Final = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -34,23 +34,6 @@ class ArticleCategory(str, Enum):
     INDUSTRY_INSIGHTS = "industry-insights"
     CASE_STUDIES = "case-studies"
     COMMUNITY = "community"
-
-
-class CmsRequiredFields(TypedDict):
-    """Required fields sent to the CMS draft-creation endpoint."""
-
-    title: str
-    body: str
-    slug: str
-    category: str
-
-
-class CmsCreateFields(CmsRequiredFields, total=False):
-    """Complete request shape for CMS draft creation."""
-
-    summary: str
-    source_name: str
-    commentary: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,20 +199,3 @@ def parse_article_payload(raw_json: str | bytes) -> ArticlePayload:
         source_name=optional["source_name"],
         commentary=optional["commentary"],
     )
-
-
-def cms_create_fields(payload: ArticlePayload) -> CmsCreateFields:
-    """Build the draft-creation request without validator-only fields."""
-    fields = CmsCreateFields(
-        title=payload.title,
-        body=payload.body,
-        slug=payload.slug,
-        category=payload.category.value,
-    )
-    if payload.summary is not None:
-        fields["summary"] = payload.summary
-    if payload.source_name is not None:
-        fields["source_name"] = payload.source_name
-    if payload.commentary is not None:
-        fields["commentary"] = payload.commentary
-    return fields
