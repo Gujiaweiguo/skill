@@ -1,10 +1,11 @@
-"""Compatibility exports plus deterministic Article digest and report I/O."""
+"""Compatibility exports plus deterministic payload digest and report I/O."""
 
 from __future__ import annotations
 
 import hashlib
 import json
-from typing import TYPE_CHECKING, Final
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Final, TypeVar
 
 from scripts.article_payload import (
     ArticleCategory,
@@ -20,11 +21,15 @@ if TYPE_CHECKING:
 
 CONTRACT_VERSION: Final = "1.0.0"
 
+T = TypeVar("T")
+PayloadParser = Callable[[bytes], T]
+
 __all__ = [
     "CONTRACT_VERSION",
     "ArticleCategory",
     "ArticlePayload",
     "JsonValue",
+    "PayloadParser",
     "PayloadValidationError",
     "ValidationIssue",
     "parse_article_payload",
@@ -48,11 +53,15 @@ def write_json(path: Path, value: JsonValue) -> None:
     temporary.replace(path)
 
 
-def validate_payload_file(payload_path: Path, report_path: Path) -> ArticlePayload:
+def validate_payload_file(
+    payload_path: Path,
+    report_path: Path,
+    parse_fn: PayloadParser[T] = parse_article_payload,
+) -> T:
     """Validate one payload file and write its deterministic report."""
     digest = payload_sha256(payload_path)
     try:
-        payload = parse_article_payload(payload_path.read_bytes())
+        payload = parse_fn(payload_path.read_bytes())
     except PayloadValidationError as error:
         write_json(
             report_path,

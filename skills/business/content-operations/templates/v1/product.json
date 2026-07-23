@@ -1,0 +1,12 @@
+{
+  "product_type": "skill",
+  "slug": "replace-with-kebab-case-slug",
+  "title": "产品标题",
+  "headline": "一句话描述",
+  "description": "产品描述",
+  "details": {
+    "painPoints": ["痛点1"],
+    "coreModules": ["模块1"]
+  },
+  "status": "draft"
+}

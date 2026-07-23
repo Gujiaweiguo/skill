@@ -11,6 +11,7 @@ SKILL_ROOT: Final = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SKILL_ROOT))
 JsonScalar = str | bool
 
+from scripts.case_payload import parse_case_payload  # noqa: E402
 from scripts.contracts import (  # noqa: E402
     CONTRACT_VERSION,
     PayloadValidationError,
@@ -19,6 +20,7 @@ from scripts.contracts import (  # noqa: E402
 )
 from scripts.import_artifacts import ImportPaths  # noqa: E402
 from scripts.markdown_to_html import convert_markdown_to_html  # noqa: E402
+from scripts.product_payload import parse_product_payload  # noqa: E402
 from scripts.write_receipt import main as write_receipt_main  # noqa: E402
 
 if TYPE_CHECKING:
@@ -247,3 +249,110 @@ def test_markdown_to_html_strips_whitespace() -> None:
     assert html.startswith("<h2>")
     assert not html.startswith(" ")
     assert not html.endswith(" ")
+
+
+# ── Case payload ──────────────────────────────────────
+
+
+def _valid_case_payload() -> dict[str, object]:
+    return {
+        "slug": "test-case-slug",
+        "client_name": "测试客户",
+        "industry": "office",
+        "problem": "招商周期长",
+        "solution": "AI 品牌企业画像加速筛选",
+        "outcome": "招商周期缩短 40%",
+        "client_authorized": True,
+        "status": "draft",
+    }
+
+
+def test_case_payload_valid_accepted() -> None:
+
+    payload = parse_case_payload(json.dumps(_valid_case_payload()).encode())
+    assert payload.slug == "test-case-slug"
+    assert payload.client_authorized is True
+
+
+def test_case_payload_without_authorization_rejected() -> None:
+
+    data = _valid_case_payload()
+    data["client_authorized"] = False
+    with pytest.raises(PayloadValidationError) as exc_info:
+        parse_case_payload(json.dumps(data).encode())
+    assert any(i.code == "missing_or_false" for i in exc_info.value.issues)
+
+
+def test_case_payload_with_forbidden_term_rejected() -> None:
+
+    data = _valid_case_payload()
+    data["solution"] = "提供解决方案"
+    with pytest.raises(PayloadValidationError) as exc_info:
+        parse_case_payload(json.dumps(data).encode())
+    assert any(i.code == "forbidden_term" for i in exc_info.value.issues)
+
+
+def test_case_payload_with_invalid_industry_rejected() -> None:
+
+    data = _valid_case_payload()
+    data["industry"] = "bogus"
+    with pytest.raises(PayloadValidationError) as exc_info:
+        parse_case_payload(json.dumps(data).encode())
+    assert any(i.code == "enum" for i in exc_info.value.issues)
+
+
+# ── Product payload ───────────────────────────────────
+
+
+def _valid_product_payload() -> dict[str, object]:
+    return {
+        "product_type": "skill",
+        "slug": "skill-leasing",
+        "title": "招商 AI Skill",
+        "headline": "AI 驱动招商",
+        "status": "draft",
+    }
+
+
+def test_product_payload_valid_accepted() -> None:
+
+    payload = parse_product_payload(json.dumps(_valid_product_payload()).encode())
+    assert payload.product_type.value == "skill"
+    assert payload.slug == "skill-leasing"
+
+
+def test_product_payload_invalid_type_rejected() -> None:
+
+    data = _valid_product_payload()
+    data["product_type"] = "bogus"
+    with pytest.raises(PayloadValidationError) as exc_info:
+        parse_product_payload(json.dumps(data).encode())
+    assert any(i.code == "enum" for i in exc_info.value.issues)
+
+
+def test_product_payload_forbidden_term_rejected() -> None:
+
+    data = _valid_product_payload()
+    data["description"] = "数字营销利器"
+    with pytest.raises(PayloadValidationError) as exc_info:
+        parse_product_payload(json.dumps(data).encode())
+    assert any(i.code == "forbidden_term" for i in exc_info.value.issues)
+
+
+def test_product_payload_ai_vision_roadmap_rejected() -> None:
+
+    data = _valid_product_payload()
+    data["slug"] = "mallsense-ai"
+    data["details"] = {"capabilities": [{"title": "精准客流"}]}
+    with pytest.raises(PayloadValidationError) as exc_info:
+        parse_product_payload(json.dumps(data).encode())
+    assert any(i.code == "ai_vision_mvp_boundary" for i in exc_info.value.issues)
+
+
+def test_product_payload_ai_vision_mvp_accepted() -> None:
+
+    data = _valid_product_payload()
+    data["slug"] = "mallsense-ai"
+    data["details"] = {"capabilities": [{"title": "通道拥堵"}, {"title": "火灾烟雾"}]}
+    payload = parse_product_payload(json.dumps(data).encode())
+    assert payload.slug == "mallsense-ai"

@@ -1,0 +1,11 @@
+{
+  "slug": "replace-with-kebab-case-slug",
+  "client_name": "客户名称（需已授权）",
+  "industry": "office",
+  "problem": "客户面临的核心问题",
+  "solution": "LangChat 提供的解决方案",
+  "outcome": "可量化的业务结果",
+  "testimonial": "客户评价（可选，需客户授权）",
+  "client_authorized": true,
+  "status": "draft"
+}
