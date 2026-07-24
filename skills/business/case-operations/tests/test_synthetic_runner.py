@@ -1,7 +1,8 @@
 """Tests for the synthetic runner and mock MCP integration.
 
 Verifies: runner produces 4 artifacts, only calls ``case_create``,
-blocks forbidden tools, and writes nothing to production paths.
+blocks forbidden tools, writes nothing to production paths,
+and fail-closed when artifact_dir is outside the system temp dir.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ sys.path.insert(0, str(_SCRIPTS_DIR))
 sys.path.insert(0, str(_TESTS_DIR))
 
 from mock_mcp_server import MockMCPError, MockMCPServer
-from synthetic_runner import run_synthetic_fixture
+from synthetic_runner import ArtifactDirError, run_synthetic_fixture
 
 FIXTURE_PATH = (
     Path(__file__).resolve().parent.parent / "fixtures" / "synthetic-fixture.json"
@@ -126,3 +127,52 @@ class TestRunnerProductionIsolation:
             run_synthetic_fixture(fixture, mock, tmp_path)
             for f in tmp_path.iterdir():
                 assert f.parent == tmp_path
+
+
+class TestRunnerTempDirEnforcement:
+    """Fail-closed when artifact_dir is outside the system temp dir."""
+
+    def test_rejects_home_dir(self) -> None:
+        fixture = _load_fixture()
+        mock = MockMCPServer()
+        bad_dir = Path("/tmp/../home/ubuntu/case-ops-out")
+        with pytest.raises(ArtifactDirError, match="must resolve inside"):
+            run_synthetic_fixture(fixture, mock, bad_dir)
+        # mock MCP must not have been called
+        assert mock.get_call_tools() == []
+
+    def test_rejects_etc_dir(self) -> None:
+        fixture = _load_fixture()
+        mock = MockMCPServer()
+        bad_dir = Path("/etc/case-ops-out")
+        with pytest.raises(ArtifactDirError, match="must resolve inside"):
+            run_synthetic_fixture(fixture, mock, bad_dir)
+        assert mock.get_call_tools() == []
+
+    def test_rejects_dotdot_bypass(self) -> None:
+        """Ensure ``..`` cannot escape the temp dir."""
+        fixture = _load_fixture()
+        mock = MockMCPServer()
+        with tempfile.TemporaryDirectory(prefix="case-ops-") as tmp:
+            bad_dir = Path(tmp) / ".." / ".." / "opt" / "code"
+            with pytest.raises(ArtifactDirError, match="must resolve inside"):
+                run_synthetic_fixture(fixture, mock, bad_dir)
+        assert mock.get_call_tools() == []
+
+    def test_rejects_absolute_opt_path(self) -> None:
+        fixture = _load_fixture()
+        mock = MockMCPServer()
+        bad_dir = Path("/opt/code/lnkwebsite/artifacts/runs")
+        with pytest.raises(ArtifactDirError, match="must resolve inside"):
+            run_synthetic_fixture(fixture, mock, bad_dir)
+        assert mock.get_call_tools() == []
+
+    def test_accepts_nested_temp_subdir(self) -> None:
+        """A subdir under the system temp dir should be accepted."""
+        fixture = _load_fixture()
+        mock = MockMCPServer()
+        with tempfile.TemporaryDirectory(prefix="case-ops-") as tmp:
+            nested = Path(tmp) / "nested" / "deeper"
+            result = run_synthetic_fixture(fixture, mock, nested)
+            assert result.valid
+            assert all(p.exists() for p in result.artifact_paths.values())

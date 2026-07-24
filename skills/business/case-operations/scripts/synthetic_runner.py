@@ -9,13 +9,15 @@ Security:
   ``execution_mode``).
 - Only calls ``case_create`` on the injected mock — never reaches real
   MCP.
-- Writes artifacts only to the provided temp directory.
+- Writes artifacts only to a directory inside the system temp dir.
+- Fail-closed if ``artifact_dir`` resolves outside ``tempfile.gettempdir()``.
 """
 
 from __future__ import annotations
 
 import json
 import sys
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -26,6 +28,27 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from validate import SYNTHETIC_TEST_MODE, ValidationResult, validate_case_payload
+
+
+class ArtifactDirError(Exception):
+    """Raised when artifact_dir is outside the system temp directory."""
+
+
+def _assert_temp_dir(artifact_dir: Path) -> None:
+    """Fail-closed if artifact_dir resolves outside the system temp dir.
+
+    Uses ``Path.resolve()`` to expand symlinks and ``..`` segments,
+    then checks that the resolved path starts with
+    ``tempfile.gettempdir()``.
+    """
+    tmp_root = Path(tempfile.gettempdir()).resolve()
+    resolved = artifact_dir.resolve()
+    if tmp_root not in resolved.parents and resolved != tmp_root:
+        msg = (
+            f"artifact_dir must resolve inside {tmp_root}, "
+            f"got {resolved}"
+        )
+        raise ArtifactDirError(msg)
 
 
 class MockMCPProtocol(Protocol):
@@ -73,10 +96,18 @@ def run_synthetic_fixture(
         payload: Fixture payload (must contain ``fixture: true``).
         mock_mcp: Injected mock MCP server (test double).
         artifact_dir: Temp directory for artifact output.
+            Must resolve inside ``tempfile.gettempdir()``.
 
     Returns:
         SyntheticRunResult with all paths and metadata.
+
+    Raises:
+        ArtifactDirError: If ``artifact_dir`` is outside the system
+            temp directory.
     """
+    # 0. Fail-closed: artifact_dir must be inside system temp
+    _assert_temp_dir(artifact_dir)
+
     ts = time.time()
 
     # 1. Validate — caller-provided execution_mode, never from payload
