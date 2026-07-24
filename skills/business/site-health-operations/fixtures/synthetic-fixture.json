@@ -1,0 +1,49 @@
+{
+  "fixture": true,
+  "check_scope": "full",
+  "check_date": "2026-07-24",
+  "services": {
+    "lnkwebsite-backend": {
+      "status": "active",
+      "uptime_hours": 9,
+      "main_pid": 2050626
+    },
+    "lnkwebsite-frontend": {
+      "status": "active",
+      "uptime_hours": 12,
+      "main_pid": 2279198
+    },
+    "lnkwebsite-admin": {
+      "status": "active",
+      "uptime_hours": 8,
+      "main_pid": 2250388
+    },
+    "lnkwebsite-h5": {
+      "status": "active",
+      "uptime_hours": 19,
+      "main_pid": 2050629
+    }
+  },
+  "endpoints": {
+    "homepage": {
+      "http_code": 200,
+      "response_time_ms": 125
+    },
+    "api_health": {
+      "http_code": 200,
+      "response_time_ms": 42,
+      "body": "{\"status\":\"ok\"}"
+    },
+    "sitemap_xml": {
+      "http_code": 200,
+      "url_count": 53
+    }
+  },
+  "resources": {
+    "disk_used_percent": 27,
+    "memory_used_percent": 60,
+    "swap_used_percent": 49
+  },
+  "drifts_detected": [],
+  "auto_actions_taken": []
+}

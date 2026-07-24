@@ -1,7 +1,7 @@
 ---
 name: site-health-operations
 version: 0.1.0
-status: planned
+status: ready
 scope: lnkwebsite
 ---
 
