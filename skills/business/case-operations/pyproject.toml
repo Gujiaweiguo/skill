@@ -23,6 +23,7 @@ extraPaths = ["scripts", "tests"]
 minversion = "8.0"
 testpaths = ["tests"]
 addopts = ["-ra", "--strict-config", "--strict-markers"]
+pythonpath = ["scripts", "tests"]
 filterwarnings = ["error"]
 
 [tool.ruff]

@@ -1,1 +1,1 @@
-# case-operations scripts package
+"""Case-operations scripts package."""

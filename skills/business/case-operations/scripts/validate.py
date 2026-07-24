@@ -88,7 +88,7 @@ class ValidationResult:
         }
 
 
-def _error(field: str, code: str, message: str) -> dict[str, str]:  # noqa: A002
+def _error(field: str, code: str, message: str) -> dict[str, str]:
     """Build a single error dict."""
     return {"field": field, "code": code, "message": message}
 
@@ -107,6 +107,7 @@ def validate_case_payload(
 
     Returns:
         ValidationResult with all errors / warnings / check flags.
+
     """
     result = ValidationResult(valid=True)
     is_fixture = payload.get("fixture") is True

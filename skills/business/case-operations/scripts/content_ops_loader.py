@@ -20,7 +20,13 @@ _runtime_mod = importlib.import_module("scripts.case_payload")
 parse_case_payload = _runtime_mod.parse_case_payload
 PayloadValidationError = _runtime_mod.PayloadValidationError
 
+
+def get_shared_parser_source() -> str | None:
+    """Return the file path of the real content-ops parser module."""
+    return getattr(_runtime_mod, "__file__", None)
+
 __all__ = [
     "PayloadValidationError",
+    "get_shared_parser_source",
     "parse_case_payload",
 ]

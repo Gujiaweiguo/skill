@@ -16,16 +16,11 @@ Security:
 from __future__ import annotations
 
 import json
-import sys
 import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
-
-_SCRIPTS_DIR = Path(__file__).resolve().parent
-if str(_SCRIPTS_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS_DIR))
 
 from validate import SYNTHETIC_TEST_MODE, ValidationResult, validate_case_payload
 
@@ -56,11 +51,17 @@ class MockMCPProtocol(Protocol):
 
     def case_create(
         self, payload: dict[str, object],
-    ) -> dict[str, object]: ...
+    ) -> dict[str, object]:
+        """Create a draft case in the mock CMS."""
+        ...
 
-    def get_call_tools(self) -> list[str]: ...
+    def get_call_tools(self) -> list[str]:
+        """Return ordered list of all tool names called."""
+        ...
 
-    def assert_no_forbidden_calls(self) -> None: ...
+    def assert_no_forbidden_calls(self) -> None:
+        """Assert no forbidden tool was ever called."""
+        ...
 
 
 @dataclass
@@ -101,9 +102,11 @@ def run_synthetic_fixture(
     Returns:
         SyntheticRunResult with all paths and metadata.
 
+
     Raises:
         ArtifactDirError: If ``artifact_dir`` is outside the system
             temp directory.
+
     """
     # 0. Fail-closed: artifact_dir must be inside system temp
     _assert_temp_dir(artifact_dir)

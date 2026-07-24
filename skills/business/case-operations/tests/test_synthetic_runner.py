@@ -8,17 +8,10 @@ and fail-closed when artifact_dir is outside the system temp dir.
 from __future__ import annotations
 
 import json
-import sys
 import tempfile
 from pathlib import Path
 
 import pytest
-
-_SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
-_TESTS_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(_SCRIPTS_DIR))
-sys.path.insert(0, str(_TESTS_DIR))
-
 from mock_mcp_server import MockMCPError, MockMCPServer
 from synthetic_runner import ArtifactDirError, run_synthetic_fixture
 
@@ -29,11 +22,7 @@ FIXTURE_PATH = (
 
 def _load_fixture() -> dict[str, object]:
     with FIXTURE_PATH.open() as f:
-        return cast_dict(json.load(f))
-
-
-def cast_dict(d: dict[str, object]) -> dict[str, object]:
-    return d
+        return dict(json.load(f))
 
 
 class TestRunnerArtifacts:
@@ -135,7 +124,7 @@ class TestRunnerTempDirEnforcement:
     def test_rejects_home_dir(self) -> None:
         fixture = _load_fixture()
         mock = MockMCPServer()
-        bad_dir = Path("/tmp/../home/ubuntu/case-ops-out")
+        bad_dir = Path.home() / "case-ops-out"
         with pytest.raises(ArtifactDirError, match="must resolve inside"):
             run_synthetic_fixture(fixture, mock, bad_dir)
         # mock MCP must not have been called

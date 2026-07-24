@@ -9,17 +9,14 @@ and shared-parser runtime invocation proof.
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import cast
 
 import pytest
-
-_SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
-sys.path.insert(0, str(_SCRIPTS_DIR))
-
 from content_ops_loader import (
     PayloadValidationError as SharedPayloadValidationError,
+)
+from content_ops_loader import (
     parse_case_payload as shared_parse_case_payload,
 )
 from validate import SYNTHETIC_TEST_MODE, validate_case_payload
@@ -30,21 +27,9 @@ FIXTURE_PATH = (
 
 
 def _valid_base() -> dict[str, object]:
-    return {
-        "slug": "case-ops-synthetic-fixture",
-        "client_name": "星河智创中心（测试案例）",
-        "industry": "office",
-        "client_authorized": True,
-        "fixture": True,
-        "problem": "虚构场景：需要统一物业服务入口。",
-        "solution": "虚构方案：部署智慧物业平台。",
-        "outcome": "虚构结果：效率提升50%。",
-        "testimonial": "虚构评价。",
-        "seo_title": "测试",
-        "seo_description": "fixture",
-        "image": "/cases/test.webp",
-        "product": "office-building",
-    }
+    """Return a copy of the synthetic fixture as a mutable dict."""
+    with FIXTURE_PATH.open() as f:
+        return dict(json.load(f))
 
 
 def _errors(
@@ -52,7 +37,7 @@ def _errors(
 ) -> list[dict[str, str]]:
     result = validate_case_payload(
         payload,
-        execution_mode=cast(str | None, kw.get("execution_mode")),
+        execution_mode=cast("str | None", kw.get("execution_mode")),
     )
     return result.errors
 
@@ -113,7 +98,7 @@ class TestAbsoluteFalsePositives:
         codes = [e["code"] for e in _errors(p, execution_mode=SYNTHETIC_TEST_MODE)]
         assert "absolute_marketing_term" not in codes
 
-    @pytest.mark.parametrize("text,term", [
+    @pytest.mark.parametrize(("text", "term"), [
         ("行业最领先的平台", "最领先"),
         ("我们是最大供应商", "最大"),
         ("全国第一的物业系统", "全国第一"),

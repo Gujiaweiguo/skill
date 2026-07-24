@@ -14,6 +14,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 
+
 class MockMCPError(Exception):
     """Raised when a forbidden MCP call is attempted."""
 
@@ -98,9 +99,11 @@ class MockMCPServer:
     ) -> dict[str, object]:
         """Simulate ``case_update`` — only if case is draft."""
         if case_id not in self._db:
-            raise MockMCPError(f"case not found: {case_id}")
+            not_found_msg = f"case not found: {case_id}"
+            raise MockMCPError(not_found_msg)
         if self._db[case_id].get("status") != "draft":
-            raise MockMCPError(f"cannot update non-draft case: {case_id}")
+            non_draft_msg = f"cannot update non-draft case: {case_id}"
+            raise MockMCPError(non_draft_msg)
         self._db[case_id].update(updates)
         self.calls.append(MockCall(
             tool="case_update",
@@ -125,7 +128,8 @@ class MockMCPServer:
             )
             raise MockMCPError(msg)
         if tool not in ALLOWED_MCP_TOOLS:
-            raise MockMCPError(f"unknown tool: {tool}")
+            unknown_msg = f"unknown tool: {tool}"
+            raise MockMCPError(unknown_msg)
         return getattr(self, tool)(**kwargs)
 
     def get_call_tools(self) -> list[str]:

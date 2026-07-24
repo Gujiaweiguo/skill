@@ -9,39 +9,26 @@ at runtime, not shadowed by a local reimplementation.
 
 from __future__ import annotations
 
-import sys
+import json
 from pathlib import Path
 from typing import cast
 
-_SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
-sys.path.insert(0, str(_SCRIPTS_DIR))
-
+from content_ops_loader import get_shared_parser_source
 from validate import SYNTHETIC_TEST_MODE, validate_case_payload
 
-_FIXTURE_BASE: dict[str, object] = {
-    "slug": "case-ops-synthetic-fixture",
-    "client_name": "星河智创中心（测试案例）",
-    "industry": "office",
-    "client_authorized": True,
-    "fixture": True,
-    "problem": "虚构场景：需要统一物业服务入口。",
-    "solution": "虚构方案：部署智慧物业平台。",
-    "outcome": "虚构结果：效率提升50%。",
-    "testimonial": "虚构评价。",
-    "seo_title": "测试",
-    "seo_description": "fixture",
-    "image": "/cases/test.webp",
-    "product": "office-building",
-}
+FIXTURE_PATH = (
+    Path(__file__).resolve().parent.parent / "fixtures" / "synthetic-fixture.json"
+)
 
 
 def _base() -> dict[str, object]:
-    return dict(_FIXTURE_BASE)
+    """Return a copy of the synthetic fixture as a mutable dict."""
+    with FIXTURE_PATH.open() as f:
+        return dict(json.load(f))
 
 
 class TestSharedParserInvoked:
-    """Regression: prove the content-ops parser is actually called at
-    runtime, not shadowed by a local reimplementation."""
+    """Regression: prove the content-ops parser is actually called."""
 
     def test_forbidden_term_surfaces_from_shared_parser(self) -> None:
         """'数字营销' is a content-ops forbidden term, not defined
@@ -69,18 +56,14 @@ class TestSharedParserInvoked:
         """Industry enum validation lives in content-ops."""
         p = _base()
         p["industry"] = "nonexistent-industry"
-        r = validate_case_payload(p, execution_mode=cast(str, SYNTHETIC_TEST_MODE))
+        r = validate_case_payload(p, execution_mode=cast("str", SYNTHETIC_TEST_MODE))
         assert "enum" in {e["code"] for e in r.errors}
 
     def test_shared_parser_is_real_module(self) -> None:
         """The loader's parse_case_payload must come from the real
         content-operations package, not a local copy."""
-        import content_ops_loader
-
-        source_mod = getattr(content_ops_loader, "_runtime_mod", None)
-        assert source_mod is not None
-        source_file = getattr(source_mod, "__file__", None)
+        source_file = get_shared_parser_source()
         assert source_file is not None
-        assert "content-operations" in str(source_file), (
+        assert "content-operations" in source_file, (
             f"expected content-operations in path, got: {source_file}"
         )

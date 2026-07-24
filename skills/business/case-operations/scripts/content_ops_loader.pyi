@@ -1,8 +1,10 @@
-"""Type stub for content_ops_loader — mirrors content-ops case_payload API."""
-
-from __future__ import annotations
-
 from dataclasses import dataclass
+from types import ModuleType
+
+_runtime_mod: ModuleType
+
+
+def get_shared_parser_source() -> str | None: ...
 
 
 @dataclass(frozen=True, slots=True)
