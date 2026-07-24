@@ -1,13 +1,13 @@
 ---
 name: redirect-audit
 version: 0.1.0
-status: planned
+status: ready
 scope: lnkwebsite
 ---
 
 # Redirect Audit
 
-> **状态**：v0.1 contract skeleton。**不包含可执行 workflow**。
+> **状态**：v0.1 contract skeleton。不包含可执行 workflow。**Lifecycle: ready** (contract skeleton with synthetic fixture)。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.8
 
 ## Purpose
