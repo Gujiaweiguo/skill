@@ -14,10 +14,6 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 
-#: JSON-like scalar value.
-JsonScalar = str | int | float | bool | None
-
-
 class MockMCPError(Exception):
     """Raised when a forbidden MCP call is attempted."""
 
@@ -42,7 +38,7 @@ class MockCall:
     """Record of a single MCP call."""
 
     tool: str
-    arguments: dict[str, JsonScalar]
+    arguments: dict[str, object]
     timestamp: float
     result: object = None
 
@@ -52,16 +48,16 @@ class MockMCPServer:
     """In-process mock of the lnkwebsite cases MCP module."""
 
     calls: list[MockCall] = field(default_factory=list)
-    _db: dict[str, dict[str, JsonScalar]] = field(default_factory=dict)
+    _db: dict[str, dict[str, object]] = field(default_factory=dict)
     _next_id: int = 1
 
     def case_create(
-        self, payload: dict[str, JsonScalar],
-    ) -> dict[str, JsonScalar]:
+        self, payload: dict[str, object],
+    ) -> dict[str, object]:
         """Simulate ``case_create`` — always returns draft status."""
         case_id = f"fixture-case-{self._next_id:03d}"
         self._next_id += 1
-        record: dict[str, JsonScalar] = {
+        record: dict[str, object] = {
             "id": case_id,
             "status": "draft",
             **payload,
@@ -75,7 +71,7 @@ class MockMCPServer:
         ))
         return {"id": case_id, "status": "draft"}
 
-    def case_get(self, case_id: str) -> dict[str, JsonScalar] | None:
+    def case_get(self, case_id: str) -> dict[str, object] | None:
         """Simulate ``case_get``."""
         result = self._db.get(case_id)
         self.calls.append(MockCall(
@@ -86,7 +82,7 @@ class MockMCPServer:
         ))
         return result
 
-    def case_list(self) -> list[dict[str, JsonScalar]]:
+    def case_list(self) -> list[dict[str, object]]:
         """Simulate ``case_list``."""
         result = list(self._db.values())
         self.calls.append(MockCall(
@@ -98,8 +94,8 @@ class MockMCPServer:
         return result
 
     def case_update(
-        self, case_id: str, updates: dict[str, JsonScalar],
-    ) -> dict[str, JsonScalar]:
+        self, case_id: str, updates: dict[str, object],
+    ) -> dict[str, object]:
         """Simulate ``case_update`` — only if case is draft."""
         if case_id not in self._db:
             raise MockMCPError(f"case not found: {case_id}")
@@ -114,7 +110,7 @@ class MockMCPServer:
         ))
         return self._db[case_id]
 
-    def call(self, tool: str, **kwargs: JsonScalar) -> object:
+    def call(self, tool: str, **kwargs: object) -> object:
         """Generic dispatch — rejects forbidden tools."""
         if tool in FORBIDDEN_MCP_TOOLS:
             self.calls.append(MockCall(

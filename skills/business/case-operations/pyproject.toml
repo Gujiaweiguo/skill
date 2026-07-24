@@ -17,19 +17,7 @@ exclude = ["**/__pycache__", "**/.venv"]
 reportAny = "none"
 reportImplicitOverride = "none"
 reportUnusedCallResult = "none"
-# Cross-skill import: content-operations/scripts/case_payload.py
-# is resolved at runtime via sys.path injection; pyright cannot see it.
-reportMissingImports = "none"
-# Cascade from the above: unresolvable imports produce unknown types.
-reportUnknownVariableType = "none"
-reportUnknownMemberType = "none"
-reportUnknownArgumentType = "none"
-reportUnknownParameterType = "none"
-# Test helpers use **kwargs and flexible dict types.
-reportMissingParameterType = "none"
-reportMissingTypeArgument = "none"
-# sys.path-inserted modules are implicitly relative.
-reportImplicitRelativeImport = "none"
+extraPaths = ["scripts", "tests"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"

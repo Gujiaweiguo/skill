@@ -1,10 +1,11 @@
 """Canonical validation for case-operations payloads.
 
 Delegates core case payload validation to
-:mod:`content-operations.scripts.case_payload`.
+:mod:`content-operations.scripts.case_payload` (loaded at runtime via
+:mod:`content_ops_loader`).
 Adds case-operations-specific safety:
 
-- Absolute marketing term rejection
+- Absolute marketing phrase rejection
 - ``publish`` / ``unpublish`` / ``delete`` intent interception
 - Fixture mode enforcement (``execution_mode`` is caller-only,
   never declared inside the payload)
@@ -13,24 +14,51 @@ Adds case-operations-specific safety:
 from __future__ import annotations
 
 import json
-import sys
+import re
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Final
 
-_CONTENT_OPS_ROOT = Path(__file__).resolve().parents[2] / "content-operations"
-if str(_CONTENT_OPS_ROOT) not in sys.path:
-    sys.path.insert(0, str(_CONTENT_OPS_ROOT))
-
-from scripts.case_payload import (  # type: ignore[import-not-found]
+from content_ops_loader import (
     PayloadValidationError,
     parse_case_payload,
 )
 
 SYNTHETIC_TEST_MODE: Final = "synthetic-test"
 
-ABSOLUTE_TERMS: Final = (
-    "最", "第一", "唯一", "独家", "首屈一指", "无与伦比", "遥遥领先",
+#: Absolute marketing phrases — precise multi-character patterns.
+#: Single-character entries like bare "最" would false-positive on
+#: "最近", "最后", etc.  Each entry is a specific superlative claim.
+ABSOLUTE_PHRASES: Final = (
+    "最领先",
+    "最优秀",
+    "最大",
+    "最小",
+    "最好",
+    "最差",
+    "最强",
+    "最弱",
+    "最优",
+    "最先进",
+    "最具",
+    "最完善",
+    "最专业",
+    "最权威",
+    "最丰富",
+    "最全面",
+    "首个",
+    "首家",
+    "首屈一指",
+    "唯一",
+    "独家",
+    "无与伦比",
+    "遥遥领先",
+    "行业第一",
+    "全国第一",
+    "全球第一",
+)
+
+_ABSOLUTE_PATTERN: Final = re.compile(
+    "|".join(re.escape(p) for p in ABSOLUTE_PHRASES),
 )
 
 FORBIDDEN_ACTION_KEYS: Final = (
@@ -101,17 +129,17 @@ def validate_case_payload(
         ))
         result.valid = False
 
-    # 3. Absolute marketing terms
+    # 3. Absolute marketing phrases (precise phrase match, not single-char)
     for fname, value in payload.items():
         if isinstance(value, str):
-            for term in ABSOLUTE_TERMS:
-                if term in value:
-                    result.errors.append(_error(
-                        str(fname),
-                        "absolute_marketing_term",
-                        f"contains absolute marketing term: '{term}'",
-                    ))
-                    result.valid = False
+            found = _ABSOLUTE_PATTERN.search(value)
+            if found:
+                result.errors.append(_error(
+                    str(fname),
+                    "absolute_marketing_term",
+                    f"contains absolute marketing term: '{found.group()}'",
+                ))
+                result.valid = False
 
     # 4. Publish / unpublish / delete intent
     for action in FORBIDDEN_ACTION_KEYS:
@@ -123,7 +151,7 @@ def validate_case_payload(
             ))
             result.valid = False
 
-    # 5. Delegate core validation to content-ops
+    # 5. Delegate core validation to content-ops shared parser
     cleaned = {
         k: v for k, v in payload.items()
         if k not in _CASE_OPS_EXTENSION_KEYS and k != "execution_mode"

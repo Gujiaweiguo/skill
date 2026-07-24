@@ -1,8 +1,9 @@
 """Validation tests for case-operations payloads.
 
 Covers: ``client_authorized``, required fields, forbidden terms,
-absolute terms, publish/delete intent, fixture mode, and
-payload self-declared ``execution_mode`` rejection.
+absolute phrases, publish/delete intent, fixture mode,
+payload self-declared ``execution_mode`` rejection,
+and shared-parser runtime invocation proof.
 """
 
 from __future__ import annotations
@@ -17,6 +18,10 @@ import pytest
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(_SCRIPTS_DIR))
 
+from content_ops_loader import (
+    PayloadValidationError as SharedPayloadValidationError,
+    parse_case_payload as shared_parse_case_payload,
+)
 from validate import SYNTHETIC_TEST_MODE, validate_case_payload
 
 FIXTURE_PATH = (
@@ -84,11 +89,46 @@ class TestTerms:
         codes = [e["code"] for e in _errors(p, execution_mode=SYNTHETIC_TEST_MODE)]
         assert "forbidden_term" in codes
 
-    def test_absolute_marketing(self) -> None:
+    def test_absolute_marketing_reject(self) -> None:
+        """Superlative phrases must be rejected."""
         p = _valid_base()
         p["outcome"] = "行业最领先的平台"
         codes = [e["code"] for e in _errors(p, execution_mode=SYNTHETIC_TEST_MODE)]
         assert "absolute_marketing_term" in codes
+
+
+class TestAbsoluteFalsePositives:
+    """Bare "最" would false-positive on normal text.  Verify
+    common neutral phrases containing "最" are allowed."""
+
+    @pytest.mark.parametrize("text", [
+        "最近一次系统升级",
+        "最后一个步骤",
+        "最终用户确认了方案",
+        "最高优先级任务是报修",
+    ])
+    def test_neutral_most_phrases_allowed(self, text: str) -> None:
+        p = _valid_base()
+        p["problem"] = text
+        codes = [e["code"] for e in _errors(p, execution_mode=SYNTHETIC_TEST_MODE)]
+        assert "absolute_marketing_term" not in codes
+
+    @pytest.mark.parametrize("text,term", [
+        ("行业最领先的平台", "最领先"),
+        ("我们是最大供应商", "最大"),
+        ("全国第一的物业系统", "全国第一"),
+        ("唯一的解决方案", "唯一"),
+        ("遥遥领先于竞品", "遥遥领先"),
+    ])
+    def test_real_absolute_phrases_rejected(
+        self, text: str, term: str,
+    ) -> None:
+        p = _valid_base()
+        p["outcome"] = text
+        errors = _errors(p, execution_mode=SYNTHETIC_TEST_MODE)
+        abs_errors = [e for e in errors if e["code"] == "absolute_marketing_term"]
+        assert len(abs_errors) == 1
+        assert term in abs_errors[0]["message"]
 
 
 class TestForbiddenActions:
@@ -135,26 +175,65 @@ class TestPayloadExecutionMode:
 
 class TestContentOpsCross:
     def test_rejects_missing_authorized(self) -> None:
-        from scripts.case_payload import (
-            PayloadValidationError,
-            parse_case_payload,
-        )
         p = _valid_base()
         del p["client_authorized"]
-        with pytest.raises(PayloadValidationError) as ei:
-            parse_case_payload(json.dumps(p, ensure_ascii=False))
+        with pytest.raises(SharedPayloadValidationError) as ei:
+            shared_parse_case_payload(json.dumps(p, ensure_ascii=False))
         assert "missing_or_false" in {i.code for i in ei.value.issues}
 
     def test_rejects_false_authorized(self) -> None:
-        from scripts.case_payload import (
-            PayloadValidationError,
-            parse_case_payload,
-        )
         p = _valid_base()
         p["client_authorized"] = False
-        with pytest.raises(PayloadValidationError) as ei:
-            parse_case_payload(json.dumps(p, ensure_ascii=False))
+        with pytest.raises(SharedPayloadValidationError) as ei:
+            shared_parse_case_payload(json.dumps(p, ensure_ascii=False))
         assert "missing_or_false" in {i.code for i in ei.value.issues}
+
+
+class TestSharedParserInvoked:
+    """Regression: prove the content-ops parser is actually called at
+    runtime, not shadowed by a local reimplementation."""
+
+    def test_forbidden_term_surfaces_from_shared_parser(self) -> None:
+        """'数字营销' is a content-ops forbidden term, not defined
+        anywhere in case-operations.  If it surfaces, the shared
+        parser was called."""
+        p = _valid_base()
+        p["solution"] = "提供数字营销服务"
+        r = validate_case_payload(p, execution_mode=SYNTHETIC_TEST_MODE)
+        shared_errors = [
+            e for e in r.errors
+            if e["code"] == "forbidden_term"
+        ]
+        assert len(shared_errors) >= 1
+        assert "数字营销" in shared_errors[0]["message"]
+
+    def test_slug_pattern_from_shared_parser(self) -> None:
+        """Slug pattern error ('string_pattern_mismatch') originates
+        from content-ops, not case-operations."""
+        p = _valid_base()
+        p["slug"] = "UPPERCASE-BAD"
+        r = validate_case_payload(p, execution_mode=SYNTHETIC_TEST_MODE)
+        assert "string_pattern_mismatch" in {e["code"] for e in r.errors}
+
+    def test_industry_enum_from_shared_parser(self) -> None:
+        """Industry enum validation lives in content-ops."""
+        p = _valid_base()
+        p["industry"] = "nonexistent-industry"
+        r = validate_case_payload(p, execution_mode=SYNTHETIC_TEST_MODE)
+        assert "enum" in {e["code"] for e in r.errors}
+
+    def test_shared_parser_is_real_module(self) -> None:
+        """The loader's parse_case_payload must come from the real
+        content-operations package, not a local copy."""
+        import content_ops_loader
+
+        source_mod = getattr(content_ops_loader, "_runtime_mod", None)
+        assert source_mod is not None
+        source_file = getattr(source_mod, "__file__", None)
+        assert source_file is not None
+        assert "content-operations" in str(source_file), (
+            f"expected content-operations in path, got: {source_file}"
+        )
 
 
 class TestSyntheticFixturePositive:
