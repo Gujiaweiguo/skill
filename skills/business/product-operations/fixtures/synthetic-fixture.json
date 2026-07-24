@@ -1,0 +1,18 @@
+{
+  "slug": "ai-vision-system-synthetic-fixture",
+  "product_name": "AI Vision System (Synthetic)",
+  "category": "ai_vision",
+  "client_authorized": true,
+  "fixture": true,
+  "short_description": "Synthetic AI vision product fixture for contract testing. No real product.",
+  "description": "AI Vision System is a completely fictional product for technical validation only. All data is synthetic. This fixture tests product-operations validation logic.",
+  "vendor": "SyntheticTech Inc. (fictional)",
+  "capabilities": [
+    {"name": "通道拥堵检测", "status": "mvp"},
+    {"name": "火灾烟雾识别", "status": "mvp"},
+    {"name": "地面脏污识别", "status": "mvp"},
+    {"name": "人员行为分析", "status": "roadmap"},
+    {"name": "设备预测维护", "status": "roadmap"}
+  ],
+  "image": "/products/ai-vision-system-fixture.webp"
+}
