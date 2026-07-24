@@ -12,8 +12,9 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from mock_mcp_server import MockMCPError, MockMCPServer
-from synthetic_runner import ArtifactDirError, run_synthetic_fixture
+
+from scripts.synthetic_runner import ArtifactDirError, run_synthetic_fixture
+from tests.mock_mcp_server import MockMCPError, MockMCPServer
 
 FIXTURE_PATH = (
     Path(__file__).resolve().parent.parent / "fixtures" / "synthetic-fixture.json"

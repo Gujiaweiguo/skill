@@ -11,10 +11,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import cast
 
-from content_ops_loader import get_shared_parser_source
-from validate import SYNTHETIC_TEST_MODE, validate_case_payload
+from scripts.content_ops_loader import get_shared_parser_source
+from scripts.validate import SYNTHETIC_TEST_MODE, validate_case_payload
 
 FIXTURE_PATH = (
     Path(__file__).resolve().parent.parent / "fixtures" / "synthetic-fixture.json"
@@ -56,7 +55,7 @@ class TestSharedParserInvoked:
         """Industry enum validation lives in content-ops."""
         p = _base()
         p["industry"] = "nonexistent-industry"
-        r = validate_case_payload(p, execution_mode=cast("str", SYNTHETIC_TEST_MODE))
+        r = validate_case_payload(p, execution_mode=SYNTHETIC_TEST_MODE)
         assert "enum" in {e["code"] for e in r.errors}
 
     def test_shared_parser_is_real_module(self) -> None:

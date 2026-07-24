@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
-from validate import SYNTHETIC_TEST_MODE, ValidationResult, validate_case_payload
+from scripts.validate import SYNTHETIC_TEST_MODE, ValidationResult, validate_case_payload
 
 
 class ArtifactDirError(Exception):

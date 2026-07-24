@@ -13,13 +13,14 @@ from pathlib import Path
 from typing import cast
 
 import pytest
-from content_ops_loader import (
+
+from scripts.content_ops_loader import (
     PayloadValidationError as SharedPayloadValidationError,
 )
-from content_ops_loader import (
+from scripts.content_ops_loader import (
     parse_case_payload as shared_parse_case_payload,
 )
-from validate import SYNTHETIC_TEST_MODE, validate_case_payload
+from scripts.validate import SYNTHETIC_TEST_MODE, validate_case_payload
 
 FIXTURE_PATH = (
     Path(__file__).resolve().parent.parent / "fixtures" / "synthetic-fixture.json"

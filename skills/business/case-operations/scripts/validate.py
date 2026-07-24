@@ -18,7 +18,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Final
 
-from content_ops_loader import (
+from scripts.content_ops_loader import (
     PayloadValidationError,
     parse_case_payload,
 )
