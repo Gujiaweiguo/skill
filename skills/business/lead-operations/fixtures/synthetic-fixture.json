@@ -1,0 +1,34 @@
+{
+  "fixture": true,
+  "lead_ids": [3, 4, 5],
+  "leads": [
+    {
+      "id": 3,
+      "name": "张经理（测试线索）",
+      "company": "虚构科技有限公司",
+      "phone": "13800000003",
+      "source": "website",
+      "message": "希望了解商业地产 AI 客服方案（合成测试数据）",
+      "created_at": "2026-07-20T10:00:00Z"
+    },
+    {
+      "id": 4,
+      "name": "李总监（测试线索）",
+      "company": "虚构商业管理集团",
+      "phone": "13800000004",
+      "source": "referral",
+      "message": "对智慧物业管理平台感兴趣（合成测试数据）",
+      "created_at": "2026-07-21T14:00:00Z"
+    },
+    {
+      "id": 5,
+      "name": "王主管（测试线索）",
+      "company": "虚构数字空间",
+      "phone": "13800000005",
+      "source": "website",
+      "message": "咨询 AI 问数产品（合成测试数据）",
+      "created_at": "2026-07-22T09:00:00Z"
+    }
+  ],
+  "triage_context": "商业地产 / AI 客服 / 智慧物业"
+}
