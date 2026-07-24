@@ -1,0 +1,55 @@
+[project]
+name = "case-operations"
+version = "0.1.0"
+description = "Synthetic-fixture validation for lnkwebsite case operations"
+requires-python = ">=3.10"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.basedpyright]
+typeCheckingMode = "all"
+pythonVersion = "3.10"
+include = ["scripts", "tests"]
+exclude = ["**/__pycache__", "**/.venv"]
+reportAny = "none"
+reportImplicitOverride = "none"
+reportUnusedCallResult = "none"
+# Cross-skill import: content-operations/scripts/case_payload.py
+# is resolved at runtime via sys.path injection; pyright cannot see it.
+reportMissingImports = "none"
+# Cascade from the above: unresolvable imports produce unknown types.
+reportUnknownVariableType = "none"
+reportUnknownMemberType = "none"
+reportUnknownArgumentType = "none"
+reportUnknownParameterType = "none"
+# Test helpers use **kwargs and flexible dict types.
+reportMissingParameterType = "none"
+reportMissingTypeArgument = "none"
+# sys.path-inserted modules are implicitly relative.
+reportImplicitRelativeImport = "none"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-config", "--strict-markers"]
+filterwarnings = ["error"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["COM812", "CPY001", "D203", "D213", "ISC001"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["ARG", "D", "PLR2004", "S101", "S105", "S106", "SLF001"]
+"scripts/**/*.py" = ["T201"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true

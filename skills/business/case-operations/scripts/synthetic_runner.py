@@ -1,50 +1,49 @@
 """Reusable synthetic-test runner for case-operations.
 
-Receives a fixture payload, an injected mock MCP server, and a temp artifact
-directory. Validates the payload, calls mock case_create, and generates the
-4 required artifacts.
+Receives a fixture payload, an injected mock MCP server, and a temp
+artifact directory.  Validates the payload, calls mock ``case_create``,
+and generates the 4 required artifacts.
 
 Security:
-- Only operates in synthetic-test mode (caller must pass execution_mode).
-- Only calls case_create on the injected mock — never reaches real MCP.
+- Only operates in synthetic-test mode (caller must pass
+  ``execution_mode``).
+- Only calls ``case_create`` on the injected mock — never reaches real
+  MCP.
 - Writes artifacts only to the provided temp directory.
 """
 
 from __future__ import annotations
 
 import json
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
 
-# --------------------------------------------------------------------------- #
-# Path setup — make validate.py importable                                    #
-# --------------------------------------------------------------------------- #
 _SCRIPTS_DIR = Path(__file__).resolve().parent
-import sys
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from validate import validate_case_payload, SYNTHETIC_TEST_MODE, ValidationResult  # noqa: E402
+from validate import SYNTHETIC_TEST_MODE, ValidationResult, validate_case_payload
 
-
-# --------------------------------------------------------------------------- #
-# Protocol for the injected mock MCP — no real HTTP / token here.              #
-# --------------------------------------------------------------------------- #
 
 class MockMCPProtocol(Protocol):
-    def case_create(self, payload: dict[str, Any]) -> dict[str, Any]: ...
+    """Minimal protocol the injected mock must satisfy."""
+
+    def case_create(
+        self, payload: dict[str, object],
+    ) -> dict[str, object]: ...
+
     def get_call_tools(self) -> list[str]: ...
+
     def assert_no_forbidden_calls(self) -> None: ...
 
 
-# --------------------------------------------------------------------------- #
-# Result                                                                       #
-# --------------------------------------------------------------------------- #
-
 @dataclass
 class SyntheticRunResult:
+    """Result of a synthetic fixture run."""
+
     valid: bool
     validation: ValidationResult
     draft_id: str
@@ -52,7 +51,8 @@ class SyntheticRunResult:
     mcp_calls: list[str]
     artifact_paths: dict[str, Path] = field(default_factory=dict)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> dict[str, object]:
+        """Serialise to a plain dict."""
         return {
             "valid": self.valid,
             "draft_id": self.draft_id,
@@ -62,12 +62,8 @@ class SyntheticRunResult:
         }
 
 
-# --------------------------------------------------------------------------- #
-# Public runner                                                                #
-# --------------------------------------------------------------------------- #
-
 def run_synthetic_fixture(
-    payload: dict[str, Any],
+    payload: dict[str, object],
     mock_mcp: MockMCPProtocol,
     artifact_dir: Path,
 ) -> SyntheticRunResult:
@@ -97,8 +93,9 @@ def run_synthetic_fixture(
         )
 
     # 2. Mock MCP case_create (the only MCP call)
+    cms_fields: dict[str, object] = dict(payload)
     cms_fields = {
-        k: v for k, v in payload.items()
+        k: v for k, v in cms_fields.items()
         if k not in ("fixture", "execution_mode")
     }
     cms_fields["status"] = "draft"
@@ -111,14 +108,21 @@ def run_synthetic_fixture(
     # 4. Generate 4 artifacts
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
+    client_name = str(payload.get("client_name", ""))
+    problem = str(payload.get("problem", ""))
+    solution = str(payload.get("solution", ""))
+    outcome = str(payload.get("outcome", ""))
+
     # 4a. case-research-pack.md
-    (artifact_dir / "case-research-pack.md").write_text(
-        f"# Case Research Pack — {payload['client_name']}\n\n"
+    research_text = (
+        f"# Case Research Pack — {client_name}\n\n"
         "> **FIXTURE**: Synthetic test data. No real client.\n\n"
-        f"## Problem\n{payload['problem']}\n\n"
-        f"## Solution\n{payload['solution']}\n\n"
-        f"## Outcome\n{payload['outcome']}\n",
-        encoding="utf-8",
+        f"## Problem\n{problem}\n\n"
+        f"## Solution\n{solution}\n\n"
+        f"## Outcome\n{outcome}\n"
+    )
+    (artifact_dir / "case-research-pack.md").write_text(
+        research_text, encoding="utf-8",
     )
 
     # 4b. case-payload.json
@@ -142,13 +146,15 @@ def run_synthetic_fixture(
     )
 
     # 4d. import-receipt.json
+    draft_id = str(draft["id"])
+    draft_status = str(draft["status"])
     (artifact_dir / "import-receipt.json").write_text(
         json.dumps({
             "skill": "case-operations",
             "fixture": True,
             "mcp_tool": "case_create",
-            "draft_id": draft["id"],
-            "draft_status": draft["status"],
+            "draft_id": draft_id,
+            "draft_status": draft_status,
             "timestamp": ts,
             "mcp_calls": mcp_calls,
             "forbidden_calls": [],
@@ -169,8 +175,8 @@ def run_synthetic_fixture(
     return SyntheticRunResult(
         valid=True,
         validation=result,
-        draft_id=draft["id"],
-        draft_status=draft["status"],
+        draft_id=draft_id,
+        draft_status=draft_status,
         mcp_calls=mcp_calls,
         artifact_paths=paths,
     )

@@ -1,8 +1,8 @@
 """Validation tests for case-operations payloads.
 
-Covers: client_authorized, required fields, forbidden terms,
+Covers: ``client_authorized``, required fields, forbidden terms,
 absolute terms, publish/delete intent, fixture mode, and
-payload self-declared execution_mode rejection.
+payload self-declared ``execution_mode`` rejection.
 """
 
 from __future__ import annotations
@@ -10,20 +10,21 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import cast
 
 import pytest
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from validate import validate_case_payload, SYNTHETIC_TEST_MODE
+from validate import SYNTHETIC_TEST_MODE, validate_case_payload
 
 FIXTURE_PATH = (
     Path(__file__).resolve().parent.parent / "fixtures" / "synthetic-fixture.json"
 )
 
 
-def _valid_base() -> dict:
+def _valid_base() -> dict[str, object]:
     return {
         "slug": "case-ops-synthetic-fixture",
         "client_name": "星河智创中心（测试案例）",
@@ -41,80 +42,71 @@ def _valid_base() -> dict:
     }
 
 
-def _errors(payload: dict, **kw) -> list[dict]:
-    return validate_case_payload(payload, **kw).errors
+def _errors(
+    payload: dict[str, object], **kw: object,
+) -> list[dict[str, str]]:
+    result = validate_case_payload(
+        payload,
+        execution_mode=cast(str | None, kw.get("execution_mode")),
+    )
+    return result.errors
 
-
-# --- client_authorized fail-closed ---
 
 class TestClientAuthorized:
-
-    def test_missing(self):
+    def test_missing(self) -> None:
         p = _valid_base()
         del p["client_authorized"]
         codes = [e["code"] for e in _errors(p, execution_mode=SYNTHETIC_TEST_MODE)]
         assert "missing_or_false" in codes
 
-    def test_false(self):
+    def test_false(self) -> None:
         p = _valid_base()
         p["client_authorized"] = False
         codes = [e["code"] for e in _errors(p, execution_mode=SYNTHETIC_TEST_MODE)]
         assert "missing_or_false" in codes
 
 
-# --- required fields ---
-
 class TestRequiredFields:
-
     @pytest.mark.parametrize("field", [
         "slug", "client_name", "industry", "problem", "solution", "outcome",
     ])
-    def test_missing(self, field):
+    def test_missing(self, field: str) -> None:
         p = _valid_base()
         del p[field]
         codes = [e["code"] for e in _errors(p, execution_mode=SYNTHETIC_TEST_MODE)]
         assert "missing" in codes
 
 
-# --- forbidden / absolute terms ---
-
 class TestTerms:
-
-    def test_domain_forbidden(self):
+    def test_domain_forbidden(self) -> None:
         p = _valid_base()
         p["solution"] = "提供数字营销服务"
         codes = [e["code"] for e in _errors(p, execution_mode=SYNTHETIC_TEST_MODE)]
         assert "forbidden_term" in codes
 
-    def test_absolute_marketing(self):
+    def test_absolute_marketing(self) -> None:
         p = _valid_base()
         p["outcome"] = "行业最领先的平台"
         codes = [e["code"] for e in _errors(p, execution_mode=SYNTHETIC_TEST_MODE)]
         assert "absolute_marketing_term" in codes
 
 
-# --- forbidden actions ---
-
 class TestForbiddenActions:
-
     @pytest.mark.parametrize("key", ["publish", "unpublish", "delete"])
-    def test_action_key(self, key):
+    def test_action_key(self, key: str) -> None:
         p = _valid_base()
         p[key] = True
         codes = [e["code"] for e in _errors(p, execution_mode=SYNTHETIC_TEST_MODE)]
         assert "forbidden_action" in codes
 
 
-# --- fixture mode enforcement ---
-
 class TestFixtureMode:
-
-    def test_fixture_without_mode(self):
+    def test_fixture_without_mode(self) -> None:
         p = _valid_base()
         codes = [e["code"] for e in _errors(p)]
         assert "fixture_requires_synthetic_mode" in codes
 
-    def test_fixture_wrong_mode(self):
+    def test_fixture_wrong_mode(self) -> None:
         p = _valid_base()
         r = validate_case_payload(p, execution_mode="production")
         assert not r.valid
@@ -123,11 +115,8 @@ class TestFixtureMode:
         }
 
 
-# --- payload self-declared execution_mode ---
-
 class TestPayloadExecutionMode:
-
-    def test_rejected(self):
+    def test_rejected(self) -> None:
         p = _valid_base()
         p["execution_mode"] = "synthetic-test"
         r = validate_case_payload(p, execution_mode=SYNTHETIC_TEST_MODE)
@@ -136,7 +125,7 @@ class TestPayloadExecutionMode:
             e["code"] for e in r.errors
         }
 
-    def test_rejected_even_without_fixture(self):
+    def test_rejected_even_without_fixture(self) -> None:
         p = _valid_base()
         del p["fixture"]
         p["execution_mode"] = "production"
@@ -144,13 +133,11 @@ class TestPayloadExecutionMode:
         assert "execution_mode_in_payload" in codes
 
 
-# --- content-ops cross-validation ---
-
 class TestContentOpsCross:
-
-    def test_rejects_missing_authorized(self):
+    def test_rejects_missing_authorized(self) -> None:
         from scripts.case_payload import (
-            parse_case_payload, PayloadValidationError,
+            PayloadValidationError,
+            parse_case_payload,
         )
         p = _valid_base()
         del p["client_authorized"]
@@ -158,9 +145,10 @@ class TestContentOpsCross:
             parse_case_payload(json.dumps(p, ensure_ascii=False))
         assert "missing_or_false" in {i.code for i in ei.value.issues}
 
-    def test_rejects_false_authorized(self):
+    def test_rejects_false_authorized(self) -> None:
         from scripts.case_payload import (
-            parse_case_payload, PayloadValidationError,
+            PayloadValidationError,
+            parse_case_payload,
         )
         p = _valid_base()
         p["client_authorized"] = False
@@ -169,18 +157,17 @@ class TestContentOpsCross:
         assert "missing_or_false" in {i.code for i in ei.value.issues}
 
 
-# --- positive fixture ---
-
 class TestSyntheticFixturePositive:
-
-    def test_passes(self):
+    def test_passes(self) -> None:
         with FIXTURE_PATH.open() as f:
             fixture = json.load(f)
-        r = validate_case_payload(fixture, execution_mode=SYNTHETIC_TEST_MODE)
+        r = validate_case_payload(
+            fixture, execution_mode=SYNTHETIC_TEST_MODE,
+        )
         assert r.valid, f"errors: {r.errors}"
         assert all(r.checks.values())
 
-    def test_markers(self):
+    def test_markers(self) -> None:
         with FIXTURE_PATH.open() as f:
             fixture = json.load(f)
         assert fixture["fixture"] is True
