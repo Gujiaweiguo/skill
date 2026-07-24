@@ -1,14 +1,10 @@
 """Canonical validation for case-operations payloads.
 
-Delegates core case payload validation (field completeness, client_authorized
-fail-closed, domain forbidden terms, slug pattern, industry enum) to the
-shared content-operations/scripts/case_payload.py — the single source of
-truth for case payload rules.
-
-Adds case-operations-specific safety on top:
-- Absolute marketing term rejection (editorial policy)
-- publish / unpublish / delete intent interception
-- fixture mode enforcement (synthetic-test isolation)
+Delegates core case payload validation to content-operations case_payload.py.
+Adds case-operations-specific safety:
+- Absolute marketing term rejection
+- publish/unpublish/delete intent interception
+- Fixture mode enforcement (execution_mode is caller-only, never in payload)
 """
 
 from __future__ import annotations
@@ -19,46 +15,29 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Final
 
-# ---------------------------------------------------------------------------
-# Import the shared case-payload rules from content-operations.
-# This is the canonical source for: required fields, client_authorized
-# fail-closed, domain forbidden terms, slug pattern, industry enum, status.
-# ---------------------------------------------------------------------------
 _CONTENT_OPS_ROOT = Path(__file__).resolve().parents[2] / "content-operations"
 if str(_CONTENT_OPS_ROOT) not in sys.path:
     sys.path.insert(0, str(_CONTENT_OPS_ROOT))
 
 from scripts.case_payload import parse_case_payload, PayloadValidationError  # type: ignore
 
-# ---------------------------------------------------------------------------
-# Case-operations-specific constants (NOT in content-ops)
-# ---------------------------------------------------------------------------
-
 SYNTHETIC_TEST_MODE: Final = "synthetic-test"
 
-#: Absolute / superlative marketing terms banned by editorial policy.
 ABSOLUTE_TERMS: Final = (
     "最", "第一", "唯一", "独家", "首屈一指", "无与伦比", "遥遥领先",
 )
 
-#: Payload keys that indicate a publish / unpublish / delete intent.
 FORBIDDEN_ACTION_KEYS: Final = (
     "publish", "unpublish", "delete",
     "case_publish", "case_unpublish", "case_delete",
 )
 
-#: Fields stripped before delegating to content-ops (case-ops extensions).
-_CASE_OPS_EXTENSION_KEYS: Final = frozenset({"fixture", "execution_mode"})
+#: Keys stripped before delegating to content-ops.
+_CASE_OPS_EXTENSION_KEYS: Final = frozenset({"fixture"})
 
-
-# ---------------------------------------------------------------------------
-# Result type
-# ---------------------------------------------------------------------------
 
 @dataclass
 class ValidationResult:
-    """Structured result of validating one case payload."""
-
     valid: bool
     errors: list[dict[str, Any]] = field(default_factory=list)
     warnings: list[dict[str, Any]] = field(default_factory=list)
@@ -73,10 +52,6 @@ class ValidationResult:
         }
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
 def validate_case_payload(
     payload: dict[str, Any],
     *,
@@ -85,31 +60,33 @@ def validate_case_payload(
     """Validate a case payload.
 
     Args:
-        payload: Raw decoded JSON dict.
-        execution_mode: Caller's execution context. Must be
-            ``"synthetic-test"`` when ``fixture`` is ``True``.
-
-    Returns:
-        ValidationResult with all errors / warnings / check flags.
+        payload: Raw decoded JSON dict. Must NOT contain ``execution_mode``.
+        execution_mode: Caller-provided context kwarg only.
     """
     result = ValidationResult(valid=True)
-
     is_fixture = payload.get("fixture") is True
 
-    # --- Case-ops-specific pre-checks ---
+    # 1. Reject payload self-declared execution_mode
+    if "execution_mode" in payload:
+        result.errors.append({
+            "field": "execution_mode",
+            "code": "execution_mode_in_payload",
+            "message": "execution_mode must be provided by the caller, "
+                       "not declared in the payload",
+        })
+        result.valid = False
 
-    # 1. Fixture mode isolation
-    # execution_mode is a CALLER-PROVIDED context, not a payload self-declaration.
-    # A payload must NOT bypass fixture safety by declaring its own mode.
+    # 2. Fixture mode isolation (caller-provided mode only)
     if is_fixture and execution_mode != SYNTHETIC_TEST_MODE:
         result.errors.append({
             "field": "fixture",
             "code": "fixture_requires_synthetic_mode",
-            "message": "fixture=true is only allowed with execution_mode=synthetic-test",
+            "message": "fixture=true is only allowed with "
+                       "execution_mode=synthetic-test (caller-provided)",
         })
         result.valid = False
 
-    # 2. Absolute marketing terms (case-ops editorial policy)
+    # 3. Absolute marketing terms
     for fname, value in payload.items():
         if isinstance(value, str):
             for term in ABSOLUTE_TERMS:
@@ -117,11 +94,11 @@ def validate_case_payload(
                     result.errors.append({
                         "field": fname,
                         "code": "absolute_marketing_term",
-        "message": f"contains absolute marketing term: '{term}'",
+                        "message": f"contains absolute marketing term: '{term}'",
                     })
                     result.valid = False
 
-    # 3. Publish / unpublish / delete intent interception
+    # 4. Publish / unpublish / delete intent
     for action in FORBIDDEN_ACTION_KEYS:
         if action in payload:
             result.errors.append({
@@ -131,9 +108,9 @@ def validate_case_payload(
             })
             result.valid = False
 
-    # --- Delegate core validation to content-ops case_payload.py ---
-    # Strip case-ops extension keys so content-ops sees a clean CMS payload.
-    cleaned = {k: v for k, v in payload.items() if k not in _CASE_OPS_EXTENSION_KEYS}
+    # 5. Delegate core validation to content-ops
+    cleaned = {k: v for k, v in payload.items()
+               if k not in _CASE_OPS_EXTENSION_KEYS and k != "execution_mode"}
     try:
         parse_case_payload(json.dumps(cleaned, ensure_ascii=False))
     except PayloadValidationError as exc:
@@ -145,7 +122,6 @@ def validate_case_payload(
                 "message": issue.message,
             })
 
-    # --- Summary check flags ---
     error_codes = {e["code"] for e in result.errors}
     result.checks = {
         "field_completeness": not error_codes & {
@@ -156,6 +132,7 @@ def validate_case_payload(
         "absolute_terms": "absolute_marketing_term" not in error_codes,
         "no_forbidden_actions": "forbidden_action" not in error_codes,
         "fixture_mode_safe": "fixture_requires_synthetic_mode" not in error_codes,
+        "no_payload_execution_mode": "execution_mode_in_payload" not in error_codes,
     }
 
     return result

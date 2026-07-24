@@ -4,7 +4,6 @@
   "industry": "office",
   "client_authorized": true,
   "fixture": true,
-  "execution_mode": "synthetic-test",
   "problem": "星河智创中心是一栋完全虚构的写字楼，用于技术验证。虚构场景：大厦管理方希望统一分散的物业服务入口。",
   "solution": "虚构方案：部署智慧物业服务平台，集成报修、公告、访客管理。所有数据为合成测试数据，不代表任何真实产品或服务。",
   "outcome": "虚构结果：报修响应时间缩短50%。此数据为合成测试数据，不代表任何真实指标。",
