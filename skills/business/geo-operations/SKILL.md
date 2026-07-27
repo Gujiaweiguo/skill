@@ -1,13 +1,13 @@
 ---
 name: geo-operations
 version: 0.1.0
-status: planned
+status: ready
 scope: lnkwebsite
 ---
 
 # GEO Operations
 
-> **状态**：v0.1 contract skeleton。**不包含可执行 workflow**。
+> **状态**：v0.1 contract skeleton (ready)。**不包含可执行 workflow**。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.4
 
 ## Purpose

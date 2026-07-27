@@ -1,0 +1,54 @@
+{
+  "fixture": true,
+  "audit_scope": "cross-check",
+  "audit_date": "2026-07-24",
+  "total_redirects_in_db": 5,
+  "total_redirects_in_doc": 5,
+  "redirects": [
+    {
+      "source_url": "gzshopex.com",
+      "db_status": "missing",
+      "doc_status": "pending-ownership-confirmation",
+      "nginx_status": "302-to-www.lanlnk.com",
+      "online_status_code": 302,
+      "drift_type": "ownership-confirmation-pending",
+      "notes": "should redirect to lanlnk.cn, ownership unconfirmed"
+    },
+    {
+      "source_url": "oldproduct.lanlnk.cn",
+      "db_status": "active",
+      "doc_status": "active",
+      "nginx_status": "301-to-www.lanlnk.cn/products",
+      "online_status_code": 301,
+      "drift_type": "none",
+      "notes": "normal redirect, no drift detected"
+    },
+    {
+      "source_url": "blog.lanlnk.com",
+      "db_status": "active",
+      "doc_status": "removed",
+      "nginx_status": "301-to-www.lanlnk.cn/blog",
+      "online_status_code": 301,
+      "drift_type": "doc-db-inconsistency",
+      "notes": "redirect exists in DB and nginx but removed from documentation"
+    },
+    {
+      "source_url": "m.lanlnk.cn",
+      "db_status": "disabled",
+      "doc_status": "active",
+      "nginx_status": "404-not-configured",
+      "online_status_code": 404,
+      "drift_type": "stale-doc-entry",
+      "notes": "disabled in DB and nginx, but doc still lists as active"
+    },
+    {
+      "source_url": "shop.lanlnk.cn",
+      "db_status": "active",
+      "doc_status": "active",
+      "nginx_status": "302-to-m.lanlnk.cn",
+      "online_status_code": 302,
+      "drift_type": "unexpected-target",
+      "notes": "expected 301 to www.lanlnk.cn/shop but nginx points to mobile"
+    }
+  ]
+}

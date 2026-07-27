@@ -1,13 +1,14 @@
 ---
 name: seo-audit
 version: 0.1.0
-status: planned
+status: ready
 scope: lnkwebsite
 ---
 
 # SEO Audit
 
-> **状态**：v0.1 contract skeleton。**不包含可执行 workflow**。
+> **状态**：v0.1 contract skeleton (ready)。**不包含可执行 workflow**。
+> **生命周期变更**：planned → ready (2026-07-24 contract skeleton pass)。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.5
 
 ## Purpose

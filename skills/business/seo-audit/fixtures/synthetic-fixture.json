@@ -1,0 +1,46 @@
+{
+  "fixture": true,
+  "audit_scope": "full",
+  "audit_date": "2026-07-24",
+  "sitemap": {
+    "total_urls": 53,
+    "entries": [
+      {"loc": "https://www.lnkwebsite.com/", "lastmod": "2026-07-20", "priority": "1.0"},
+      {"loc": "https://www.lnkwebsite.com/capabilities", "lastmod": "2026-07-18", "priority": "0.8"},
+      {"loc": "https://www.lnkwebsite.com/cases", "lastmod": "2026-07-19", "priority": "0.8"},
+      {"loc": "https://www.lnkwebsite.com/about", "lastmod": "2026-07-15", "priority": "0.5"},
+      {"loc": "https://www.lnkwebsite.com/contact", "lastmod": "2026-07-10", "priority": "0.5"}
+    ],
+    "missing_urls": [],
+    "broken_urls": []
+  },
+  "canonical": {
+    "page_canonicals": [
+      {"page": "homepage", "url": "https://www.lnkwebsite.com/", "canonical": "https://www.lnkwebsite.com/"},
+      {"page": "capabilities", "url": "https://www.lnkwebsite.com/capabilities", "canonical": "https://www.lnkwebsite.com/capabilities"},
+      {"page": "cases", "url": "https://www.lnkwebsite.com/cases", "canonical": "https://www.lnkwebsite.com/cases"}
+    ],
+    "inconsistencies": []
+  },
+  "structured_data": {
+    "validated_pages": ["homepage", "capability-pages"],
+    "errors": []
+  },
+  "meta": {
+    "page_titles": [
+      {"page": "homepage", "title": "LNK Digital - Enterprise Operations Platform"},
+      {"page": "capabilities", "title": "Core Capabilities - LNK Digital"},
+      {"page": "cases", "title": "Client Case Studies - LNK Digital"}
+    ],
+    "page_descriptions": [
+      {"page": "homepage", "description": "Enterprise-grade digital operations platform for property management."},
+      {"page": "capabilities", "description": "Explore the core capabilities of the LNK operations platform."},
+      {"page": "cases", "title": "Real-world case studies demonstrating measurable client outcomes."}
+    ],
+    "duplicate_titles": [],
+    "duplicate_descriptions": []
+  },
+  "redirects": [
+    {"source": "https://gzshopex.com", "target": "https://www.lnkwebsite.com", "status": 301}
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "geo_profile_id": "geo-fixture-001",
+  "fixture": true,
+  "baidu_verification": {
+    "status": "verified",
+    "verified_date": "2026-07-20",
+    "platform": "pc",
+    "site_url": "https://example.lnkwebsite.com"
+  },
+  "geo_profile": {
+    "name": "lnkwebsite-gpt-test",
+    "description": "A synthetic GEO profile for contract skeleton validation",
+    "capabilities": ["property-management", "visitor-control", "repair-portal"],
+    "contact_email": "test@example.com",
+    "website": "https://example.lnkwebsite.com",
+    "language": "zh-CN"
+  },
+  "llms_txt": {
+    "content_hash": "abc123def456",
+    "last_updated": "2026-07-18",
+    "source_url": "https://example.lnkwebsite.com/llms.txt",
+    "content_lines": [
+      "# lnkwebsite",
+      "> Property management platform",
+      "## Capabilities",
+      "- Property management system",
+      "- Visitor management",
+      "- Repair request portal"
+    ],
+    "capability_pages": [
+      {
+        "slug": "property-management",
+        "last_updated": "2026-07-15"
+      },
+      {
+        "slug": "visitor-control",
+        "last_updated": "2026-07-12"
+      },
+      {
+        "slug": "repair-portal",
+        "last_updated": "2026-07-10"
+      }
+    ]
+  },
+  "baseline_date": "2026-07-15"
+}
