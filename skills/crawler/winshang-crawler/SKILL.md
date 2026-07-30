@@ -1,7 +1,18 @@
 ---
 name: winshang-crawler
 emoji: 🏗️
-description: 赢商大数据爬虫 — 爬取商业地产项目数据，支持按城市/状态筛选
+description: |-
+  赢商大数据商业地产项目爬虫 Skill。从 winshangdata.com 爬取商业地产项目信息
+  （projectId/项目名称/项目状态/所在城市/项目类型/商业面积/开业时间/招商需求/
+  更新时间/项目概况/详情页 URL 等字段），自包含 Python 项目
+  （自带 src/ + pyproject.toml + .env.example + 独立 git history），由 uv 管理依赖。
+  两种数据获取模式：首次通过 Playwright 登录获取 JWT token（约 10s），后续 API 调用走 httpx 直连 JSON API；
+  每页请求间隔 1-2s 避免触发限流，自动重试。
+  CLI 提供两个子命令：crawl（按 --province/--status 爬取全量数据，输出 CSV，默认 data/winshang_data.csv）+
+  query（按 --province/--city/--status/--year/--year-after/--limit 筛选已爬取数据）。
+  触发场景："查一下上海有哪些未开业的购物中心"、"帮我爬取北京的新项目数据"、
+  "查询已爬取的广州项目"、"更新之前爬取的数据"。
+  仅依赖 winshangdata.com，不从其他网站抓取；凭据在 .env（已在 .gitignore 中，不入版本控制）。
 requires:
   bins: [python3, uv]
   env:

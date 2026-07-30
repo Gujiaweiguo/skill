@@ -1,11 +1,19 @@
 ---
 name: material-importer
 description: |-
-  素材导入与结构化 Skill。将原始文档（PPT/Word/Excel/图片）批量转换、提取图片、
-  OCR 识别、智能分类，整理为标准化素材存入共享素材库。核心能力：多文件混合拆分、
-  AI 内容识别与质量评估、交互式确认。
+  素材导入与结构化 Skill。将原始文档（PPT/Word/Excel/图片）批量转换为 Markdown，提取图片，
+  按内容 AI 拆分到 8 大类结构化素材库（company/cases/products/qual/impl/svc/hr/bid）。
+  核心能力：markitdown 文本转换链路 + convert_excel.py（PEP 723）按复杂度分流
+  （简单表→Markdown table、复杂表→CSV，含合并传播、双行表头展平、Excel 序列号日期、.xls 自动转换）+
+  extract_images.py 图片提取 + DeepSeek-OCR-2（VLM，BF16，3B）图片型资料 OCR + pytesseract 证照有效期检查 +
+  case_matcher.py 案例匹配（行业×3/场景×2.5/关键词×1.5/规模×1/完整度×0.5 加权，供 company-intro-generator/bid-doc-master 调用）+
+  validate_material.py 校验 + scan_raw_index.py 索引重建；三级目录 incoming→raw→materials，
+  含 raw/_index.json 关系索引、P1.5 空章节清理、P2 多文件混合拆分、P3 质量评估、P4 交互式确认。
   触发场景："整理素材"、"导入公司资料"、"把 incoming/ 里的文件入库"、"入库新案例"、
-  "检查证照有效期"、"检查素材质量"。
+  "检查证照有效期"、"检查素材质量"、"案例匹配"、"做方案素材够不够"。
+  被 product-prd-generator / competitor-product-analyzer / strategy-brief-generator /
+  project-proposal-generator / requirement-evaluator 复用作为文档转换与素材库基础设施。
+  不修改业务系统代码、不生成对外方案/PRD/投标文件，只产出结构化素材供下游 skill 消费。
 compatibility: >
   Requires Python 3.10+ and uv.
 
