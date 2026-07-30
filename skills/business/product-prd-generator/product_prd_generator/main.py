@@ -98,7 +98,17 @@ def main() -> int:
             coverage_args.extend(["--competitors", args.competitors])
         return _run("product_prd_generator.coverage_validate", coverage_args)
 
-    if _run("product_prd_generator.render", ["--reconcile", str(reconcile_path), "--doc-map", str(doc_map_path), "--docs-root", args.docs_root, "--output-dir", args.output_dir]) != 0:
+    if _run(
+        "product_prd_generator.render",
+        [
+            "--reconcile", str(reconcile_path),
+            "--doc-map", str(doc_map_path),
+            "--docs-root", args.docs_root,
+            "--output-dir", args.output_dir,
+            "--project", args.project,
+            "--code-root", args.code_root,
+        ],
+    ) != 0:
         return 1
 
     content_package_path = build_content_package(reconcile_path, doc_map_path, args.output_dir, args.docs_root)

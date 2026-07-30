@@ -4,14 +4,17 @@ import argparse
 import json
 import os
 import re
+import subprocess
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from ._paths import ontology_path_for_project
+from .competitor_render import render_competitor_feature_list
 from .data_model import (
     TableMeta,
     get_unmatched,
@@ -217,7 +220,55 @@ def _render_structure_summary(requirements: list[dict[str, Any]]) -> str:  # noq
     return "\n".join(lines) + "\n"
 
 
-def _render_feature_list(capabilities: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
+def _git_revision(code_root: str) -> tuple[str | None, str | None]:
+    try:
+        commit = subprocess.run(
+            ["git", "-C", code_root, "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        commit_date = subprocess.run(
+            ["git", "-C", code_root, "log", "-1", "--format=%cI"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None, None
+    return commit or None, commit_date.split("T", maxsplit=1)[0] or None
+
+
+def _render_feature_list(
+    capabilities: list[dict[str, Any]],  # noqa: ANY_OK
+    project: str = "商管系统",
+    code_root: str = "/opt/code/mi",
+) -> str:
+    commit, commit_date = _git_revision(code_root)
+    status_counts = Counter(
+        cap.get("reconciled_status")
+        for cap in capabilities
+        if cap.get("reconciled_status") in {"existing", "partial", "missing", "explicitly-not-do"}
+    )
+    metadata = {
+        "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "generator": "product-prd-generator",
+        "generator_version": "0.1.0",
+        "project": project,
+        "mi_code_root": code_root,
+        "mi_commit": commit,
+        "mi_commit_date": commit_date,
+        "mi_commits_since_last_prd": None,
+        "item_count": len(capabilities),
+        "status_distribution": {
+            "existing": status_counts.get("existing", 0),
+            "partial": status_counts.get("partial", 0),
+            "missing": status_counts.get("missing", 0),
+            "explicitly_not_do": status_counts.get("explicitly-not-do", 0),
+        },
+        "high_confidence_count": sum(cap.get("confidence") == "high" for cap in capabilities),
+    }
+    front_matter = yaml.safe_dump(metadata, allow_unicode=True, sort_keys=False)
     lines = ["# 功能清单", "", "| 功能名 | 状态 | 置信度 | 证据数 |", "|---|---|---|---|"]
     for cap in capabilities:
         name = cap.get("name", cap.get("id", ""))
@@ -225,7 +276,7 @@ def _render_feature_list(capabilities: list[dict[str, Any]]) -> str:  # noqa: AN
         confidence = cap.get("confidence", "low")
         evidence_count = len(cap.get("evidence", []))
         lines.append(f"| {name} | {status} | {confidence} | {evidence_count} |")
-    return "\n".join(lines) + "\n"
+    return f"---\n{front_matter}---\n\n" + "\n".join(lines) + "\n"
 
 
 def _render_gap_analysis(capabilities: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
@@ -1167,6 +1218,8 @@ def main() -> int:
     parser.add_argument("--doc-map", default="")
     parser.add_argument("--docs-root", default="")
     parser.add_argument("--output-dir", default="output")
+    parser.add_argument("--project", default="商管系统")
+    parser.add_argument("--code-root", default="/opt/code/mi")
     args = parser.parse_args()
 
     doc_map_path = args.doc_map if args.doc_map else None
@@ -1178,14 +1231,18 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     (output_dir / "产品PRD.md").write_text(render_prd(inputs), encoding="utf-8")
-    (output_dir / "功能清单.md").write_text(_render_feature_list(capabilities), encoding="utf-8")
+    (output_dir / "功能清单.md").write_text(
+        _render_feature_list(capabilities, project=args.project, code_root=args.code_root),
+        encoding="utf-8",
+    )
+    (output_dir / "竞品功能清单.md").write_text(render_competitor_feature_list(capabilities), encoding="utf-8")
     (output_dir / "差距分析.md").write_text(_render_gap_analysis(capabilities), encoding="utf-8")
     (output_dir / "需求证据表.md").write_text(_render_evidence_table(capabilities), encoding="utf-8")
     (output_dir / "需求清单.md").write_text(_render_requirement_list_file(requirements), encoding="utf-8")
     (output_dir / "高优先级需求review清单.md").write_text(_render_priority_review(requirements), encoding="utf-8")
     _write_handoff_outputs(inputs, output_dir)
 
-    print(f"rendered 9 files to {output_dir}/")
+    print(f"rendered 10 files to {output_dir}/")
     return 0
 
 

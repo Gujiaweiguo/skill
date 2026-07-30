@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -36,7 +35,12 @@ LANGCHAT_MODULES = ["数字员工与契约", "能力治理与发布", "工作流
 LNKCHATBI_MODULES = ["数据源管理", "问数会话", "术语库", "OpenClaw 集成"]
 
 
-def _run_cli(args: list[str], output_dir: Path, parsed_dir: Path, mode: str) -> subprocess.CompletedProcess:
+def _run_cli(
+    args: list[str],
+    output_dir: Path,
+    parsed_dir: Path,
+    mode: str,
+) -> subprocess.CompletedProcess[str]:
     """Invoke product-prd-generator CLI as subprocess."""
     cmd = [
         "uv", "run", "product-prd-generator",
@@ -74,6 +78,7 @@ def test_e2e_商管_generate(tmp_path: Path):
     )
     assert result.returncode == 0, f"CLI failed:\n{result.stderr}"
     _assert_modules_in_prd(tmp_path / "out", SHANGGUAN_MODULES)
+    assert (tmp_path / "out" / "竞品功能清单.md").is_file()
 
 
 # ─── 2. 商管系统 coverage-validate (regression) ────────────────────────
