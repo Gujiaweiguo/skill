@@ -3,6 +3,8 @@ name: product-operations
 version: 0.1.0
 status: ready
 scope: lnkwebsite
+description: |-
+  把产品 PRD / capability 文档转换为 lnkwebsite CMS product draft，仅创建 draft 不公开发布。复用 content-operations 的 product_payload / validate_product 校验逻辑（含 brand-guardrail 与 AI Vision MVP 检查）。触发场景：产品页草稿、产品文档入库、capability 转 CMS draft。与 content-operations 共享 product 处理 helper。
 ---
 
 # Product Operations

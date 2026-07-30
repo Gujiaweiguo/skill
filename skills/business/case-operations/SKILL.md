@@ -3,6 +3,8 @@ name: case-operations
 version: 0.1.0
 status: ready
 scope: lnkwebsite
+description: |-
+  把客户授权的案例素材转换为可审计、可验证的 lnkwebsite CMS case draft，仅创建 draft 不公开发布。复用 content-operations 的 case_payload / validate_case 校验逻辑（含 client_authorized fail-closed 与禁词检查）。触发场景：录入案例、案例草稿入库、客户案例上 CMS。与 content-operations 共享 case 处理 helper，未来可能提取为独立目录或保持共享。
 ---
 
 # Case Operations

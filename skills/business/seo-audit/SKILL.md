@@ -3,6 +3,8 @@ name: seo-audit
 version: 0.1.0
 status: ready
 scope: lnkwebsite
+description: |-
+  定期审计 lnkwebsite 的 SEO 健康度，覆盖 sitemap 完整性、canonical 一致性、structured data 校验与 meta 唯一性四个维度，生成可审计的 drift report。不自动修复任何 drift，所有修正由人工执行。触发场景：SEO 审计、sitemap 检查、canonical 一致性、structured data 校验、meta 重复检测。审计结果可定期对比基线，追踪 SEO 健康度趋势变化。
 ---
 
 # SEO Audit

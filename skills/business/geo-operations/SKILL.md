@@ -3,6 +3,8 @@ name: geo-operations
 version: 0.1.0
 status: ready
 scope: lnkwebsite
+description: |-
+  读取 lnkwebsite geo MCP，对比 GEO profile 与 llms.txt 实际内容，识别 drift（profile 字段缺失、llms.txt 内容陈旧、capability 描述与 capability 页不一致）。不自动修改任何 GEO 内容，仅生成 drift report 供人工修正。触发场景：GEO 一致性检查、llms.txt drift 检测、capability 页同步校验。当前依赖百度站长平台验证通过后运行。
 ---
 
 # GEO Operations

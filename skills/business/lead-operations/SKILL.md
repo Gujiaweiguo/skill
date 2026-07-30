@@ -3,6 +3,8 @@ name: lead-operations
 version: 0.1.0
 status: ready
 scope: lnkwebsite
+description: |-
+  读取 lnkwebsite leads 表，对新线索做分类建议与跟进建议，生成可审计的 triage report。不执行任何外发动作（不邮件、不短信、不 IM、不自动改 status），所有跟进由销售 owner 人工决定。触发场景：线索分诊、新线索分类、leads 表跟进建议。本 skill 为 ready 状态的 contract skeleton，含 synthetic fixture。
 ---
 
 # Lead Operations

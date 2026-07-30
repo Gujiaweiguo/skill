@@ -308,6 +308,21 @@ content-operations ─ 独立（lnkwebsite 内容研究→生成→校验→CMS 
 ops-manual-generator  独立（纯模板，读项目 IaC 文件输出 Markdown 部署/维护手册）
 
 ═══════════════════════════════════════════════════════════════════
+website-operations 层（lnkwebsite 站点运营，scope=lnkwebsite；contract skeleton）
+═══════════════════════════════════════════════════════════════════
+
+case-operations ───── 复用 content-operations helper（case_payload/validate_case）
+product-operations ── 复用 content-operations helper（product_payload/validate_product）
+comment-moderation ── 独立（读 comments 表，生成 triage report，不写）
+lead-operations ───── 独立（读 leads 表，生成 triage report，不写）
+geo-operations ────── 独立（读 geo MCP，生成 GEO drift report，不写）
+redirect-audit ────── 独立（对比 redirects 表/nginx/线上，生成 drift report）
+seo-audit ─────────── 独立（sitemap/canonical/structured data/meta 审计，不修复）
+site-health-operations  独立（systemd/endpoint/DB/磁盘 基线报告，不修复）
+
+注：均为 contract skeleton（只读 + 报告，不自动修改站点；status ready，comment-moderation 为 planned）
+
+═══════════════════════════════════════════════════════════════════
 业务决策层（business skill 之间的衔接）
 ═══════════════════════════════════════════════════════════════════
 
