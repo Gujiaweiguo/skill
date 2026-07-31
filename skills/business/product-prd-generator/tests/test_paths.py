@@ -34,10 +34,10 @@ def test_ontology_path_商管_falls_back_to_business_ontology():
 
 
 def test_ontology_path_langchat_returns_project_specific():
-    """Phase A deliverable: langchat/output/ontology.yaml exists."""
+    """langchat ontology.yaml migrated to 30-products/langchat/."""
     p = ontology_path_for_project("langchat")
-    assert p == DEFAULT_LANLNK_BASE / "out" / "prd" / "langchat" / "output" / "ontology.yaml"
-    assert p.is_file(), f"langchat ontology.yaml must exist (Phase A deliverable): {p}"
+    assert p == DEFAULT_LANLNK_BASE / "30-products" / "langchat" / "ontology.yaml"
+    assert p.is_file(), f"langchat ontology.yaml must exist: {p}"
 
 
 def test_ontology_path_LnkChatBI_returns_project_specific():
@@ -76,10 +76,10 @@ def test_term_aliases_path_商管_falls_back_to_skill_references():
 
 
 def test_term_aliases_path_langchat_returns_project_specific():
-    """Phase A deliverable: langchat/output/term-aliases.yaml exists."""
+    """langchat term-aliases.yaml migrated to 30-products/langchat/."""
     p = term_aliases_path_for_project("langchat", SKILL_ROOT)
-    assert p == DEFAULT_LANLNK_BASE / "out" / "prd" / "langchat" / "output" / "term-aliases.yaml"
-    assert p.is_file(), f"langchat term-aliases.yaml must exist (Phase A deliverable): {p}"
+    assert p == DEFAULT_LANLNK_BASE / "30-products" / "langchat" / "term-aliases.yaml"
+    assert p.is_file(), f"langchat term-aliases.yaml must exist: {p}"
 
 
 def test_term_aliases_path_LnkChatBI_returns_project_specific():

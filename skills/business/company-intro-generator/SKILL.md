@@ -1164,7 +1164,7 @@ V5 的强信号（满足 2 个以上即可考虑）：
 
 - 客户多项目多业态（如 5 个非标项目：文旅/滨水/街区/公园/社区）
 - 客户决策层对业务深度敏感（中海/万达/印力体系出身）
-- MI 工程领域架构包已建立（`$LANLNK_BASE/90-legacy/2026-07-31-pre-document-control-plane/old-architecture/mi-cre-erp-domain-model/` 存在）
+- MI 工程领域架构包已建立（`$LANLNK_BASE/20-architecture/mi-cre/domain-model/` 存在）
 - 客户组织岗位不清晰或一人多岗（按岗位切不够清晰）
 - 客户明确按业务条线管理（如招商线/财务线/营运线分头汇报）
 
@@ -1270,7 +1270,7 @@ python3 $SKILL_DIR/.opencode/skills/company-intro-generator/references/compile_v
 V5 是 MI 专属方案模式，领域列表来自 MI 工程领域架构包（基于 MI 代码反推的 Bounded Context，非 product-prd-generator 产物；product-prd-generator 契约产物是功能清单/差距分析/PRD/版本规划，不含领域模型）：
 
 ```
-$LANLNK_BASE/90-legacy/2026-07-31-pre-document-control-plane/old-architecture/mi-cre-erp-domain-model/
+$LANLNK_BASE/20-architecture/mi-cre/domain-model/
 ├── README.md                              # 领域总览
 ├── MI-CRE-ERP-Domain-Model-v1.0.md        # 领域模型主文件（17 Context）
 ├── MI-Domain-Model-Gap-Analysis-v1.1.md   # 差距分析
@@ -1278,7 +1278,7 @@ $LANLNK_BASE/90-legacy/2026-07-31-pre-document-control-plane/old-architecture/mi
 ```
 
 **V5 启动检查**：
-1. 检查 `$LANLNK_BASE/90-legacy/2026-07-31-pre-document-control-plane/old-architecture/mi-cre-erp-domain-model/` 是否存在
+1. 检查 `$LANLNK_BASE/20-architecture/mi-cre/domain-model/` 是否存在
 2. 存在 → 从 README.md 提取领域清单，填入 YAML `slides:` 的领域页
 3. 不存在 → 提示用户先建立 MI 工程领域架构包（参考 `architecture/README.md`）
 
@@ -1397,7 +1397,7 @@ Step 1: 收集客户信息（从对话中提取或主动问）
   └─ 预算锚点（如有）
 
 Step 2: 检查领域模型
-  ├─ 检查 $LANLNK_BASE/90-legacy/2026-07-31-pre-document-control-plane/old-architecture/mi-cre-erp-domain-model/ 是否存在
+  ├─ 检查 $LANLNK_BASE/20-architecture/mi-cre/domain-model/ 是否存在
   ├─ 存在 → 从 README.md 提取领域清单
   └─ 不存在 → 提示用户先建立 MI 工程领域架构包，或基于客户需求现场列领域
 
