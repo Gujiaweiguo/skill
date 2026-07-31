@@ -83,8 +83,9 @@ def main() -> int:
             "--output-dir", args.output_dir,
             "--review-dir", str(review_dir),
             "--skill-root", args.skill_root,
+            "--project", args.project,
         ]
-        analysis_root = Path(args.output_dir).parent / "competitor-analysis"
+        analysis_root = Path(args.output_dir) / "competitor-analysis"
         for comp_dir in sorted(analysis_root.iterdir()) if analysis_root.is_dir() else []:
             if comp_dir.is_dir() and comp_dir.glob("*capability-map.md"):
                 coverage_args.extend(["--capability-map-dir", str(comp_dir)])

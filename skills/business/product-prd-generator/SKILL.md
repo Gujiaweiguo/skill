@@ -469,7 +469,7 @@ uv run product-prd-generator --project 商管系统 \
 
 **样板参考**：
 - 商管（基线）：`$LANLNK_BASE/config/ontology/business-ontology.yaml`（1572 行，12 模块）
-- langchat（v2 战略）：`$LANLNK_BASE/out/prd/langchat/output/ontology.yaml`（8 模块，源自 v2-strategy/02）
+- langchat（v2 战略）：`$LANLNK_BASE/30-products/langchat/ontology.yaml`（8 模块，源自 v2-strategy/02）
 - LnkChatBI（问数）：`$LANLNK_BASE/out/prd/LnkChatBI/output/ontology.yaml`（8 模块）
 
 ### Step 2：创建 term-aliases
@@ -480,7 +480,7 @@ key = capability ID（与 ontology.sub_functions.capabilities 一致），value 
 
 **样板参考**：
 - 商管（基线）：`<skill>/references/term-aliases.yaml`
-- langchat：`$LANLNK_BASE/out/prd/langchat/output/term-aliases.yaml`（38 keys，含 v2 对象 + legacy OrchestratorAgent 术语）
+- langchat：`$LANLNK_BASE/30-products/langchat/term-aliases.yaml`（38 keys，含 v2 对象 + legacy OrchestratorAgent 术语）
 - LnkChatBI：`$LANLNK_BASE/out/prd/LnkChatBI/output/term-aliases.yaml`（14 keys，含 legacy 产品名 mysqlbot/SQLBot）
 
 ### Step 3：创建 raw 目录（用户素材入口）
