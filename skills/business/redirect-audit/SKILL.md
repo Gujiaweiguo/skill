@@ -1,7 +1,7 @@
 ---
 name: redirect-audit
 version: 0.1.0
-status: ready
+status: planned
 scope: lnkwebsite
 description: |-
   对比 lnkwebsite redirects 表、docs/seo/redirect-map.md 文档、实际 nginx 配置与线上 curl 状态三方数据源，识别 drift（表/文档/线上不一致）。不自动创建、修改、启用或禁用任何 redirect，仅生成 drift report 供人工核查。触发场景：redirect 漂移检查、301 审计、redirect 表与 nginx 一致性校验。
@@ -9,7 +9,7 @@ description: |-
 
 # Redirect Audit
 
-> **状态**：v0.1 contract skeleton。不包含可执行 workflow。**Lifecycle: ready** (contract skeleton with synthetic fixture)。
+> **状态**：v0.1 contract skeleton，**status=planned**（SEO owner 未明确，已知 drift 待审计）。不包含可执行 workflow。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.8
 
 ## Purpose

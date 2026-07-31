@@ -1,7 +1,7 @@
 ---
 name: seo-audit
 version: 0.1.0
-status: ready
+status: planned
 scope: lnkwebsite
 description: |-
   定期审计 lnkwebsite 的 SEO 健康度，覆盖 sitemap 完整性、canonical 一致性、structured data 校验与 meta 唯一性四个维度，生成可审计的 drift report。不自动修复任何 drift，所有修正由人工执行。触发场景：SEO 审计、sitemap 检查、canonical 一致性、structured data 校验、meta 重复检测。审计结果可定期对比基线，追踪 SEO 健康度趋势变化。
@@ -9,8 +9,8 @@ description: |-
 
 # SEO Audit
 
-> **状态**：v0.1 contract skeleton (ready)。**不包含可执行 workflow**。
-> **生命周期变更**：planned → ready (2026-07-24 contract skeleton pass)。
+> **状态**：v0.1 contract skeleton，**status=planned**（GSC 数据 < 2 周 + SEO owner 未明确）。**不包含可执行 workflow**。
+> **生命周期变更**：planned → ready 待 GSC 数据 ≥ 2 周 + 明确 SEO owner。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.5
 
 ## Purpose

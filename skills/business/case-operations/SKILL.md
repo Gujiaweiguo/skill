@@ -1,7 +1,7 @@
 ---
 name: case-operations
 version: 0.1.0
-status: ready
+status: planned
 scope: lnkwebsite
 description: |-
   把客户授权的案例素材转换为可审计、可验证的 lnkwebsite CMS case draft，仅创建 draft 不公开发布。复用 content-operations 的 case_payload / validate_case 校验逻辑（含 client_authorized fail-closed 与禁词检查）。触发场景：录入案例、案例草稿入库、客户案例上 CMS。与 content-operations 共享 case 处理 helper，未来可能提取为独立目录或保持共享。
@@ -9,7 +9,7 @@ description: |-
 
 # Case Operations
 
-> **状态**：v0.1 contract skeleton，**status=ready**（pilot 基准待选定）。**不包含可执行 workflow**。
+> **状态**：v0.1 contract skeleton，**status=planned**（pilot 基准案例待选定 + 业务方书面同意未落实）。**不包含可执行 workflow**。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.2
 
 ## Purpose

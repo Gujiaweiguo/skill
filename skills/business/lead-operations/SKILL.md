@@ -1,15 +1,15 @@
 ---
 name: lead-operations
 version: 0.1.0
-status: ready
+status: planned
 scope: lnkwebsite
 description: |-
-  读取 lnkwebsite leads 表，对新线索做分类建议与跟进建议，生成可审计的 triage report。不执行任何外发动作（不邮件、不短信、不 IM、不自动改 status），所有跟进由销售 owner 人工决定。触发场景：线索分诊、新线索分类、leads 表跟进建议。本 skill 为 ready 状态的 contract skeleton，含 synthetic fixture。
+  读取 lnkwebsite leads 表，对新线索做分类建议与跟进建议，生成可审计的 triage report。不执行任何外发动作（不邮件、不短信、不 IM、不自动改 status），所有跟进由销售 owner 人工决定。触发场景：线索分诊、新线索分类、leads 表跟进建议。本 skill 为 planned 状态的 contract skeleton，含 synthetic fixture。
 ---
 
 # Lead Operations
 
-> **状态**：v0.1 contract skeleton with synthetic fixture，**status=ready**（pilot 基准待选定）。**不包含可执行 production workflow**。
+> **状态**：v0.1 contract skeleton with synthetic fixture，**status=planned**（业务 owner 任命 + SLA 文档化 + ≥5 条新真实 lead 待 triage 均未落实）。**不包含可执行 production workflow**。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.3
 
 ## Purpose
