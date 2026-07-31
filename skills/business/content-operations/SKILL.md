@@ -1,7 +1,7 @@
 ---
 name: content-operations
 version: "1.0.0"
-status: ready
+status: pilot
 scope: lnkwebsite
 description: |-
   蓝联创新网站内容运营 Skill。将有证据支撑的选题按 Research、Generation、Validation、Draft Import
