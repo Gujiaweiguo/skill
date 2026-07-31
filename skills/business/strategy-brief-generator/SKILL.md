@@ -185,7 +185,7 @@ $LANLNK_BASE/out/strategy/商业地产信息化战略/
 
 1. 在对应 input 子目录放一个 `source-ref.md`，记录源码根路径
 2. 后续由 Agent 读取源码，抽取能力清单到 `parsed/self/`
-3. 商管可复用已有 PRD：`$LANLNK_BASE/out/prd/商管系统/output/产品PRD.md`
+3. 商管可复用已有 PRD：`$LANLNK_BASE/30-products/mi-cre/prd/PRD-MI-001-product-baseline.md`
 
 ## 处理流程
 
@@ -293,7 +293,7 @@ self-capability-map.json
 
 | 资产 | 来源 | 盘点内容 |
 |------|------|---------|
-| 商管 | `/opt/code/mi` 源码 + `$LANLNK_BASE/out/prd/商管系统/output/` | 已有模块、能力成熟度、技术栈 |
+| 商管 | `/opt/code/mi` 源码 + `$LANLNK_BASE/30-products/mi-cre/` | 已有模块、能力成熟度、技术栈 |
 | 会员 | `$LANLNK_BASE/materials/03-products/` + `04-cases/` | 产品功能、已交付案例、行业覆盖 |
 | AI | lnkchatbi / langchat 源码 | AI问数能力、RAG 能力、大模型集成方式 |
 

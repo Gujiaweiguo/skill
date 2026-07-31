@@ -12,7 +12,7 @@
 - 可选：项目名或项目路径，例如 `mi` / `langchat` / `/opt/code/mi`。
 - 可选：时间范围，例如 `今天` / `最近一次` / `本周归档`。
 - 可选：一个或多个 archived change id/path，用于精确指定回写对象。
-- 可选：PRD 输出目录，例如 `$LANLNK_BASE/out/prd/商管系统/output/`。
+- 可选：PRD 输出目录，例如 `$LANLNK_BASE/30-products/mi-cre/`。
 - 可选：`verification-report.md`、实现摘要、暂缓/合并/误判结论。
 
 ## 步骤

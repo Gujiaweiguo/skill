@@ -482,10 +482,10 @@ uv run product-prd-generator \
   --code-root /opt/code/mi \
   --docs-root $LANLNK_BASE/raw/prd-商管系统 \
   --skill-root . \
-  --parsed-dir $LANLNK_BASE/out/prd/商管系统/parsed \
-  --output-dir $LANLNK_BASE/out/prd/商管系统/output \
+  --parsed-dir $LANLNK_BASE/raw/prd-商管系统/parsed \
+  --output-dir $LANLNK_BASE/30-products/mi-cre \
   --mode coverage-validate \
-  --baseline $LANLNK_BASE/out/prd/商管系统/parsed/coverage-baseline.json \
+  --baseline $LANLNK_BASE/raw/prd-商管系统/parsed/coverage-baseline.json \
   --update-baseline
 ​```
 

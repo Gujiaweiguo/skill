@@ -129,9 +129,9 @@ uv run scripts/ocr_extract.py <input_dir> [<input_dir> ...] \
 
 # Example: extract Haiding contract table structures from PPT images
 uv run scripts/ocr_extract.py \
-  /opt/code/docs/lanlnk/out/prd/商管系统/raw/02-competitors/海鼎/业务逻辑 \
-  --sql-dir /opt/code/docs/lanlnk/out/prd/商管系统/input/02-competitors/海鼎/数据结构 \
-  --output-dir /opt/code/docs/lanlnk/out/prd/商管系统/raw/02-competitors/海鼎/业务逻辑/_extracted
+  /opt/code/docs/lanlnk/raw/prd-商管系统/02-competitors/海鼎/业务逻辑 \
+  --sql-dir /opt/code/docs/lanlnk/incoming/prd-商管系统/02-competitors/海鼎/数据结构 \
+  --output-dir /opt/code/docs/lanlnk/raw/prd-商管系统/02-competitors/海鼎/业务逻辑/_extracted
 ```
 
 Outputs: `slides.jsonl` (per-image OCR + bbox), `tables.jsonl` (table names + SQL calibration), `all-ocr.md` (human-readable), `manifest.json`.
@@ -384,7 +384,7 @@ subprocess.run(
 |---|---|
 | `material-importer/references/domain-tags.md` | material-importer (owner), product-prd-generator, compound-learning |
 | `product-prd-generator/references/term-aliases.yaml` | product-prd-generator (owner), competitor-product-analyzer |
-| `$LANLNK_BASE/out/prd/商管系统/域知识.md` | product-prd-generator (商管 project only; 域知识跟着项目走，不放 skill 目录), competitor-product-analyzer, strategy-brief-generator, compound-learning |
+| `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md` | product-prd-generator (商管 project only; 域知识跟着项目走，不放 skill 目录), competitor-product-analyzer, strategy-brief-generator, compound-learning |
 | `$LANLNK_BASE/config/ontology/business-ontology.yaml` | product-prd-generator (runtime dependency), competitor-product-analyzer |
 
 > 此表与 `references/scripts/check_docs_consistency.sh` 的 `SHARED_FILES` 数组是**双 source of truth**——改一边必须同步另一边，跑 `check_docs_consistency.sh` 验证。Aspirational readers（"将来应该读但还没接"）不要写进此表，写到 skill 自身的 roadmap/TODO 里，避免 agent 读了做错误假设。

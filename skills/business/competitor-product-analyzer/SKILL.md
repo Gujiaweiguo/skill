@@ -20,7 +20,7 @@ compatibility: >
   文档转换复用 material-importer（markitdown + 图片提取 + OCR）。
   Demo 探测复用 doc-generator 的 Playwright 模式与文本/角色 locator 规范。
   能力对齐参考 product-prd-generator 输出的功能清单与 ontology（$LANLNK_BASE/config/ontology/business-ontology.yaml）。
-  商管域知识参考 $LANLNK_BASE/out/prd/商管系统/域知识.md。
+  商管域知识参考 $LANLNK_BASE/30-products/mi-cre/domain-knowledge.md。
 
   Quick start:
   ```bash
@@ -149,7 +149,7 @@ strategy-brief-generator（战略定位 / 竞对打法）     ←─ 你的能�
 | 阶段 | 触发 | 产物位置 | 性质 |
 |---|---|---|---|
 | **S0 采集入库** | 用户提供手册路径或 demo 账号 | `incoming/` + `raw/` + `materials/13-competitors/` | 竞品素材沉淀（三层归属）|
-| **S1/S5 能力分析** | 需要做能力矩阵/改进建议/PRD 时 | `out/prd/商管系统/competitor-analysis/<vendor>/` | 蓝联对竞品的分析结论 |
+| **S1/S5 能力分析** | 需要做能力矩阵/改进建议/PRD 时 | `30-products/mi-cre/competitor-analysis/<vendor>/` | 蓝联对竞品的分析结论 |
 
 > **为什么分离**：采集入库是"竞品有什么"（事实层，可被多个 skill 复用）；能力分析是"蓝联该怎么改进"（判断层，依赖蓝联功能清单和客户优先级）。混在一起会导致采集产物被分析结论淹没，且 materials 层缺失导致其他 skill 无法复用竞品素材。
 
@@ -194,7 +194,7 @@ $LANLNK_BASE/
 ### S1/S5 能力分析：competitor-analysis 输出
 
 ```text
-$LANLNK_BASE/out/prd/商管系统/competitor-analysis/<vendor>/
+$LANLNK_BASE/30-products/mi-cre/competitor-analysis/<vendor>/
 ├── .auth.json                          ← demo 凭据（mode 0600，gitignored）
 ├── capability-map.json                 ← 竞品能力结构化清单（从 materials 素材抽取）
 ├── competitor-capability-map.md        ← 人类可读版
@@ -285,7 +285,7 @@ S1.5: 证据台账 + 待确认项
 S1.6: 交互确认与交付
 ```
 
-**S1 阶段产物全部在 `out/prd/商管系统/competitor-analysis/<vendor>/`**，不回写 materials（避免分析结论污染素材库）。
+**S1 阶段产物全部在 `30-products/mi-cre/competitor-analysis/<vendor>/`**，不回写 materials（避免分析结论污染素材库）。
 
 ### S0.1 输入解析
 
@@ -471,7 +471,7 @@ markitdown "<原始文件>" -o "<raw 目录>/<6类>/<同名>.md"
 
 把竞品的原始术语映射到蓝联标准功能名，复用：
 
-- `$LANLNK_BASE/out/prd/商管系统/域知识.md`（商管域术语别名表）
+- `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md`（商管域术语别名表）
 - `$LANLNK_BASE/config/ontology/business-ontology.yaml`（8 模块 482 术语）
 - `product-prd-generator/references/term-aliases.yaml`
 
@@ -483,7 +483,7 @@ markitdown "<原始文件>" -o "<raw 目录>/<6类>/<同名>.md"
 
 | 对照产品 | 功能清单路径 |
 |---|---|
-| MI / 商管系统 | `$LANLNK_BASE/out/prd/商管系统/output/功能清单.md` |
+| MI / 商管系统 | `$LANLNK_BASE/30-products/mi-cre/feature-baseline/feature-baseline.yaml` |
 | CRM / 会员系统 | `$LANLNK_BASE/materials/03-products/CRM会员系统功能清单.md` |
 | AI Skills | `$LANLNK_BASE/materials/11-cre-ai-skills/02_机会与产品/岗位 AI Skills 增强性与摩擦消除分析矩阵.md` |
 
@@ -639,7 +639,7 @@ export LANLNK_BASE=/opt/code/docs/lanlnk
 | `$INCOMING_VENDOR_DIR` | `$LANLNK_BASE/incoming/competitor-<vendor>/` | **S0 原始证据入口**（百度盘）|
 | `$RAW_VENDOR_DIR` | `$LANLNK_BASE/raw/prd-商管系统/02-competitors/<vendor>/` | **S0 转换产物**（gitignored，百度盘）|
 | `$MATERIALS_VENDOR_DIR` | `$COMPETITORS_DIR/<vendor>/` | **S0 权威精华**（进 Git）|
-| `$PRD_DIR` | `$LANLNK_BASE/out/prd/商管系统` | PRD 项目根 |
+| `$PRD_DIR` | `$LANLNK_BASE/30-products/mi-cre` | PRD 项目根 |
 | `$ANALYSIS_ROOT` | `$PRD_DIR/competitor-analysis/<vendor>` | **S1 能力分析输出根**（不含原始素材）|
 | `$USERGUIDE_BASE` | `$LANLNK_BASE/materials/03-products/user-guides` | doc-generator 的输出根（如需生成竞品操作手册）|
 

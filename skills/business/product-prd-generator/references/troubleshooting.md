@@ -497,7 +497,7 @@ for kw in ['m3newcontract', 'm3modifycontract']:
 **诊断步骤**：
 
 1. **检查 SKILL.md / 命令行里写的 docs-root 路径是否与磁盘实际路径一致**
-   - 历史根因：SKILL.md 写的是 `$LANLNK_BASE/out/prd/商管系统/raw`，但实际路径是 `$LANLNK_BASE/raw/prd-商管系统`。`doc_map._load_aliases()` 在找不到 ontology 时**静默退化**到纯 term-aliases 匹配（不报错），导致 ontology 从未加载，匹配率从应有水平跌到 ~15%。
+   - 历史根因：SKILL.md 写的是 `$LANLNK_BASE/raw/prd-商管系统`，但实际路径是 `$LANLNK_BASE/raw/prd-商管系统`。`doc_map._load_aliases()` 在找不到 ontology 时**静默退化**到纯 term-aliases 匹配（不报错），导致 ontology 从未加载，匹配率从应有水平跌到 ~15%。
    - 自检：
      ```bash
      ls "$LANLNK_BASE/raw/prd-商管系统" 2>/dev/null || echo "❌ docs-root 路径错"
