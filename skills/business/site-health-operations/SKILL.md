@@ -1,7 +1,7 @@
 ---
 name: site-health-operations
 version: 0.1.0
-status: ready
+status: planned
 scope: lnkwebsite
 description: |-
   定期生成 lnkwebsite 站点健康基线报告，覆盖 4 个 systemd service 状态、关键 endpoint 响应时间、DB 连接、磁盘/内存/swap 使用四个维度。仅生成报告，不自动修复、不自动重启、不改任何配置。触发场景：站点健康检查、服务状态基线、endpoint 响应时间监控、DB 连接诊断。报告可定期对比基线，追踪站点健康趋势，辅助容量规划与故障预警。所有指标输出结构化 JSON 便于趋势追踪与告警对接。
@@ -9,7 +9,7 @@ description: |-
 
 # Site Health Operations
 
-> **状态**：v0.1 contract skeleton。**不包含可执行 workflow**。
+> **状态**：v0.1 contract skeleton，**status=planned**（待业务方决定恢复监控 + 明确运维 owner）。**不包含可执行 workflow**。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.9
 
 ## Purpose

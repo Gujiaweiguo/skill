@@ -1,6 +1,8 @@
 ---
 name: content-operations
 version: "1.0.0"
+status: ready
+scope: lnkwebsite
 description: |-
   蓝联创新网站内容运营 Skill。将有证据支撑的选题按 Research、Generation、Validation、Draft Import
   四个阶段转成 lnkwebsite CMS 草稿，保留研究包、Pattern Draft、审阅记录、Article JSON、校验报告和导入回执。
