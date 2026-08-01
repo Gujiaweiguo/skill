@@ -1,7 +1,7 @@
 ---
 name: content-operations
 version: "1.0.0"
-status: pilot
+status: validated
 scope: lnkwebsite
 description: |-
   蓝联创新网站内容运营 Skill。将有证据支撑的选题按 Research、Generation、Validation、Draft Import
@@ -15,6 +15,18 @@ compatibility: |-
 ---
 
 # Content Operations
+
+## Validation History (pilot → validated)
+
+Promotion Rule: pilot → validated 需 3 次端到端跑通 + 人审通过。
+
+| # | 日期 | 选题 | Pattern | Article ID | 人审 |
+|---|------|------|---------|-----------|------|
+| 1 | 2026-07-31 | 什么是 MCP（Model Context Protocol） | term-entry (ai-trends) | 24 | ✅ approved |
+| 2 | 2026-08-01 | AI Agent vs Automation | industry-insight (ai-trends) | 25 | ✅ approved |
+| 3 | 2026-08-01 | What is Function Calling | term-entry (ai-trends) | 26 | ✅ approved |
+
+Promotion date: 2026-08-01. All 4 phases (Research → Generation → Validation → Draft Import) completed end-to-end for each pilot. 28 unit tests green throughout.
 
 ## 目标与边界
 
