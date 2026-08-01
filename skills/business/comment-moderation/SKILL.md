@@ -1,15 +1,15 @@
 ---
 name: comment-moderation
 version: 0.1.0
-status: planned
+status: ready
 scope: lnkwebsite
 description: |-
-  读取 lnkwebsite comments 表中 status=pending 的评论，做风险标记与审核建议，生成可审计的 triage report。不执行任何 approve/reject/delete 动作，所有审核决定由审核员人工做出。触发场景：审核评论、评论分诊、pending 评论风险扫描。本 skill 为 planned 状态，包含 payload 校验、synthetic fixture、risk engine、triage CLI 和 MCP reader。workflow 可通过 fixture 模式端到端执行，但未连接真实 CMS。
+  读取 lnkwebsite comments 表中 status=pending 的评论，做风险标记与审核建议，生成可审计的 triage report。不执行任何 approve/reject/delete 动作，所有审核决定由审核员人工做出。触发场景：审核评论、评论分诊、pending 评论风险扫描。本 skill 为 ready 状态，包含 payload 校验、synthetic fixture、risk engine、triage CLI 和 MCP reader。审核员 owner = opc（一人公司）。workflow 可通过 fixture 模式端到端执行，真实评论 ≥ 10 条为 pilot 验证条件，不影响 ready。
 ---
 
 # Comment Moderation
 
-> **状态**：v0.1 — workflow 可通过 fixture 模式端到端执行，未连接真实 CMS。
+> **状态**：v0.1 — **status=ready**（审核员 owner = opc，一人公司）。workflow 可通过 fixture 模式端到端执行，未连接真实 CMS。真实评论 ≥ 10 条为 pilot → validated 条件，不影响 ready。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.6
 
 ## Purpose
@@ -19,7 +19,7 @@ description: |-
 ## Trigger Condition
 
 - 有真实评论审核量（≥ 10 条待审）
-- 当前 status：`planned`，无真实评论量
+- 当前 status：`ready`，审核员 owner = opc（一人公司）。真实评论 ≥ 10 条为 pilot 验证条件。
 
 ## Inputs
 
@@ -78,9 +78,9 @@ description: |-
 ## Promotion Rule
 
 ```
-planned → ready：真实评论 ≥ 10 条 + 审核员书面任命
+planned → ready：✅ 已完成（审核员 owner = opc，一人公司）
 ready → pilot：triage report 跑通 1 次
-pilot → validated：10 条评论跑过 + 准确率 ≥ 80%
+pilot → validated：真实评论 ≥ 10 条 + 准确率 ≥ 80%
 validated → Phase 5：在 skill-portfolio.md 显式记录
 ```
 

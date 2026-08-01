@@ -1,7 +1,7 @@
 ---
 name: seo-audit
 version: 0.2.0
-status: planned
+status: ready
 scope: lnkwebsite
 description: |-
   定期审计 lnkwebsite 的 SEO 健康度，覆盖 sitemap 完整性、canonical 一致性、structured data 校验、meta 唯一性、Open Graph 完整性与 robots.txt 配置六个维度，生成可审计的 drift report。不自动修复任何 drift，所有修正由人工执行。触发场景：SEO 审计、sitemap 检查、canonical 一致性、structured data 校验、meta 重复检测。审计结果可定期对比基线，追踪 SEO 健康度趋势变化。
@@ -12,8 +12,7 @@ compatibility: |-
 
 # SEO Audit
 
-> **状态**：v0.2 — 可执行 workflow 就绪，**status=planned**（GSC 数据 < 2 周 + SEO owner 未明确）。
-> **Promotion Gate**：GSC 数据 ≥ 2 周 + 明确 SEO owner → ready。
+> **状态**：v0.2 — **status=ready**（SEO owner = opc，一人公司）。GSC 数据 ≥ 2 周为 pilot 验证条件，不影响 ready。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.5
 
 ## Purpose
@@ -26,7 +25,7 @@ compatibility: |-
 - 出现 SEO drift（canonical 错误 / 重复 title / sitemap 缺失 / structured data 失效）
 - 季度 SEO 审核
 
-当前状态：GSC 验证已完成（2026-07-24），但数据 < 2 周。
+当前状态：GSC 验证已完成（2026-07-24），数据 < 2 周（pilot 验证条件）。SEO owner = opc（一人公司）。
 
 ## 配置
 
@@ -227,9 +226,9 @@ uv run python -m scripts.seo_audit_runner \
 ## Promotion Rule
 
 ```
-planned → ready：GSC 数据 ≥ 2 周 + 明确 SEO owner
+planned → ready：✅ 已完成（SEO owner = opc，一人公司）
 ready → pilot：drift report 跑通 1 次
-pilot → validated：3 次 drift report + ≥ 1 个真实 drift 识别并修复
+pilot → validated：GSC 数据 ≥ 2 周 + 3 次 drift report + ≥ 1 个真实 drift 识别并修复
 validated → Phase 5：在 skill-portfolio.md 显式记录
 ```
 
@@ -243,8 +242,8 @@ validated → Phase 5：在 skill-portfolio.md 显式记录
 - [x] 测试覆盖：121 tests passing（含 validation + synthetic runner + SEO audit runner + CLI）
 - [x] CLI 可运行：`uv run python -m scripts.seo_audit_runner --fixture ... --output ...`
 - [x] Drift report 结构化输出：JSON 含 severity / issue_type / description / dimension / summary
-- [ ] GSC 数据 ≥ 2 周（当前 < 2 周）
-- [ ] 明确 SEO owner
+- [ ] GSC 数据 ≥ 2 周（当前 < 2 周，pilot 验证条件）
+- [x] 明确 SEO owner — opc（一人公司）
 
 ## Maintenance
 

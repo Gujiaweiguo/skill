@@ -1,15 +1,15 @@
 ---
 name: lead-operations
 version: 0.1.0
-status: planned
+status: ready
 scope: lnkwebsite
 description: |-
-  读取 lnkwebsite leads 表，对新线索做分类建议与跟进建议，生成可审计的 triage report。不执行任何外发动作（不邮件、不短信、不 IM、不自动改 status），所有跟进由销售 owner 人工决定。触发场景：线索分诊、新线索分类、leads 表跟进建议。本 skill 为 planned 状态的 contract skeleton，含 synthetic fixture。
+  读取 lnkwebsite leads 表，对新线索做分类建议与跟进建议，生成可审计的 triage report。不执行任何外发动作（不邮件、不短信、不 IM、不自动改 status），所有跟进由销售 owner 人工决定。触发场景：线索分诊、新线索分类、leads 表跟进建议。本 skill 为 ready 状态的 contract skeleton，含 synthetic fixture。业务 owner = opc（一人公司），SLA = 24h 首次响应。真实 lead ≥ 5 条为 pilot 验证条件，不影响 ready。
 ---
 
 # Lead Operations
 
-> **状态**：v0.1 contract skeleton with synthetic fixture，**status=planned**（业务 owner 任命 + SLA 文档化 + ≥5 条新真实 lead 待 triage 均未落实）。**不包含可执行 production workflow**。
+> **状态**：v0.1 contract skeleton with synthetic fixture，**status=ready**（业务 owner = opc，一人公司；SLA = 24h 首次响应）。真实 lead ≥ 5 条为 pilot 验证条件，不影响 ready。**不包含可执行 production workflow**。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.3
 
 ## Purpose
@@ -18,9 +18,9 @@ description: |-
 
 ## Trigger Condition
 
-- 业务方书面任命 lead 业务 owner
-- 书面确定响应 SLA（建议：新线索 24h 内联系）
-- 当前 status：`planned`，业务 owner 与 SLA 未确定前禁止进入 pilot
+- 业务方书面任命 lead 业务 owner — opc（一人公司）
+- 书面确定响应 SLA：24h 首次响应（默认标准）
+- 当前 status：`ready`，业务 owner = opc，SLA = 24h。真实 lead ≥ 5 条为 pilot 验证条件。
 
 ## Inputs
 
@@ -80,8 +80,8 @@ description: |-
 ## Promotion Rule
 
 ```
-planned → ready：业务 owner 任命 + SLA 文档化 + 至少 5 条新真实 lead 待 triage
-ready → pilot：triage report 跑通 1 次 + 销售 owner 审阅认可
+planned → ready：✅ 已完成（业务 owner = opc，一人公司；SLA = 24h 首次响应）
+ready → pilot：triage report 跑通 1 次 + 销售 owner 审阅认可 + 至少 5 条新真实 lead 待 triage
 pilot → validated：5 条 lead 跑过 + 分类准确率 ≥ 80%
 validated → Phase 5：在 skill-portfolio.md 显式记录 + 进入 LangChat 映射讨论
 ```

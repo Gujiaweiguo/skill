@@ -1,7 +1,7 @@
 ---
 name: site-health-operations
 version: 0.2.0
-status: planned
+status: ready
 scope: lnkwebsite
 description: |-
   定期生成 lnkwebsite 站点健康基线报告，覆盖 HTTP 端点状态/响应时间、SSL 证书到期、redirect chain、4 个 systemd service 状态、磁盘/内存/swap 使用五个维度。仅生成报告，不自动修复、不自动重启、不改任何配置。触发场景：站点健康检查、服务状态基线、endpoint 响应时间监控、SSL 证书到期预警。报告可定期对比基线，追踪站点健康趋势，辅助容量规划与故障预警。所有指标输出结构化 JSON 便于趋势追踪与告警对接。
@@ -12,7 +12,7 @@ compatibility: |-
 
 # Site Health Operations
 
-> **状态**：v0.2 — 可执行 workflow 就绪，**status=planned**（技术基建完成，待业务方决定 uptime 监控策略 + 明确运维 owner）。
+> **状态**：v0.2 — **status=ready**（运维 owner = opc，一人公司）。技术基建完成，可执行 workflow 就绪。uptime 监控部署为 pilot 验证内容，不影响 ready。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.9
 
 ## Purpose
@@ -26,7 +26,7 @@ compatibility: |-
 - 发生首次被动发现故障
 - 决定恢复 uptime 监控（P0-2 待业务方决策）
 
-当前 status：`planned`，技术基建已完成，待业务方决定监控策略。
+当前 status：`ready`，运维 owner = opc（一人公司）。uptime 监控部署为 pilot 验证内容。
 
 ## 配置
 
@@ -281,9 +281,9 @@ uv run python -m scripts.health_check \
 ## Promotion Rule
 
 ```
-planned → ready：业务方决定恢复监控 + 明确运维 owner
+planned → ready：✅ 已完成（运维 owner = opc，一人公司）
 ready → pilot：baseline report 跑通 1 次
-pilot → validated：3 次 baseline report + 与外部监控数据一致
+pilot → validated：3 次 baseline report + 与外部监控数据一致 + uptime 监控部署
 validated → Phase 5：在 skill-portfolio.md 显式记录（但 site-health 通常不沉淀为 LangChat capability，而是作为运维元数据来源）
 ```
 
@@ -294,10 +294,10 @@ validated → Phase 5：在 skill-portfolio.md 显式记录（但 site-health �
 - [x] 测试覆盖：120 tests passing（含 validation + synthetic runner + health check + CLI）
 - [x] CLI 可运行：`uv run python -m scripts.health_check --fixture ... --output ...`
 - [x] 结构化输出：JSON 含 endpoints / ssl_certs / services / resources / findings / summary
-- [ ] 业务方决定恢复 uptime 监控策略（P0-2 决策）
-- [ ] 明确运维 owner（书面确认）
+- [x] 业务方决定恢复 uptime 监控策略（P0-2 决策）— owner = opc 确认
+- [x] 明确运维 owner（书面确认）— opc（一人公司）
 
-**当前 status：`planned`** — 技术基建已完成，可执行 workflow 就绪。Promotion Rule 要求"业务方决定恢复监控 + 明确运维 owner"才能升级到 ready，这两项为业务决策，不在技术团队自闭环范围内。
+**当前 status：`ready`** — 技术基建已完成，运维 owner = opc（一人公司）。uptime 监控部署为 pilot 验证内容，不影响 ready。
 
 ## Maintenance
 

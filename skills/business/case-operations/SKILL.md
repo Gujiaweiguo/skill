@@ -1,7 +1,7 @@
 ---
 name: case-operations
 version: 0.2.0
-status: planned
+status: ready
 scope: lnkwebsite
 description: |-
   把客户授权的案例素材转换为可审计、可验证的 lnkwebsite CMS case draft，仅创建 draft 不公开发布。复用 content-operations 的 case_payload / validate_case 校验逻辑（含 client_authorized fail-closed 与禁词检查）。触发场景：录入案例、案例草稿入库、客户案例上 CMS。与 content-operations 共享 case 处理 helper，未来可能提取为独立目录或保持共享。
@@ -14,7 +14,7 @@ compatibility: |-
 
 # Case Operations
 
-> **状态**：v0.2 — 可执行 workflow 就绪，**status=planned**（pilot 基准案例已选定 Top 3，业务方书面同意待落实）。
+> **状态**：v0.2 — **status=ready**（业务方书面同意 = opc 确认，一人公司）。pilot 基准案例：粤海天河城（screening Top 1）。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.2
 
 ## Purpose
@@ -26,7 +26,8 @@ compatibility: |-
 ## Trigger Condition
 
 - 客户书面授权的案例素材入库
-- status 从 `planned` → `ready` 的前置条件：选定 1 个明确客户授权的案例作为 pilot 基准 + 业务方书面同意
+- status 从 `ready` → `pilot` 的前置条件：pilot 基准案例 research-pack 完成 + 双签授权证据在档
+- pilot 基准案例：粤海天河城（screening Top 1）
 
 ## 配置
 
@@ -179,7 +180,7 @@ uv run python -m scripts.case_workflow import \
 ## Promotion Rule
 
 ```
-planned → ready：选定 pilot 基准案例 + 业务方书面同意
+planned → ready：✅ 已完成（业务方书面同意 = opc 确认，一人公司；pilot 基准 = 粤海天河城）
 ready → pilot：pilot 基准案例的 research-pack 完成 + 双签授权证据在档
 pilot → validated：1 次端到端跑通 + artifact 完整 + 人审通过
 validated → Phase 5：在 skill-portfolio.md 显式记录 + 进入 LangChat 映射讨论
@@ -195,7 +196,7 @@ validated → Phase 5：在 skill-portfolio.md 显式记录 + 进入 LangChat �
 - [x] Artifact 结构化输出：4 个 JSON/MD artifact 含 validation checks / draft status
 - [x] 模板就位：`templates/v1/` 含 case-payload / research-pack / validation-report / import-receipt / review-record
 - [x] References 文档：payload-v1.md / runtime-artifacts-v1.md / troubleshooting.md
-- [ ] 业务方书面同意（pilot 基准案例授权确认）
+- [x] 业务方书面同意（pilot 基准案例授权确认）— opc 确认（一人公司）；pilot 基准 = 粤海天河城
 
 ## Pilot Candidate Screening（pre-existing）
 

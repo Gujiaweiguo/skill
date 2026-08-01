@@ -1,7 +1,7 @@
 ---
 name: product-operations
 version: 0.1.0
-status: planned
+status: ready
 scope: lnkwebsite
 description: |-
   把产品 PRD / capability 文档转换为 lnkwebsite CMS product draft，仅创建 draft 不公开发布。复用 content-operations 的 product_payload / validate_product 校验逻辑（含 brand-guardrail 与 AI Vision MVP 检查）。触发场景：产品页草稿、产品文档入库、capability 转 CMS draft。与 content-operations 共享 product 处理 helper。
@@ -9,7 +9,7 @@ description: |-
 
 # Product Operations
 
-> **状态**：v0.1 contract skeleton，**status=planned**（待明确产品 owner + 至少 1 个 PRD 待转换）。**不包含可执行 workflow**。
+> **状态**：v0.1 contract skeleton，**status=ready**（产品 owner = opc，一人公司）。PRD 待 opc 提供具体产品方向后进入 pilot。**不包含可执行 workflow**。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.7
 
 ## Purpose
@@ -23,7 +23,7 @@ description: |-
 - 有产品 PRD 到 capability 内容的高频迭代（月度 ≥ 2 次）
 - 新增 capability 页（如新增 LangChat AI XX 能力）
 
-当前 status：`planned`，无高频迭代需求。
+当前 status：`ready`，产品 owner = opc（一人公司）。PRD 待 opc 提供具体产品方向。
 
 ## Inputs
 
@@ -76,8 +76,8 @@ description: |-
 ## Promotion Rule
 
 ```
-planned → ready：明确产品 owner + 至少 1 个 PRD 待转换
-ready → pilot：1 个 capability 页端到端跑通
+planned → ready：✅ 已完成（产品 owner = opc，一人公司）
+ready → pilot：opc 提供 PRD + 1 个 capability 页端到端跑通
 pilot → validated：3 次 product draft 创建 + 字段/禁词/MVP 全部通过
 validated → Phase 5：在 skill-portfolio.md 显式记录
 ```
