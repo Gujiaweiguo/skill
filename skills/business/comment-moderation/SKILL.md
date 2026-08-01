@@ -4,12 +4,12 @@ version: 0.1.0
 status: planned
 scope: lnkwebsite
 description: |-
-  读取 lnkwebsite comments 表中 status=pending 的评论，做风险标记与审核建议，生成可审计的 triage report。不执行任何 approve/reject/delete 动作，所有审核决定由审核员人工做出。触发场景：审核评论、评论分诊、pending 评论风险扫描。本 skill 为 planned 状态的 contract skeleton，包含 payload 校验与 synthetic fixture，不含真实 I/O。
+  读取 lnkwebsite comments 表中 status=pending 的评论，做风险标记与审核建议，生成可审计的 triage report。不执行任何 approve/reject/delete 动作，所有审核决定由审核员人工做出。触发场景：审核评论、评论分诊、pending 评论风险扫描。本 skill 为 planned 状态，包含 payload 校验、synthetic fixture、risk engine、triage CLI 和 MCP reader。workflow 可通过 fixture 模式端到端执行，但未连接真实 CMS。
 ---
 
 # Comment Moderation
 
-> **状态**：v0.1 contract skeleton。**不包含可执行 workflow**。
+> **状态**：v0.1 — workflow 可通过 fixture 模式端到端执行，未连接真实 CMS。
 > **生命周期登记**：见 `lnkwebsite/docs/strategy/dogfooding/skill-portfolio.md` §2.6
 
 ## Purpose

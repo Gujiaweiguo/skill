@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol, cast
 
+from scripts.risk_engine import TriageItem, assess_batch
 from scripts.validate import SYNTHETIC_TEST_MODE, ValidationResult, validate_comment_payload
 
 
@@ -59,81 +60,9 @@ class MockMCPProtocol(Protocol):
         ...
 
 
-@dataclass
-class CommentTriageItem:
-    """A single triaged comment entry."""
-
-    comment_id: int
-    risk_level: str
-    risk_flags: list[str]
-    moderation_suggestion: str
-    human_review_required: bool
-
-    def to_dict(self) -> dict[str, object]:
-        """Serialise to a plain dict."""
-        return {
-            "comment_id": self.comment_id,
-            "risk_level": self.risk_level,
-            "risk_flags": self.risk_flags,
-            "moderation_suggestion": self.moderation_suggestion,
-            "auto_actions_taken": [],
-            "human_review_required": self.human_review_required,
-        }
-
-
-def _assess_risk(comment: dict[str, object]) -> CommentTriageItem:
-    """Assess risk level and generate moderation suggestion."""
-    content = str(comment.get("content", ""))
-    comment_id = cast("int", comment.get("comment_id", 0))
-
-    risk_flags: list[str] = []
-    risk_level = "low"
-
-    # Check for forbidden terms
-    for term in (
-        "\u89e3\u51b3\u65b9\u6848",
-        "\u6570\u5b57\u8425\u9500",
-        "\u65b0\u96f6\u552e",
-        "\u65b0\u5546\u4e1a",
-        "\u65b0\u8425\u9500",
-        "\u65b0\u6d88\u8d39",
-    ):
-        if term in content:
-            risk_flags.append(f"forbidden_term:{term}")
-            risk_level = "high"
-
-    # Check for absolute marketing phrases
-    absolute_markers = (
-        "\u6700\u9886\u5148", "\u552f\u4e00", "\u9065\u9065\u9886\u5148",
-        "\u884c\u4e1a\u7b2c\u4e00", "\u5168\u56fd\u7b2c\u4e00", "\u5168\u7403\u7b2c\u4e00",
-    )
-    for marker in absolute_markers:
-        if marker in content:
-            risk_flags.append(f"absolute_phrase:{marker}")
-            if risk_level != "high":
-                risk_level = "medium"
-
-    # Check for URLs in content (potential spam)
-    if "http" in content:
-        risk_flags.append("contains_url")
-        if risk_level == "low":
-            risk_level = "medium"
-
-    # Determine moderation suggestion
-    suggestion = "approve"
-    human_review = True
-    if risk_level == "high":
-        suggestion = "reject"
-    elif risk_level == "medium":
-        suggestion = "review"
-
-    return CommentTriageItem(
-        comment_id=comment_id,
-        risk_level=risk_level,
-        risk_flags=risk_flags,
-        moderation_suggestion=suggestion,
-        human_review_required=human_review,
-    )
+# CommentTriageItem and _assess_risk are now in scripts.risk_engine
+# as TriageItem and assess_risk, re-exported here for backward compat.
+CommentTriageItem = TriageItem
 
 
 @dataclass
@@ -196,12 +125,14 @@ def run_synthetic_fixture(
     mcp_calls = mock_mcp.get_call_tools()
 
     # Also exercise comment_get for each comment
-    triage_items: list[CommentTriageItem] = []
+    triage_items: list[TriageItem] = []
     for comment in comments:
-        cid = cast("int", comment.get("comment_id", 0))
+        cid = cast("int", comment.get("comment_id", comment.get("id", 0)))
         fetched = mock_mcp.comment_get(cid)
         if fetched is not None:
-            triage_items.append(_assess_risk(fetched))
+            triage_items.append(
+                assess_batch([fetched])[0],
+            )
     mcp_calls = mock_mcp.get_call_tools()
 
     # 3. Verify no forbidden calls
