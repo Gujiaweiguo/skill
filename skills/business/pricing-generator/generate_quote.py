@@ -893,7 +893,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--date", default=None,
                    help="报价日期 YYYYMMDD（默认今天）")
     p.add_argument("--devkit", default=None,
-                   help="可选：requirement-evaluator 二开清单路径（v1 暂未启用）")
+                   help="可选：requirement-evaluator 需求评估报告路径（.md，parse_devkit 解析二开项表格）")
     p.add_argument("--positions", type=int, default=3,
                    help="AI Skills 岗位数（仅 --product AI 有效，默认 3，范围 2-6）")
     args = p.parse_args(argv)

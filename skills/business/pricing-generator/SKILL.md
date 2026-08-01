@@ -69,7 +69,7 @@ compatibility: >
 
 | 产品 | 功能清单路径 | 说明 |
 |---|---|---|
-| MI / 商管系统 | `$PRD_DIR/商管系统/output/功能清单.md` | 345 项功能 |
+| MI / 商管系统 | `$LANLNK_BASE/30-products/mi-cre/feature-baseline/feature-baseline.yaml` | 270 项功能（document-control-plane 迁移后权威位置） |
 | CRM / 会员系统 | `$MATERIALS_DIR/03-products/CRM会员系统功能清单.md` | 会员 CRM 功能 |
 
 > 若功能清单不存在，提示用户先运行 product-prd-generator 生成。
@@ -182,7 +182,7 @@ P5: 输出报价单 → 标准产品 + 可选二开 + 方案对比 + 服务说�
 
 ### 1.2 整理方法
 
-读产品功能清单（345 项 flat 列表），按业务模块归类：
+读产品功能清单（270 项 flat 列表），按业务模块归类：
 
 **模块划分原则**：
 - 按业务域归类（招商/资源/合同/计费/运营/物业/报表/移动端/系统管理）

@@ -58,7 +58,7 @@ compatibility: >
 
 | 产品代号 | 功能清单路径 | 说明 |
 |---|---|---|
-| MI / 商管系统 | `$PRD_DIR/商管系统/output/功能清单.md` | 345 项功能，含 existing/missing 状态 |
+| MI / 商管系统 | `$LANLNK_BASE/30-products/mi-cre/feature-baseline/feature-baseline.yaml` | 270 项功能（208 existing / 60 missing），yaml 格式（document-control-plane 迁移后权威位置） |
 | CRM / 会员系统 | `$MATERIALS_DIR/03-products/CRM会员系统功能清单.md` | 会员 CRM 功能 |
 | AI Skills | `$MATERIALS_DIR/11-cre-ai-skills/02_机会与产品/岗位 AI Skills 增强性与摩擦消除分析矩阵.md` | AI 岗位 Skill 能力 |
 
