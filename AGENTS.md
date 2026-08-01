@@ -384,7 +384,7 @@ subprocess.run(
 |---|---|
 | `material-importer/references/domain-tags.md` | material-importer (owner), product-prd-generator, compound-learning |
 | `product-prd-generator/references/term-aliases.yaml` | product-prd-generator (owner), competitor-product-analyzer |
-| `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md` | product-prd-generator (商管 project only; 域知识跟着项目走，不放 skill 目录), competitor-product-analyzer, strategy-brief-generator, compound-learning |
+| `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md` | product-prd-generator (商管 project only; 域知识跟着项目走，不放 skill 目录), competitor-product-analyzer |
 | `$LANLNK_BASE/config/ontology/business-ontology.yaml` | product-prd-generator (runtime dependency), competitor-product-analyzer |
 
 > 此表与 `references/scripts/check_docs_consistency.sh` 的 `SHARED_FILES` 数组是**双 source of truth**——改一边必须同步另一边，跑 `check_docs_consistency.sh` 验证。Aspirational readers（"将来应该读但还没接"）不要写进此表，写到 skill 自身的 roadmap/TODO 里，避免 agent 读了做错误假设。

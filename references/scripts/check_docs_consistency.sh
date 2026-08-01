@@ -65,7 +65,7 @@ print_result() {
 SHARED_FILES=(
   "skills/business/material-importer/references/domain-tags.md|material-importer,product-prd-generator,compound-learning"
   "skills/business/product-prd-generator/references/term-aliases.yaml|product-prd-generator,competitor-product-analyzer"
-  "$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md|product-prd-generator,competitor-product-analyzer,strategy-brief-generator,compound-learning"
+  "$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md|product-prd-generator,competitor-product-analyzer"
   "$LANLNK_BASE/config/ontology/business-ontology.yaml|product-prd-generator,competitor-product-analyzer"
 )
 
