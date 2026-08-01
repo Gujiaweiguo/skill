@@ -1,0 +1,8 @@
+{
+  "contract_version": "0.1.0",
+  "decision": "approved",
+  "client_authorized": true,
+  "gate1_business_approval": "pending",
+  "gate2_editorial_approval": "pending",
+  "source_research_pack": "/path/to/research-pack.md"
+}

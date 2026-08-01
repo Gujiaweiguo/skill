@@ -1,0 +1,20 @@
+{
+  "skill": "case-operations",
+  "skill_version": "0.1.0",
+  "mode": "synthetic-test",
+  "timestamp": 0,
+  "valid": true,
+  "errors": [],
+  "warnings": [],
+  "checks": {
+    "field_completeness": true,
+    "client_authorized": true,
+    "forbidden_terms": true,
+    "absolute_terms": true,
+    "no_forbidden_actions": true,
+    "fixture_mode_safe": true,
+    "no_payload_execution_mode": true
+  },
+  "mcp_calls": ["case_create"],
+  "forbidden_calls_detected": false
+}

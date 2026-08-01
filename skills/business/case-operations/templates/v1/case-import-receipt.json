@@ -1,0 +1,10 @@
+{
+  "skill": "case-operations",
+  "fixture": true,
+  "mcp_tool": "case_create",
+  "draft_id": "fixture-case-001",
+  "draft_status": "draft",
+  "timestamp": 0,
+  "mcp_calls": ["case_create"],
+  "forbidden_calls": []
+}

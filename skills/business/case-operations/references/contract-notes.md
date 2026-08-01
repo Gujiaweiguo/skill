@@ -1,14 +1,11 @@
-# Contract Notes (v0.1 placeholder)
+# Contract Notes
 
-> This directory will hold reference documents for the **case-operations** skill.
->
-> **Current state**: v0.1 contract skeleton. No executable workflow yet.
+> Case operations skill — v0.2 可执行 workflow 就绪。
 
-## Planned references (when skill promotes to ready/pilot)
+## Status history
 
-- `payload-v1.md` — payload schema (when validated)
-- `runtime-artifacts-v1.md` — artifact path conventions (when validated)
-- `troubleshooting.md` — operational pitfalls (after pilot)
+- 2026-07-24: contract skeleton created (status=planned)
+- 2026-08-01: executable workflow added — screening / validate / generate / import CLI, templates, references, 81 tests passing. status 保持 planned（业务方书面同意待落实）
 
 ## Cross-references
 
@@ -17,6 +14,8 @@
 - Phase 5 mapping plan: `/opt/code/lnkwebsite/docs/strategy/dogfooding/phase5-mapping-plan.md`
 - OpenSpec change: `define-website-operations-skill-portfolio`
 
-## Status history
+## Shared modules
 
-- 2026-07-24: contract skeleton created (status=planned)
+- `content-operations/scripts/case_payload.py` — core payload parsing + forbidden terms
+- `content-operations/scripts/validate_case.py` — CLI validator (shared)
+- `case-operations/scripts/content_ops_loader.py` — runtime loader for shared parser
