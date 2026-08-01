@@ -251,6 +251,24 @@ def test_markdown_to_html_strips_whitespace() -> None:
     assert not html.endswith(" ")
 
 
+def test_markdown_to_html_strips_yaml_front_matter() -> None:
+    """Front matter (--- ... ---) must not appear in the HTML output."""
+    source = (
+        "---\n"
+        "contract_version: \"1.0.0\"\n"
+        "content_id: \"test\"\n"
+        "---\n"
+        "\n"
+        "## 定义\n\n"
+        "这是正文内容。\n"
+    )
+    html = convert_markdown_to_html(source)
+    assert html.startswith("<h2>"), f"expected <h2>, got: {html[:50]}"
+    assert "contract_version" not in html
+    assert "content_id" not in html
+    assert "---" not in html
+
+
 # ── Case payload ──────────────────────────────────────
 
 

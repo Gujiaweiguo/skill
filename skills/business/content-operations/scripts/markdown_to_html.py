@@ -4,6 +4,9 @@ Converts the Markdown subset used by Content Operations Pattern Drafts into
 clean HTML suitable for the lnkwebsite CMS Article body field. Uses the
 ``markdown`` library with fenced code, tables, and smart extensions enabled.
 
+Strips YAML front matter (``---`` delimited block at the start of the file)
+before conversion so that Pattern Draft metadata is not emitted into HTML.
+
 Supports: ATX headers (## ###), bold/italic, ordered/unordered lists,
 blockquotes, inline code, fenced code blocks, tables, horizontal rules,
 and links. Converts ``「」`` to ``<em>`` for emphasis where present.
@@ -15,6 +18,7 @@ or custom syntax extensions. Pattern Drafts should not rely on these.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 from typing import Final
@@ -28,9 +32,21 @@ _EXTENSIONS: Final = (
     "sane_lists",
 )
 
+# Matches a YAML front matter block at the very start of a file:
+#   ---\n...\n---\n
+_FRONT_MATTER_RE: Final = re.compile(r"\A---\r?\n.*?\r?\n---\r?\n", re.DOTALL)
+
+
+def _strip_front_matter(markdown_text: str) -> str:
+    """Remove a leading YAML front matter block if present."""
+    return _FRONT_MATTER_RE.sub("", markdown_text)
+
 
 def convert_markdown_to_html(markdown_text: str) -> str:
     """Convert Pattern Draft Markdown to CMS-ready HTML.
+
+    Strips YAML front matter before conversion so metadata is not emitted
+    into the HTML body.
 
     Args:
         markdown_text: Source Markdown from a Pattern Draft body.
@@ -39,8 +55,9 @@ def convert_markdown_to_html(markdown_text: str) -> str:
         HTML string with no surrounding ``<html>`` or ``<body>`` tags.
 
     """
+    cleaned = _strip_front_matter(markdown_text)
     converter = md.Markdown(extensions=list(_EXTENSIONS))
-    html = converter.convert(markdown_text.strip())
+    html = converter.convert(cleaned.strip())
     return html.strip()
 
 
