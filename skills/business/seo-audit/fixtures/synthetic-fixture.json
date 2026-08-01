@@ -2,23 +2,62 @@
   "fixture": true,
   "audit_scope": "full",
   "audit_date": "2026-07-24",
+  "sitemap_url": "https://lanlnk.cn/sitemap.xml",
+  "robots_url": "https://lanlnk.cn/robots.txt",
+  "known_urls": [
+    "https://lanlnk.cn/",
+    "https://lanlnk.cn/capabilities",
+    "https://lanlnk.cn/cases",
+    "https://lanlnk.cn/about",
+    "https://lanlnk.cn/contact"
+  ],
+  "pages": [
+    {
+      "url": "https://lanlnk.cn/",
+      "html": "<!DOCTYPE html><html><head><title>LANLNK - 智能物业运营平台</title><meta name=\"description\" content=\"LANLNK 为物业管理企业提供数字化运营工具，覆盖报修、巡检、计费等核心场景。\"><meta name=\"robots\" content=\"index,follow\"><link rel=\"canonical\" href=\"https://lanlnk.cn/\"><meta property=\"og:title\" content=\"LANLNK - 智能物业运营平台\"><meta property=\"og:description\" content=\"LANLNK 为物业管理企业提供数字化运营工具\"><meta property=\"og:image\" content=\"https://lanlnk.cn/og/home.png\"><script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"Organization\",\"name\":\"LANLNK\",\"url\":\"https://lanlnk.cn\"}</script></head><body><h1>智能物业运营平台</h1></body></html>"
+    },
+    {
+      "url": "https://lanlnk.cn/capabilities",
+      "html": "<!DOCTYPE html><html><head><title>核心能力 - LANLNK</title><meta name=\"description\" content=\"探索 LANLNK 运营平台的核心能力模块，包括报修管理、设备巡检、能源计量等。\"><meta name=\"robots\" content=\"index,follow\"><link rel=\"canonical\" href=\"https://lanlnk.cn/capabilities\"><meta property=\"og:title\" content=\"核心能力 - LANLNK\"><meta property=\"og:description\" content=\"探索核心能力模块\"><meta property=\"og:image\" content=\"https://lanlnk.cn/og/capabilities.png\"><script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"WebPage\",\"name\":\"核心能力\",\"url\":\"https://lanlnk.cn/capabilities\"}</script></head><body><h1>核心能力</h1></body></html>"
+    },
+    {
+      "url": "https://lanlnk.cn/cases",
+      "html": "<!DOCTYPE html><html><head><title>客户案例 - LANLNK</title><meta name=\"description\" content=\"查看 LANLNK 客户的实际案例与落地成果。\"><meta name=\"robots\" content=\"index,follow\"><link rel=\"canonical\" href=\"https://lanlnk.cn/cases\"><meta property=\"og:title\" content=\"客户案例 - LANLNK\"><meta property=\"og:description\" content=\"客户案例与落地成果\"><meta property=\"og:image\" content=\"https://lanlnk.cn/og/cases.png\"><script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"ItemList\",\"name\":\"客户案例\"}</script></head><body><h1>客户案例</h1></body></html>"
+    },
+    {
+      "url": "https://lanlnk.cn/about",
+      "html": "<!DOCTYPE html><html><head><title>关于我们 - LANLNK</title><meta name=\"description\" content=\"了解 LANLNK 团队、使命与愿景。\"><meta name=\"robots\" content=\"index,follow\"><link rel=\"canonical\" href=\"https://lanlnk.cn/about\"><meta property=\"og:title\" content=\"关于我们 - LANLNK\"><meta property=\"og:description\" content=\"了解 LANLNK 团队\"><meta property=\"og:image\" content=\"https://lanlnk.cn/og/about.png\"><script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"AboutPage\",\"name\":\"关于我们\"}</script></head><body><h1>关于 LANLNK</h1></body></html>"
+    },
+    {
+      "url": "https://lanlnk.cn/contact",
+      "html": "<!DOCTYPE html><html><head><title>联系我们 - LANLNK</title><meta name=\"description\" content=\"联系 LANLNK 团队，获取产品演示与咨询。\"><meta name=\"robots\" content=\"index,follow\"><link rel=\"canonical\" href=\"https://lanlnk.cn/contact\"><meta property=\"og:title\" content=\"联系我们 - LANLNK\"><meta property=\"og:description\" content=\"联系 LANLNK 团队\"><meta property=\"og:image\" content=\"https://lanlnk.cn/og/contact.png\"><script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"ContactPage\",\"name\":\"联系我们\"}</script></head><body><h1>联系方式</h1></body></html>"
+    },
+    {
+      "url": "https://lanlnk.cn/duplicate-title",
+      "html": "<!DOCTYPE html><html><head><title>LANLNK - 智能物业运营平台</title><meta name=\"description\" content=\"重复页面用于测试。\"><meta name=\"robots\" content=\"index,follow\"><link rel=\"canonical\" href=\"https://lanlnk.cn/duplicate-title\"><meta property=\"og:title\" content=\"重复页面\"><meta property=\"og:description\" content=\"重复页面\"><meta property=\"og:image\" content=\"https://lanlnk.cn/og/dup.png\"></head><body><h1>测试页面</h1></body></html>"
+    },
+    {
+      "url": "https://lanlnk.cn/broken-page",
+      "html": "<!DOCTYPE html><html><head></head><body></body></html>"
+    }
+  ],
   "sitemap": {
-    "total_urls": 53,
+    "total_urls": 5,
     "entries": [
-      {"loc": "https://www.lnkwebsite.com/", "lastmod": "2026-07-20", "priority": "1.0"},
-      {"loc": "https://www.lnkwebsite.com/capabilities", "lastmod": "2026-07-18", "priority": "0.8"},
-      {"loc": "https://www.lnkwebsite.com/cases", "lastmod": "2026-07-19", "priority": "0.8"},
-      {"loc": "https://www.lnkwebsite.com/about", "lastmod": "2026-07-15", "priority": "0.5"},
-      {"loc": "https://www.lnkwebsite.com/contact", "lastmod": "2026-07-10", "priority": "0.5"}
+      {"loc": "https://lanlnk.cn/", "lastmod": "2026-07-20", "priority": "1.0"},
+      {"loc": "https://lanlnk.cn/capabilities", "lastmod": "2026-07-18", "priority": "0.8"},
+      {"loc": "https://lanlnk.cn/cases", "lastmod": "2026-07-19", "priority": "0.8"},
+      {"loc": "https://lanlnk.cn/about", "lastmod": "2026-07-15", "priority": "0.5"},
+      {"loc": "https://lanlnk.cn/contact", "lastmod": "2026-07-10", "priority": "0.5"}
     ],
     "missing_urls": [],
     "broken_urls": []
   },
   "canonical": {
     "page_canonicals": [
-      {"page": "homepage", "url": "https://www.lnkwebsite.com/", "canonical": "https://www.lnkwebsite.com/"},
-      {"page": "capabilities", "url": "https://www.lnkwebsite.com/capabilities", "canonical": "https://www.lnkwebsite.com/capabilities"},
-      {"page": "cases", "url": "https://www.lnkwebsite.com/cases", "canonical": "https://www.lnkwebsite.com/cases"}
+      {"page": "homepage", "url": "https://lanlnk.cn/", "canonical": "https://lanlnk.cn/"},
+      {"page": "capabilities", "url": "https://lanlnk.cn/capabilities", "canonical": "https://lanlnk.cn/capabilities"},
+      {"page": "cases", "url": "https://lanlnk.cn/cases", "canonical": "https://lanlnk.cn/cases"}
     ],
     "inconsistencies": []
   },
@@ -28,19 +67,18 @@
   },
   "meta": {
     "page_titles": [
-      {"page": "homepage", "title": "LNK Digital - Enterprise Operations Platform"},
-      {"page": "capabilities", "title": "Core Capabilities - LNK Digital"},
-      {"page": "cases", "title": "Client Case Studies - LNK Digital"}
+      {"page": "homepage", "title": "LANLNK - 智能物业运营平台"},
+      {"page": "capabilities", "title": "核心能力 - LANLNK"},
+      {"page": "cases", "title": "客户案例 - LANLNK"}
     ],
     "page_descriptions": [
-      {"page": "homepage", "description": "Enterprise-grade digital operations platform for property management."},
-      {"page": "capabilities", "description": "Explore the core capabilities of the LNK operations platform."},
-      {"page": "cases", "title": "Real-world case studies demonstrating measurable client outcomes."}
+      {"page": "homepage", "description": "LANLNK 为物业管理企业提供数字化运营工具，覆盖报修、巡检、计费等核心场景。"},
+      {"page": "capabilities", "description": "探索 LANLNK 运营平台的核心能力模块，包括报修管理、设备巡检、能源计量等。"}
     ],
     "duplicate_titles": [],
     "duplicate_descriptions": []
   },
   "redirects": [
-    {"source": "https://gzshopex.com", "target": "https://www.lnkwebsite.com", "status": 301}
+    {"source": "https://gzshopex.com", "target": "https://lanlnk.cn", "status": 301}
   ]
 }

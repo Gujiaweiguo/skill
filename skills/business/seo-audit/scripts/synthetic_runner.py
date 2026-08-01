@@ -1,9 +1,9 @@
 """Reusable synthetic-test runner for seo-audit.
 
 Receives a fixture payload, an injected mock MCP server, and a temp
-artifact directory.  Validates the payload, calls mock read-only MCP
-tools (``redirect_list``, ``url_check``), and generates the 3 required
-artifacts.
+artifact directory. Validates the payload, calls mock read-only MCP
+tools (``redirect_list``, ``url_check``), runs the SEO audit engine
+on fixture pages, and generates the required artifacts.
 
 Security:
 - Only operates in synthetic-test mode (caller must pass
@@ -23,6 +23,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+from scripts.seo_audit_runner import (
+    PageRecord,
+    SEOAuditRunner,
+    parse_html,
+)
 from scripts.validate import SYNTHETIC_TEST_MODE, ValidationResult, validate_audit_payload
 
 
@@ -85,18 +90,39 @@ class SyntheticRunResult:
         }
 
 
-def _build_drift_report(
-    payload: dict[str, object], redirects: list[dict[str, str]],
+def _build_seo_drift_report(
+    payload: dict[str, object],
+    redirects: list[dict[str, str]],
 ) -> dict[str, object]:
-    """Build the SEO drift report from payload and redirect data."""
-    return {
-        "audit_date": str(payload.get("audit_date", "")),
-        "sitemap": payload.get("sitemap", {}),
-        "canonical": payload.get("canonical", {}),
-        "structured_data": payload.get("structured_data", {}),
-        "meta": payload.get("meta", {}),
-        "redirects": redirects,
-    }
+    """Build the SEO drift report from fixture pages and redirect data.
+
+    Parses fixture HTML pages through the SEO audit engine to produce
+    real findings rather than just echoing fixture data.
+    """
+    pages = payload.get("pages", [])
+    if not isinstance(pages, list):
+        pages = []
+
+    records: list[PageRecord] = []
+    for item in pages:
+        if not isinstance(item, dict):
+            continue
+        html = item.get("html", "")
+        url = item.get("url", "")
+        if isinstance(html, str) and html:
+            record = parse_html(html, url=str(url))
+        else:
+            record = PageRecord(url=str(url))
+        records.append(record)
+
+    # Use SEOAuditRunner in full scope to generate real findings
+    audit_scope = str(payload.get("audit_scope", "full"))
+    runner = SEOAuditRunner(audit_scope=audit_scope, site="lanlnk.cn")
+    report = runner.run(records)
+
+    result = report.to_dict()
+    result["redirects"] = redirects
+    return result
 
 
 def run_synthetic_fixture(
@@ -160,8 +186,8 @@ def run_synthetic_fixture(
     # 4. Generate 3 artifacts
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
-    # 4a. seo-drift-report.json
-    drift_report = _build_drift_report(payload, redirects)
+    # 4a. seo-drift-report.json (with real audit findings)
+    drift_report = _build_seo_drift_report(payload, redirects)
     (artifact_dir / "seo-drift-report.json").write_text(
         json.dumps(drift_report, indent=2, ensure_ascii=False),
         encoding="utf-8",
