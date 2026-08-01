@@ -569,7 +569,8 @@ uv run pytest tests/ -v
 - **Ontology sub_functions 必须与 field-specs 全局同步**：ontology 的 `sub_functions` 有旧名称而 field-specs 没有对应实体时，渲染器会产生**空 `####` 标题**（有标题无内容）。这不是报错而是静默问题。每次大改后应做全局同步检查：`ont_subs == spec_keys` for all modules。
 
 > 商管域专属已知限制（资产管理空壳/集团驾驶舱图表库缺失/销售五源模型）见 `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md`。
-- **多产品支持（2026-07-19 起）**：CLI 已支持 langchat / LnkChatBI / 未来的 CRM 等非商管产品自动生成 PRD。每个产品通过 `$LANLNK_BASE/out/prd/<project>/output/{ontology.yaml,term-aliases.yaml}` + `<skill>/references/code-map-rules-<project>.yaml` 三组配置实现项目级覆盖，缺失时回退到商管默认。新产品的 onboarding 流程见下方「添加新产品的步骤」章节。已落地的非商管样板：`$LANLNK_BASE/out/prd/{langchat,LnkChatBI}/output/`。
+- **多产品支持（2026-07-19 起，2026-08-01 三产品真实收官验证）**：CLI 已支持 langchat / LnkChatBI / 未来的 CRM 等非商管产品自动生成 PRD。每个产品通过项目级配置三件套（ontology.yaml + term-aliases.yaml + code-map-rules-<project>.yaml）实现覆盖，缺失时回退到商管默认。配置路径解析为三级 fallback（document-control-plane 迁移后）：`$LANLNK_BASE/30-products/<canonical-dir>/` → `$LANLNK_BASE/out/prd/<project>/output/`（legacy）→ 商管默认。新产品的 onboarding 流程见下方「添加新产品的步骤」章节。**已验证样板**：商管（`30-products/mi-cre/`）/ langchat（`30-products/langchat/`，2026-08-01 真实运行通过：8 模块全覆盖 / 0 商管污染 / 107 capabilities 归类）/ LnkChatBI（`out/prd/LnkChatBI/output/`，legacy 路径）。
+- **平台型产品素材分层原则（2026-08-01 实证）**：langchat 等「平台型」产品的 PRD 素材必须按**平台层 vs 业务层**分层。平台 PRD 只用平台层素材（产品架构图 / 术语口径 / v2-strategy 目标架构 / 代码 specs）；业务层素材（如商管岗位 AI Skill 解决方案——招商/营运/客服等）是「平台之上的行业应用」，归商管域，**不进平台 PRD 的 docs-root**。混层会导致 doc_map 把业务岗位需求错误归到平台模块，产出语义错乱的 PRD。详见 `/opt/code/docs/opencode/90-复利工程/更新日志.md` 2026-08-01 条目。
 
 ## 设计决策
 
