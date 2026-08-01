@@ -1,7 +1,8 @@
 """Synthetic-test runner for lead-operations.
 
 Read-only triage: loads fixture leads, calls mock ``lead_list`` /
-``lead_get``, generates a triage report artifact.
+``lead_get``, generates a triage report artifact using the production
+``LeadTriageRunner`` engine.
 
 Security:
 - Only operates in synthetic-test mode.
@@ -18,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+from scripts.lead_triage import LeadRecord, LeadTriageRunner, TriageReport
 from scripts.validate import SYNTHETIC_TEST_MODE, ValidationResult, validate_lead_payload
 
 
@@ -60,42 +62,20 @@ class SyntheticRunResult:
 
     valid: bool
     validation: ValidationResult
-    triage_entries: list[dict[str, object]]
-    mcp_calls: list[str]
+    triage_report: TriageReport | None = None
+    mcp_calls: list[str] = field(default_factory=list)
     artifact_paths: dict[str, Path] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, object]:
         """Serialise to a plain dict."""
         return {
             "valid": self.valid,
-            "triage_entries": self.triage_entries,
+            "triage_report": (
+                self.triage_report.to_dict() if self.triage_report else None
+            ),
             "mcp_calls": self.mcp_calls,
             "artifacts": {k: str(v) for k, v in self.artifact_paths.items()},
         }
-
-
-def _classify_lead(lead: dict[str, object]) -> dict[str, object]:
-    """Generate a triage suggestion for one lead."""
-    message = str(lead.get("message", ""))
-    source = str(lead.get("source", ""))
-
-    if "AI" in message or "智能" in message:
-        category = "high-priority-ai-solution"
-    elif "物业" in message:
-        category = "medium-priority-property-management"
-    elif source == "referral":
-        category = "medium-priority-referral"
-    else:
-        category = "standard"
-
-    return {
-        "lead_id": lead.get("id"),
-        "category_suggestion": category,
-        "follow_up_suggestion": "建议24h内联系(合成测试建议)",
-        "risk_flags": [],
-        "auto_actions_taken": [],
-        "human_review_required": True,
-    }
 
 
 def run_synthetic_fixture(
@@ -120,40 +100,40 @@ def run_synthetic_fixture(
     _assert_temp_dir(artifact_dir)
     ts = time.time()
 
+    # 1. Validate payload
     result = validate_lead_payload(
         payload, execution_mode=SYNTHETIC_TEST_MODE,
     )
     if not result.valid:
         return SyntheticRunResult(
             valid=False, validation=result,
-            triage_entries=[], mcp_calls=[],
+            mcp_calls=[],
         )
 
-    leads = mock_mcp.lead_list()
+    # 2. Fetch leads via mock MCP (read-only)
+    raw_leads = mock_mcp.lead_list()
     mcp_calls = mock_mcp.get_call_tools()
 
-    triage_entries: list[dict[str, object]] = []
-    for lead in leads:
-        raw_id = lead.get("id", 0)
+    # 3. Fetch details for each lead
+    leads: list[LeadRecord] = []
+    for raw in raw_leads:
+        raw_id = raw.get("id", 0)
         if isinstance(raw_id, int):
             detail = mock_mcp.lead_get(raw_id)
             if detail is not None:
-                triage_entries.append(_classify_lead(detail))
+                leads.append(LeadRecord.from_dict(detail))
 
     mock_mcp.assert_no_forbidden_calls()
 
+    # 4. Run triage engine
+    runner = LeadTriageRunner()
+    triage_report = runner.run(leads, mode=SYNTHETIC_TEST_MODE)
+
+    # 5. Write artifacts
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
     (artifact_dir / "lead-triage-report.json").write_text(
-        json.dumps({
-            "skill": "lead-operations",
-            "skill_version": "0.1.0",
-            "mode": SYNTHETIC_TEST_MODE,
-            "timestamp": ts,
-            "triage_entries": triage_entries,
-            "auto_actions_taken": [],
-            "human_review_required": True,
-        }, indent=2, ensure_ascii=False),
+        json.dumps(triage_report.to_dict(), indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
 
@@ -185,6 +165,6 @@ def run_synthetic_fixture(
 
     return SyntheticRunResult(
         valid=True, validation=result,
-        triage_entries=triage_entries,
+        triage_report=triage_report,
         mcp_calls=mcp_calls, artifact_paths=paths,
     )

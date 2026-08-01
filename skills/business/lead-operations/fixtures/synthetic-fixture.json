@@ -1,6 +1,6 @@
 {
   "fixture": true,
-  "lead_ids": [3, 4, 5],
+  "lead_ids": [3, 4, 5, 6, 7],
   "leads": [
     {
       "id": 3,
@@ -26,8 +26,26 @@
       "company": "虚构数字空间",
       "phone": "13800000005",
       "source": "website",
-      "message": "咨询 AI 问数产品（合成测试数据）",
+      "message": "咨询 AI 问数产品，想了解数字化转型的合作机会（合成测试数据）",
       "created_at": "2026-07-22T09:00:00Z"
+    },
+    {
+      "id": 6,
+      "name": "赵总（测试线索）",
+      "company": "虚构产业园运营",
+      "phone": "13800000006",
+      "source": "referral",
+      "message": "我们产业园需要一套智能化客服系统，希望合作（合成测试数据）",
+      "created_at": "2026-07-25T11:00:00Z"
+    },
+    {
+      "id": 7,
+      "name": "孙经理（测试线索）",
+      "company": "虚构写字楼管理",
+      "phone": "13800000007",
+      "source": "website",
+      "message": "写字楼数字化转型方案咨询（合成测试数据）",
+      "created_at": "2026-07-28T08:00:00Z"
     }
   ],
   "triage_context": "商业地产 / AI 客服 / 智慧物业"
