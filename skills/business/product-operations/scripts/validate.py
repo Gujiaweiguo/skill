@@ -181,13 +181,13 @@ def _check_capabilities(
         ))
         return errors
 
-    for idx, cap in enumerate(cast(list[object], caps)):
+    for idx, cap in enumerate(cast("list[object]", caps)):
         cap_field = f"capabilities[{idx}]"
         if not isinstance(cap, dict):
             errors.append(_error(cap_field, "invalid_type", "each capability must be a dict"))
             continue
 
-        cap_dict: dict[str, object] = cast(dict[str, object], cap)
+        cap_dict: dict[str, object] = cast("dict[str, object]", cap)
 
         if "name" not in cap_dict:
             errors.append(_error(cap_field, "missing", f"capability {idx} missing 'name'"))
