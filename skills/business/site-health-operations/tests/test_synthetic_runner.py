@@ -100,8 +100,17 @@ class TestRunnerMCPSafety:
         mock = MockMCPServer()
         with tempfile.TemporaryDirectory(prefix="site-health-ops-") as tmp:
             run_synthetic_fixture(fixture, mock, Path(tmp))
-        # Should call service_status for 4 services + endpoint_check for 3
-        assert len(mock.calls) == 7
+        # 4 services + 6 endpoints (homepage, www, openclaw, chatbi, api, sitemap)
+        svc_count = sum(
+            1 for name in fixture.get("services", {})
+            if isinstance(fixture.get("services", {}), dict)
+        )
+        ep_count = sum(
+            1 for name in fixture.get("endpoints", {})
+            if isinstance(fixture.get("endpoints", {}), dict)
+        )
+        expected_total = svc_count + ep_count
+        assert len(mock.calls) == expected_total
 
 
 class TestRunnerTempDirEnforcement:

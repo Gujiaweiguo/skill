@@ -26,16 +26,39 @@
   },
   "endpoints": {
     "homepage": {
+      "url": "https://lanlnk.cn",
       "http_code": 200,
-      "response_time_ms": 125
+      "response_time_ms": 125,
+      "redirect_chain": []
+    },
+    "www_homepage": {
+      "url": "https://www.lanlnk.cn",
+      "http_code": 200,
+      "response_time_ms": 98,
+      "redirect_chain": []
+    },
+    "openclaw": {
+      "url": "https://openclaw.lanlnk.cn",
+      "http_code": 200,
+      "response_time_ms": 210,
+      "redirect_chain": []
+    },
+    "chatbi": {
+      "url": "https://chatbi.lanlnk.cn",
+      "http_code": 200,
+      "response_time_ms": 350,
+      "redirect_chain": []
     },
     "api_health": {
+      "url": "https://lanlnk.cn/api/health",
       "http_code": 200,
       "response_time_ms": 42,
       "body": "{\"status\":\"ok\"}"
     },
     "sitemap_xml": {
+      "url": "https://lanlnk.cn/sitemap.xml",
       "http_code": 200,
+      "response_time_ms": 15,
       "url_count": 53
     }
   },

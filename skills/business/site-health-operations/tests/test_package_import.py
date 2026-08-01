@@ -30,3 +30,9 @@ class TestPackageSmoke:
         """import scripts must succeed with docstring."""
         mod = importlib.import_module("scripts")
         assert mod.__doc__ is not None
+
+    def test_health_check_importable(self) -> None:
+        """import scripts.health_check must succeed."""
+        mod = importlib.import_module("scripts.health_check")
+        assert callable(mod.HealthChecker)
+        assert callable(mod.HealthChecker.run)

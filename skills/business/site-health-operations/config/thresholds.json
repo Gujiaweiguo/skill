@@ -1,0 +1,46 @@
+{
+  "endpoints": {
+    "lanlnk.cn": {
+      "expected_https": true,
+      "expected_redirect": "https://lanlnk.cn",
+      "max_response_time_ms": 3000,
+      "expected_http_code": 200
+    },
+    "www.lanlnk.cn": {
+      "expected_https": true,
+      "expected_redirect": "https://www.lanlnk.cn",
+      "max_response_time_ms": 3000,
+      "expected_http_code": 200
+    },
+    "openclaw.lanlnk.cn": {
+      "expected_https": true,
+      "expected_redirect": null,
+      "max_response_time_ms": 5000,
+      "expected_http_code": 200
+    },
+    "chatbi.lanlnk.cn": {
+      "expected_https": true,
+      "expected_redirect": null,
+      "max_response_time_ms": 5000,
+      "expected_http_code": 200
+    }
+  },
+  "ssl": {
+    "warn_days_remaining": 30,
+    "critical_days_remaining": 7
+  },
+  "resources": {
+    "disk_warn_percent": 80,
+    "disk_critical_percent": 90,
+    "memory_warn_percent": 75,
+    "memory_critical_percent": 90,
+    "swap_warn_percent": 60,
+    "swap_critical_percent": 80
+  },
+  "services": {
+    "lnkwebsite-backend": {"expected_status": "active"},
+    "lnkwebsite-frontend": {"expected_status": "active"},
+    "lnkwebsite-admin": {"expected_status": "active"},
+    "lnkwebsite-h5": {"expected_status": "active"}
+  }
+}
