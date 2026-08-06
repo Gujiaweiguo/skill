@@ -56,12 +56,12 @@ def _status_stats(capabilities: list[dict[str, Any]]) -> Counter[str]:  # noqa: 
     return Counter(cap.get("reconciled_status", "missing") for cap in capabilities)
 
 
-def _render_project_context(project: str, stats: Counter[str]) -> str:
+def _render_project_context(project: str, stats: Counter[str], code_root: str) -> str:
     total = sum(stats.values())
     return f"""## 1. 背景
 
 - 项目：{project}
-- 来源：客户需求 + 竞品资料 + 当前产品代码基线（/opt/code/mi）
+- 来源：客户需求 + 竞品资料 + 当前产品代码基线（{code_root}）
 - 能力总数：{total}
 - 状态分布：existing {stats.get("existing", 0)} / partial {stats.get("partial", 0)} / missing {stats.get("missing", 0)} / explicitly-not-do {stats.get("explicitly-not-do", 0)}
 
@@ -426,7 +426,7 @@ def _build_handoff_changes(capabilities: list[dict[str, Any]]) -> list[dict[str,
     return sorted(changes, key=lambda c: (priority_rank.get(str(c["priority"]), 9), str(c["change_id"])))
 
 
-def _render_prd_handoff(inputs: RenderInputs, output_dir: Path) -> str:
+def _render_prd_handoff(inputs: RenderInputs, output_dir: Path, code_root: str) -> str:
     project = str(inputs.reconcile.get("project", "商管系统"))
     capabilities = inputs.reconcile.get("capabilities", [])
     stats = _status_stats(capabilities)
@@ -438,7 +438,7 @@ def _render_prd_handoff(inputs: RenderInputs, output_dir: Path) -> str:
     lines = [
         f"# {project} PRD 实施交接包",
         "",
-        "> 本文件由 product-prd-generator 自动生成，供目标业务系统项目（如 `/opt/code/mi`）评估并拆 OpenSpec change。PRD 侧只提供证据、优先级和建议拆分；最终是否新建 change、如何实现、如何验证，由目标项目会话决定。",
+        f"> 本文件由 product-prd-generator 自动生成，供目标业务系统项目（如 `{code_root}`）评估并拆 OpenSpec change。PRD 侧只提供证据、优先级和建议拆分；最终是否新建 change、如何实现、如何验证，由目标项目会话决定。",
         "",
         "## 1. 交接边界",
         "",
@@ -506,12 +506,12 @@ def _render_prd_handoff(inputs: RenderInputs, output_dir: Path) -> str:
     return "\n".join(lines)
 
 
-def _render_mi_consumption_prompt(project: str, output_dir: Path) -> str:
+def _render_mi_consumption_prompt(project: str, output_dir: Path, code_root: str) -> str:
     handoff = (output_dir / "PRD实施交接包.md").resolve()
     changes = (output_dir / "suggested-openspec-changes.yaml").resolve()
     return f"""# MI / 目标项目消费提示词
 
-在目标项目目录（如 `/opt/code/mi`）启动 OpenCode 后使用。
+在目标项目目录（如 `{code_root}`）启动 OpenCode 后使用。
 
 ```text
 请先读取当前项目 AGENTS.md、openspec/specs/、相关代码和测试基线，再消费 PRD 交接包，不要直接创建 change。
@@ -533,7 +533,7 @@ PRD 实施交接包：{handoff}
 """
 
 
-def _write_handoff_outputs(inputs: RenderInputs, output_dir: Path) -> None:
+def _write_handoff_outputs(inputs: RenderInputs, output_dir: Path, code_root: str) -> None:
     project = str(inputs.reconcile.get("project", "商管系统"))
     capabilities = inputs.reconcile.get("capabilities", [])
     changes = _build_handoff_changes(capabilities)
@@ -550,13 +550,13 @@ def _write_handoff_outputs(inputs: RenderInputs, output_dir: Path) -> None:
         "changes": changes,
     }
     (output_dir / "PRD实施交接包.md").write_text(
-        _render_prd_handoff(inputs, output_dir), encoding="utf-8"
+        _render_prd_handoff(inputs, output_dir, code_root), encoding="utf-8"
     )
     (output_dir / "suggested-openspec-changes.yaml").write_text(
         yaml.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8"
     )
     (output_dir / "mi-consumption-prompt.md").write_text(
-        _render_mi_consumption_prompt(project, output_dir), encoding="utf-8"
+        _render_mi_consumption_prompt(project, output_dir, code_root), encoding="utf-8"
     )
 
 
@@ -1171,7 +1171,7 @@ def _render_data_model_index(tables_by_module: dict[str, list[TableMeta]], unmat
     return "\n".join(lines)
 
 
-def render_prd(inputs: RenderInputs) -> str:
+def render_prd(inputs: RenderInputs, code_root: str = "/opt/code/mi") -> str:
     project = inputs.reconcile.get("project", "商管系统")
     capabilities = inputs.reconcile.get("capabilities", [])
     requirements = inputs.reconcile.get("requirements", [])
@@ -1190,7 +1190,7 @@ def render_prd(inputs: RenderInputs) -> str:
     parts = [
         f"# {project} 产品 PRD\n",
         review_brief,
-        _render_project_context(str(project), stats),
+        _render_project_context(str(project), stats, code_root),
         _render_customer_summary(inputs.doc_map),
         _render_structure_summary(requirements),
         _render_blueprint_modules(requirements, capabilities, ontology, tables_by_mod) if ontology else _render_requirement_list(requirements),
@@ -1232,7 +1232,7 @@ def main() -> int:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    (output_dir / "产品PRD.md").write_text(render_prd(inputs), encoding="utf-8")
+    (output_dir / "产品PRD.md").write_text(render_prd(inputs, code_root=args.code_root), encoding="utf-8")
     (output_dir / "功能清单.md").write_text(
         _render_feature_list(capabilities, project=args.project, code_root=args.code_root),
         encoding="utf-8",
@@ -1242,7 +1242,7 @@ def main() -> int:
     (output_dir / "需求证据表.md").write_text(_render_evidence_table(capabilities), encoding="utf-8")
     (output_dir / "需求清单.md").write_text(_render_requirement_list_file(requirements), encoding="utf-8")
     (output_dir / "高优先级需求review清单.md").write_text(_render_priority_review(requirements), encoding="utf-8")
-    _write_handoff_outputs(inputs, output_dir)
+    _write_handoff_outputs(inputs, output_dir, code_root=args.code_root)
 
     print(f"rendered 10 files to {output_dir}/")
     return 0
