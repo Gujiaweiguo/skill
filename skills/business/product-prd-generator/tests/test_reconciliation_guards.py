@@ -138,3 +138,28 @@ def test_doc_feature_spaces_matches_code_cap_kebab_case() -> None:
     cap = result.capabilities[0]
     assert cap.doc_status == "existing"
     assert not any("doc gap" in g for g in cap.gaps)
+
+
+def test_spec_evidence_promotes_doc_status_from_missing() -> None:
+    """Capabilities with spec evidence (code repo openspec/specs/) must not
+    stay doc_status=missing. doc_map only scans docs repo, not code repo
+    specs — without this sweep, capabilities with real spec files are
+    falsely flagged as doc gaps."""
+    code_map = {
+        "spec_capabilities": [
+            {
+                "id": "skill-release-canonical",
+                "name": "skill release canonical",
+                "status": "existing",
+                "evidence": [{"kind": "spec", "ref": "openspec/specs/skill-release-canonical/spec.md"}],
+            },
+        ],
+        "matrix_rows": [],
+    }
+    doc_map = {"features": [], "requirements": []}
+
+    result = reconcile(code_map, doc_map)
+    cap = result.capabilities[0]
+    assert cap.doc_status == "existing"
+    assert not any("doc gap" in g for g in cap.gaps)
+    assert any(e.kind == "spec" for e in cap.evidence)

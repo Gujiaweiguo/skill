@@ -198,6 +198,8 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
         if archive_evidence:
             apply_archive_evidence(by_id, archive_evidence)
 
+    _spec_doc_status_sweep(by_id)
+
     requirements = _build_requirement_records(doc_map, by_id)
 
     return ReconcileResult(
@@ -341,6 +343,37 @@ def _ontology_capability_ids(project: str) -> frozenset[str]:
             if isinstance(capabilities, list):
                 capability_ids.update(str(capability) for capability in capabilities)
     return frozenset(capability_ids)
+
+
+def _spec_doc_status_sweep(by_id: dict[str, ReconciledCapability]) -> None:
+    """Promote doc_status to existing when spec evidence is present.
+
+    doc_map scans the docs repo (lanlnk), not the code repo's openspec/specs/.
+    A capability with ``kind=spec`` evidence has an authoritative spec file in
+    the code repo — doc_status must not stay missing for it. Without this
+    sweep, capabilities like ``skill-release-canonical`` (which has a 96-line
+    spec.md in langchat repo) are falsely flagged as doc gaps.
+    """
+    stale_markers = ("spec has no doc evidence yet", "doc gap: code has it but doc does not mention it")
+    for cap_id, cap in by_id.items():
+        if cap.doc_status != CapabilityStatus.MISSING.value:
+            continue
+        if not any(e.kind == "spec" for e in cap.evidence):
+            continue
+        reconciled, confidence, pair_gaps = _reconcile_pair(
+            _coerce_status(cap.code_status), CapabilityStatus.EXISTING
+        )
+        retained_gaps = tuple(g for g in cap.gaps if not any(m in g for m in stale_markers))
+        by_id[cap_id] = ReconciledCapability(
+            id=cap.id,
+            name=cap.name,
+            code_status=cap.code_status,
+            doc_status=CapabilityStatus.EXISTING.value,
+            reconciled_status=reconciled.value,
+            confidence=confidence.value,
+            gaps=retained_gaps + pair_gaps,
+            evidence=cap.evidence,
+        )
 
 
 def _add_spec_referenced_capabilities(
