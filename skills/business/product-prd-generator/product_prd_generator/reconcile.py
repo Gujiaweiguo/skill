@@ -8,6 +8,9 @@ from enum import Enum, unique
 from pathlib import Path
 from typing import Any
 
+import yaml
+
+from ._paths import codebase_features_path_for_project, ontology_path_for_project
 from .models import RequirementRecord
 
 
@@ -182,9 +185,9 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
 
     _add_unmatched_customer_requirements(by_id, doc_features)
 
-    _add_spec_referenced_capabilities(by_id, doc_map)
+    _add_spec_referenced_capabilities(by_id, doc_map, _ontology_capability_ids(project))
 
-    _add_codebase_features(by_id)
+    _add_codebase_features(by_id, project)
 
     requirements = _build_requirement_records(doc_map, by_id)
 
@@ -304,9 +307,37 @@ def _add_unmatched_customer_requirements(
         )
 
 
+def _ontology_capability_ids(project: str) -> frozenset[str]:
+    """Load declared ontology capability IDs used to validate doc references."""
+    path = ontology_path_for_project(project)
+    if not path.is_file():
+        return frozenset()
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, Mapping):
+        return frozenset()
+    modules = data.get("modules", {})
+    if not isinstance(modules, Mapping):
+        return frozenset()
+    capability_ids: set[str] = set()
+    for module in modules.values():
+        if not isinstance(module, Mapping):
+            continue
+        sub_functions = module.get("sub_functions", {})
+        if not isinstance(sub_functions, Mapping):
+            continue
+        for sub_function in sub_functions.values():
+            if not isinstance(sub_function, Mapping):
+                continue
+            capabilities = sub_function.get("capabilities", [])
+            if isinstance(capabilities, list):
+                capability_ids.update(str(capability) for capability in capabilities)
+    return frozenset(capability_ids)
+
+
 def _add_spec_referenced_capabilities(
     by_id: dict[str, ReconciledCapability],
     doc_map: Mapping[str, object],
+    ontology_ids: frozenset[str] = frozenset(),
 ) -> None:
     """Create missing capabilities for ontology spec IDs referenced in requirements.
 
@@ -333,6 +364,8 @@ def _add_spec_referenced_capabilities(
         term = str(req.get("normalized_term", ""))
         if not term or term in by_id or not spec_id_pattern.match(term):
             continue
+        if ontology_ids and term not in ontology_ids:
+            continue
         customer = str(req.get("source_customer", ""))
         if customer:
             term_customers.setdefault(term, set()).add(customer)
@@ -354,10 +387,9 @@ def _add_spec_referenced_capabilities(
         )
 
 
-def _add_codebase_features(by_id: dict[str, ReconciledCapability]) -> None:
+def _add_codebase_features(by_id: dict[str, ReconciledCapability], project: str) -> None:
     """Load actual codebase features and add as existing. Overwrites false missing."""
-    import os
-    features_path = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "prd" / "projects" / "商管系统" / "parsed" / "codebase-features.json"
+    features_path = codebase_features_path_for_project(project)
     if not features_path.is_file():
         return
     data = json.loads(features_path.read_text(encoding="utf-8"))

@@ -389,7 +389,9 @@ def _slugify_change_id(raw: str, fallback_index: int) -> str:
 def _build_handoff_changes(capabilities: list[dict[str, Any]]) -> list[dict[str, Any]]:  # noqa: ANY_OK
     candidates = [
         cap for cap in capabilities
-        if cap.get("gaps") and str(cap.get("reconciled_status", "")) in {"missing", "partial"}
+        if cap.get("gaps")
+        and str(cap.get("reconciled_status", "")) in {"missing", "partial"}
+        and str(cap.get("confidence", "low")) != "low"
     ]
     priority_rank = {"P0": 0, "P1": 1, "P2": 2}
     changes: list[dict[str, Any]] = []

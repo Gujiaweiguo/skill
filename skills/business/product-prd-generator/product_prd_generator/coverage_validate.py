@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ._paths import term_aliases_path_for_project
+from ._paths import term_aliases_path_for_project, validate_project
 
 try:
     import yaml
@@ -970,7 +970,7 @@ def _slugify_change_id(raw: str, fallback_index: int) -> str:
 def _build_suggested_changes(rows: list[CapabilityRow]) -> list[dict]:
     candidates = [
         row for row in rows
-        if row.prd_status in {"missing", "partial"} or row.recommendation
+        if (row.prd_status in {"missing", "partial"} and row.confidence != "low") or row.recommendation
     ]
     priority_rank = {"P0": 0, "P1": 1, "P2": 2}
     changes: list[dict] = []
@@ -1027,7 +1027,7 @@ def _write_suggested_changes_yaml(output_dir: Path, rows: list[CapabilityRow]) -
         },
         "changes": changes,
     }
-    path = output_dir / "suggested-openspec-changes.yaml"
+    path = output_dir / "coverage-suggested-openspec-changes.yaml"
     if yaml is not None:
         path.write_text(yaml.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8")
     else:
@@ -1086,7 +1086,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--competitors", default="")
     parser.add_argument("--skill-root", default="")
     parser.add_argument("--capability-map-dir", action="append", default=[])
-    parser.add_argument("--project", default="商管系统")
+    parser.add_argument("--project", default="商管系统", type=validate_project)
     return parser.parse_args(argv)
 
 

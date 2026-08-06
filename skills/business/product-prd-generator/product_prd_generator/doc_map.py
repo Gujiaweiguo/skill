@@ -34,6 +34,7 @@ _TABLE_ROW = re.compile(r"^\|\s*(.+?)\s*\|\s*(.+?)\s*\|", re.MULTILINE)
 class SourceType(str, Enum):
     CUSTOMER = "customer-requirements"
     CURRENT = "current-product"
+    ARCHITECTURE = "target-architecture"
     COMPETITOR = "competitor"
     UNKNOWN = "unknown"
 
@@ -196,6 +197,8 @@ def _prefer_requirement(existing: Requirement, candidate: Requirement) -> bool:
 
 def _classify_source_type(rel_path: Path) -> str:
     parts = rel_path.parts
+    if "04-target-architecture" in parts or "03-target-architecture" in parts or "03-architecture" in parts:
+        return SourceType.ARCHITECTURE.value
     if "01-customer-requirements" in parts:
         return SourceType.CUSTOMER.value
     if "00-current-product" in parts:

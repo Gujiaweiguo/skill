@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from .word_export import build_content_package, render_docx
+from ._paths import validate_project
 
 
 def _run(module: str, extra_args: list[str]) -> int:
@@ -34,7 +35,7 @@ def _doc_map_args(args: argparse.Namespace, output: str) -> list[str]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="product-prd-generator")
-    parser.add_argument("--project", default="商管系统")
+    parser.add_argument("--project", default="商管系统", type=validate_project)
     parser.add_argument("--code-root", default="/opt/code/mi")
     parser.add_argument("--docs-root", default=str(Path.cwd()))
     parser.add_argument("--skill-root", default=str(Path(__file__).resolve().parents[1]))
@@ -97,7 +98,8 @@ def main() -> int:
             coverage_args.extend(["--customers", args.customers])
         if args.competitors:
             coverage_args.extend(["--competitors", args.competitors])
-        return _run("product_prd_generator.coverage_validate", coverage_args)
+        if _run("product_prd_generator.coverage_validate", coverage_args) != 0:
+            return 1
 
     if _run(
         "product_prd_generator.render",

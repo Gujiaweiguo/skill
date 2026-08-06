@@ -62,3 +62,36 @@ def term_aliases_path_for_project(project: str, skill_root: Path) -> Path:
         return legacy
 
     return skill_root / "references" / "term-aliases.yaml"
+
+
+def codebase_features_path_for_project(project: str) -> Path:
+    """Return the optional curated code-feature map for a project."""
+    base = _lanlnk_base()
+    return base / "raw" / f"prd-{project}" / "parsed" / "codebase-features.json"
+
+
+class InvalidProjectError(ValueError):
+    """Raised when --project contains path-traversal or otherwise unsafe characters."""
+
+
+def validate_project(raw: str) -> str:
+    """CLI boundary parser for --project: reject path-unsafe inputs.
+
+    Project names are interpolated into filesystem paths (raw/prd-<project>/...,
+    out/prd/<project>/...). Reject separators, traversal, and empty strings so
+    a hostile or mistyped value cannot redirect file reads outside $LANLNK_BASE.
+    """
+    if not raw or not raw.strip():
+        raise InvalidProjectError("--project must not be empty")
+    cleaned = raw.strip()
+    for fragment in ("/", "\\", ".."):
+        if fragment in cleaned:
+            raise InvalidProjectError(
+                f"--project contains forbidden fragment {fragment!r}: {raw!r}",
+            )
+    for char in cleaned:
+        if char < " " or char == "\x7f":
+            raise InvalidProjectError(
+                f"--project contains control character: {raw!r}",
+            )
+    return cleaned
