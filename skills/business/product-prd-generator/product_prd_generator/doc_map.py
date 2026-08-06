@@ -208,10 +208,29 @@ def _classify_source_type(rel_path: Path) -> str:
     return SourceType.UNKNOWN.value
 
 
-def _iter_markdown_files(docs_root: Path) -> tuple[Path, ...]:
+def _iter_markdown_files(docs_root: Path, project: str | None = None) -> tuple[Path, ...]:
+    """Enumerate markdown files under ``docs_root``.
+
+    When ``project`` is given, only files whose relative path contains a
+    ``<project>/`` segment are returned. This prevents a multi-product
+    docs root (e.g. lanlnk containing both langchat and mi-cre trees)
+    from leaking other products' requirements into the target product's
+    doc map.
+    """
     if not docs_root.is_dir():
         return ()
-    return tuple(sorted(p for p in docs_root.rglob("*.md") if p.is_file() and not any(part.startswith(".") for part in p.relative_to(docs_root).parts)))
+    result: list[Path] = []
+    for p in docs_root.rglob("*.md"):
+        if not p.is_file():
+            continue
+        rel = p.relative_to(docs_root)
+        rel_parts = rel.parts
+        if any(part.startswith(".") for part in rel_parts):
+            continue
+        if project is not None and project not in rel_parts:
+            continue
+        result.append(p)
+    return tuple(sorted(result))
 
 
 def _normalize_term(heading: str, aliases: dict[str, str]) -> str:
@@ -909,7 +928,7 @@ def extract(
     extra_roots: list[Path] | None = None,
 ) -> DocMap:
     aliases, ontology = _load_aliases(skill_root, project)
-    md_files = _iter_markdown_files(docs_root)
+    md_files = _iter_markdown_files(docs_root, project=project)
     features: dict[str, DocFeature] = {}
     requirements: dict[tuple[str, str], Requirement] = {}
     for md_path in md_files:
