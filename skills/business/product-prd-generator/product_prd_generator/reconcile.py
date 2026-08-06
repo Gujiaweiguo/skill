@@ -11,6 +11,7 @@ from typing import Any
 import yaml
 
 from ._paths import codebase_features_path_for_project, ontology_path_for_project
+from .archive_evidence import apply_archive_evidence, load_archive_evidence
 from .models import RequirementRecord
 
 
@@ -188,6 +189,12 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
     _add_spec_referenced_capabilities(by_id, doc_map, _ontology_capability_ids(project))
 
     _add_codebase_features(by_id, project)
+
+    code_root_str = str(code_map.get("source_path", ""))
+    if code_root_str:
+        archive_evidence = load_archive_evidence(Path(code_root_str))
+        if archive_evidence:
+            apply_archive_evidence(by_id, archive_evidence)
 
     requirements = _build_requirement_records(doc_map, by_id)
 

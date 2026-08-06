@@ -27,6 +27,7 @@ class EvidenceKind(str, Enum):
     DOC = "doc"
     IMAGE = "image"
     MATRIX = "matrix"
+    OPENSPEC_ARCHIVE = "openspec-archive"
 
 
 @unique
