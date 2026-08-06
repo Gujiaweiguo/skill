@@ -15,7 +15,7 @@ from product_prd_generator.coverage_validate import (
     _write_suggested_changes_yaml,
 )
 from product_prd_generator.doc_map import SourceType, _classify_source_type
-from product_prd_generator.reconcile import _add_spec_referenced_capabilities
+from product_prd_generator.reconcile import _add_spec_referenced_capabilities, reconcile
 
 
 def test_target_architecture_source_is_not_customer_requirements() -> None:
@@ -112,3 +112,29 @@ def test_validate_project_rejects_unsafe_input(raw: str) -> None:
 @pytest.mark.parametrize("raw", ["商管系统", "langchat", "LnkChatBI", "mi-cre"])
 def test_validate_project_accepts_known_projects(raw: str) -> None:
     assert validate_project(raw) == raw
+
+
+def test_doc_feature_spaces_matches_code_cap_kebab_case() -> None:
+    """code_map cap_id is kebab-case; doc_map normalized_term uses spaces.
+
+    Without normalization, ``if term in by_id`` fails and every matched
+    capability carries a false "doc gap" — the bug fixed 2026-08-06 that
+    inflated langchat PRD doc gaps from 0 to 28.
+    """
+    code_map = {
+        "spec_capabilities": [
+            {"id": "workspace-boundary-contract", "name": "workspace boundary contract", "status": "existing"},
+        ],
+        "matrix_rows": [],
+    }
+    doc_map = {
+        "features": [
+            {"normalized_term": "workspace boundary contract"},
+        ],
+        "requirements": [],
+    }
+
+    result = reconcile(code_map, doc_map)
+    cap = result.capabilities[0]
+    assert cap.doc_status == "existing"
+    assert not any("doc gap" in g for g in cap.gaps)

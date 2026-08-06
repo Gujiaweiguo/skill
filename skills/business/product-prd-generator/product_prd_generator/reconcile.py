@@ -156,8 +156,10 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
             if not isinstance(feat, Mapping):
                 continue
             term = str(feat.get("normalized_term", ""))
-            if term in by_id:
-                existing = by_id[term]
+            term_key = term.replace(" ", "-").lower()  # code_map ids are kebab-case; doc_map terms use spaces
+            match_key = term_key if term_key in by_id else (term if term in by_id else None)
+            if match_key is not None:
+                existing = by_id[match_key]
                 doc_status = CapabilityStatus.EXISTING
                 reconciled, confidence, pair_gaps = _reconcile_pair(_coerce_status(existing.code_status), doc_status)
                 evidence_items = feat.get("evidence", [])
@@ -173,8 +175,8 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
                 # "no doc evidence" gaps — they are no longer true. Without
                 # this cleanup every matched capability carries a false gap.
                 retained_gaps = tuple(g for g in existing.gaps if not any(m in g for m in stale_markers))
-                by_id[term] = ReconciledCapability(
-                    id=term,
+                by_id[match_key] = ReconciledCapability(
+                    id=existing.id,
                     name=existing.name,
                     code_status=existing.code_status,
                     doc_status=doc_status.value,
