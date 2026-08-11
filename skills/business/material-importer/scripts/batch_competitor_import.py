@@ -14,6 +14,9 @@ import sys
 from datetime import date
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from sanitize_markdown import sanitize_content
+
 
 def read_text_auto(path: Path) -> str:
     """自动探测编码读取文本文件。
@@ -142,6 +145,7 @@ def process_vendor(vendor_cn: str, vendor_en: str, domain: str) -> int:
         name = infer_name(rel.name)
         fm = build_frontmatter(vendor_en, vendor_cn, domain, seq, name, raw_rel)
 
+        content, _ = sanitize_content(content)
         mat_file.write_text(fm + content, encoding="utf-8")
         print(f"  [OK] {mat_file.relative_to(MATERIALS_COMPETITORS)}")
         seq += 1

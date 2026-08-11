@@ -39,6 +39,11 @@ compatibility: >
     PEP 723 inline deps in the script header document requirements but are not the primary run path.
   Cert expiry: pytesseract (optional, CPU-only, lightweight).
 change: >
+  v5 — 2026-08-07
+  • 新增 scripts/sanitize_markdown.py：规范化 OCR/markitdown 产出的 Markdown
+  • ocr_extract.py write_markdown_summary + batch_competitor_import.py process_vendor
+    在写入 .md 前自动 sanitize（HTML 表格/超长行/深嵌套引用包进 ```html fence）
+  • 防止 marksman 等 Markdown LSP parser 触发 "depth limit exceeded" 栈溢出
   v4 — 2026-07-11
   • OCR 环境说明修正：明确 GPU 依赖（torch/transformers）装在 ~/.local 用户级，不在 skill venv
   • OCR 调用方式修正：用 python3 scripts/ocr_extract.py（非 uv run）
@@ -191,6 +196,7 @@ raw/<source_dir>/
 | **占位文本** | 纯占位符（`XXXX`、`…`、`……`、纯标点行）→ 移除 | `XXXX集团` → 处理为上下文推断 |
 | **内嵌 base64 图片** | 超过 500 字符的 data URI → 替换为 `[图片: 第N页]` | `![](data:image/png;base64,iVBOR...)` → `[图片: 第15页]` |
 | **空行坍缩** | 连续 3+ 空行 → 压缩为 1 行 | 保留基本排版结构 |
+| **HTML 表格/超长行污染**（v5） | 含 `<table>/<td>/<tr>/<th>` 的行、>500 字符的 OCR 幻觉重复行、≥3 层嵌套引用 → 自动包进 ` ```html ` fence | `<table><td>...</table>` 单行 → 包 fence 避免 marksman LSP 栈溢出 |
 
 执行方式：
 

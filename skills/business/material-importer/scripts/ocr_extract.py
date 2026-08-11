@@ -50,6 +50,9 @@ import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from sanitize_markdown import sanitize_content
+
 # ---------------------------------------------------------------------------
 # 数据结构
 # ---------------------------------------------------------------------------
@@ -435,7 +438,12 @@ def write_markdown_summary(results: list[OCRResult],
             else:
                 lines += [r.raw_markdown.strip(), ""]
 
-    path.write_text("\n".join(lines), encoding="utf-8")
+    content = "\n".join(lines)
+    content, wraps = sanitize_content(content)
+    if wraps > 0:
+        print(f"  ℹ️  {path.name}: {wraps} 处 HTML 表格/超长行已包 fence "
+              f"（避免 marksman 等 LSP parser 栈溢出）")
+    path.write_text(content, encoding="utf-8")
     return path
 
 
