@@ -77,6 +77,36 @@ def _load_devkit_rate() -> int:
 # 二开报价单价 — 唯一权威源：$LANLNK_BASE/config/pricing/pricing-basis.yaml
 DEVKIT_RATE = _load_devkit_rate()
 
+
+def _load_mi_feature_baseline() -> dict[str, Any]:
+    """读取 MI 商管系统功能基线（feature-baseline.yaml）统计信息。
+
+    功能基线权威源：$LANLNK_BASE/30-products/mi-cre/feature-baseline/feature-baseline.yaml
+
+    返回值：
+        { "item_count": int, "status": {existing: n, partial: n, missing: n}, "source": str }
+    读取失败时返回空 dict 并打印警告（功能清单降级为模块级展示，不影响报价生成）。
+    """
+    path = (get_lanlnk_base()
+            / "30-products" / "mi-cre" / "feature-baseline" / "feature-baseline.yaml")
+    try:
+        import yaml
+        with open(path, encoding="utf-8") as f:
+            bl = yaml.safe_load(f) or {}
+        items = bl.get("items", [])
+        status = {}
+        for it in items:
+            s = it.get("status", "unknown")
+            status[s] = status.get(s, 0) + 1
+        return {
+            "item_count": bl.get("item_count", len(items)),
+            "status": status,
+            "source": str(path),
+        }
+    except Exception as e:
+        print(f"[WARN] MI 功能基线读取失败({e})，功能清单使用内置模块说明", file=sys.stderr)
+        return {}
+
 # === MI 商管系统数据（v1 硬编码，用于验证；后续版本改为读模板动态生成）===
 MI_DATA: dict[str, Any] = {
     "product_name": "MI 商管系统",
@@ -177,6 +207,8 @@ MI_DATA: dict[str, Any] = {
     ],
     "standard_first_year_total": 50000,
     "standard_next_year_total": 20000,
+    # 功能基线统计（feature-baseline.yaml），缺失时为空 dict，渲染层降级
+    "baseline_meta": _load_mi_feature_baseline(),
 }
 
 
@@ -347,6 +379,109 @@ def build_ai_data(positions: int) -> dict[str, Any]:
         "service_notes": AI_SERVICE_NOTES,
         "standard_first_year_total": first_year,
         "standard_next_year_total": next_year,
+    }
+
+
+def build_lnkchatbi_data() -> dict[str, Any]:
+    """构造 LnkChatBI 智能问数平台报价数据。
+
+    定价：默认战略赠送（首年 0 / 次年 0，用于云泰等试水/赠送场景），
+    可通过环境变量覆盖：
+      LNKCHATBI_PRICE_Y1 / LNKCHATBI_PRICE_Y2  首年/次年费用（整数元）
+    模块源自 out/prd/LnkChatBI/output/功能清单.md 的功能域。
+    """
+    import os as _os
+
+    def _price(var: str, default: int) -> int:
+        raw = _os.environ.get(var)
+        if raw is None:
+            return default
+        try:
+            return max(0, int(raw))
+        except ValueError:
+            print(f"[WARN] {var} 非法({raw!r})，使用默认 {default}", file=sys.stderr)
+            return default
+
+    p1 = _price("LNKCHATBI_PRICE_Y1", 0)
+    p2 = _price("LNKCHATBI_PRICE_Y2", 0)
+    free = (p1 == 0 and p2 == 0)
+    note = (
+        "战略赠送（首年/次年均为 0）"
+        if free
+        else f"首年 {p1:,} / 次年 {p2:,}"
+    )
+
+    return {
+        "product_name": "LnkChatBI 智能问数平台",
+        "product_label": "LnkChatBI",
+        "mode_desc": (
+            "报价模式：SAAS 智能问数服务（NL2SQL 对话查数 + 数据看板；"
+            f"本次报价 {note}）"
+        ),
+        "standard_items": [
+            ("1.1", "智能问数平台 SAAS",
+             "自然语言对话式查询经营数据（NL2SQL），支持销售/客流/车流/合同/应收等"
+             "高频经营场景，返回 SQL/结果表/可视化图表/分析摘要；含数据源接入、"
+             "基础问数配置与看板模板",
+             p1, p2, note),
+            ("1.2", "实施服务",
+             "数据源接入 + 元数据同步 + 术语库初始化 + 问数校准配置 + 看板搭建"
+             "（约 8 人天），随产品赠送",
+             p1, 0, "含在首年费用（若赠送则为 0）" if free else "首年一次性，含 8 人天"),
+        ],
+        "optional_items": [
+            ("2.1", "Embedded 嵌入式小助手对接",
+             "把 LnkChatBI 嵌入企业门户/OA/运营系统，按 Origin 白名单免登录返回"
+             "最小助手列表与问数能力",
+             0, 0, f"{DEVKIT_RATE:,} 元/人天；按需"),
+            ("2.2", "MCP/OpenClaw 工具接入",
+             "暴露 session bind / question execute / analysis execute / datasource list"
+             " 等 MCP 工具，供 OrchestratorAgent 或外部系统调用",
+             0, 0, f"{DEVKIT_RATE:,} 元/人天；按需"),
+        ],
+        "third_party": [
+            ("大模型推理 API", "GLM/DeepSeek/通义等大模型 NL2SQL 推理",
+             "客户自购或蓝联代采，按 token 计费"),
+        ],
+        "plans": [
+            ("5.1", "方案 A：LnkChatBI 标准赠送版",
+             p1, "", p2, "",
+             "纯问数能力免费试用（赠送）"),
+            ("5.2", "方案 B：标准 + 嵌入式/MCP 接入",
+             p1, "", p2, "",
+             "在标准基础上叠加嵌入/工具接入定制"),
+        ],
+        "modules": [
+            ("对话问数核心",
+             "自然语言问数与 SQL 执行、SSE 流式前端消费、记录数据/日志/usage 查询、"
+             "会话编排与追问"),
+            ("数据源管理",
+             "多数据库数据源接入与 schema 同步、异步同步 job、数据源权限校验"),
+            ("Text-to-SQL 校准",
+             "术语库管理、SQL 示例/训练数据维护、自定义提示词、问数准确率优化"),
+            ("助手管理",
+             "助手默认数据源入口、展示模式（嵌入/弹窗）、知识材料维护"),
+            ("嵌入集成",
+             "免登录嵌入式小助手、Origin 白名单、嵌入式对接接口"),
+            ("MCP/OpenClaw",
+             "四工具接通（session/question/analysis/datasource）、data_query 结果投影、"
+             "service token 与 workspace 隔离"),
+            ("审计与可观测",
+             "关键请求观测、操作日志、指标体系、效果看板"),
+            ("部署运维",
+             "分离式容器部署、MCP/DB/Redis 健康检查、环境配置模板"),
+        ],
+        "service_notes": [
+            "1. 服务承诺：提供数据源接入、术语库/问数示例初始化、看板搭建与上线辅导；",
+            f"2. 二开单价：未来新需求，二开人天单价按 {DEVKIT_RATE:,} 元/人天结算；",
+            "3. SAAS 服务范围：含平台运维、安全更新、版本升级；"
+            "不含数据清洗/ETL/数仓建设（产品边界为只读问数）；",
+            "4. 本产品为自然语言问数底座，不承载 langchat 工作流编排与托管复盘；",
+            "5. 定价：本次报价" + note + "，可通过环境变量 LNKCHATBI_PRICE_Y1/Y2 覆盖；",
+            "6. 第三方大模型推理费用（token）由客户自购或蓝联代采，另计。",
+        ],
+        "standard_first_year_total": p1,
+        "standard_next_year_total": p2,
     }
 
 
@@ -635,8 +770,9 @@ def build_quote_sheet(
                      ["序号", "名称", "内容说明",
                       "首年报价(元)", "次年报价(元)", "备注"])
     r += 1
-    for item in data["standard_items"]:
-        write_data_row(ws, r, list(item)); r += 1
+    for i, item in enumerate(data["standard_items"], start=1):
+        write_data_row(ws, r,
+                       [f"1.{i}", item[1], item[2], item[3], item[4], item[5]]); r += 1
     # 标准汇总
     write_data_row(
         ws, r,
@@ -655,8 +791,9 @@ def build_quote_sheet(
                      ["序号", "名称", "内容说明",
                       "首年报价(元)", "次年报价(元)", "备注"])
     r += 1
-    for item in data["optional_items"]:
-        write_data_row(ws, r, list(item)); r += 1
+    for i, item in enumerate(data["optional_items"], start=1):
+        write_data_row(ws, r,
+                       [f"2.{i}", item[1], item[2], item[3], item[4], item[5]]); r += 1
 
     r += 1
 
@@ -672,10 +809,10 @@ def build_quote_sheet(
 
         r += 1
 
-    # 三、汇总区
-    write_section_title(ws, r,
-                        "三、汇总：报价合计",
-                        end_col); r += 1
+    # 汇总节号：third_party 存在时前面已有"三、第三方集成"，汇总顺延为四
+    has_tp = bool(data.get("third_party"))
+    summary_title = f"{'四' if has_tp else '三'}、汇总：报价合计"
+    write_section_title(ws, r, summary_title, end_col); r += 1
     write_header_row(ws, r,
                      ["序号", "项目", "首年汇总(元)", "首年优惠价",
                       "次年汇总(元)", "次年优惠价"]); r += 1
@@ -685,19 +822,20 @@ def build_quote_sheet(
                     data["standard_next_year_total"], ""],
                    highlight=True); r += 1
     opt_first = sum(it[3] for it in data["optional_items"])
+    opt_next = sum(it[4] for it in data["optional_items"])
     write_data_row(ws, r,
-                   ["3.2", "+ 第三方对接（全选）", opt_first, "", 0, ""],
+                   ["3.2", "+ 第三方对接（全选）", opt_first, "", opt_next, ""],
                    highlight=True); r += 1
     write_data_row(ws, r,
                    ["3.3", "合计",
                     data["standard_first_year_total"] + opt_first, "",
-                    data["standard_next_year_total"], ""],
+                    data["standard_next_year_total"] + opt_next, ""],
                    total=True, highlight=True); r += 1
 
     r += 1
 
-    # 四、服务说明
-    write_section_title(ws, r, "四、服务说明", end_col); r += 1
+    # 服务说明节号跟随汇总：有 third_party 时汇总为"四"，服务说明顺延为"五"
+    write_section_title(ws, r, f"{'五' if has_tp else '四'}、服务说明", end_col); r += 1
     for note in data["service_notes"]:
         ws.merge_cells(start_row=r, start_column=1,
                        end_row=r, end_column=end_col)
@@ -853,7 +991,23 @@ def _fill_modules_from_data(ws, data: dict[str, Any]) -> None:
     )
     style_cell(c, size=9, color=COLOR_INFO_FG, h="left", v="center", border=False)
     ws.row_dimensions[r].height = 20
-    r += 2
+    r += 1
+
+    bm = data.get("baseline_meta") or {}
+    if bm:
+        st = bm.get("status", {})
+        dist = "、".join(f"{k} {v}" for k, v in sorted(st.items()))
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
+        c = ws.cell(
+            r, 1,
+            f"功能基线：共 {bm.get('item_count', 0)} 项能力（{dist}），"
+            "源自 MI 功能基线 feature-baseline.yaml。",
+        )
+        style_cell(c, size=9, color=COLOR_INFO_FG, h="left", v="center", border=False)
+        ws.row_dimensions[r].height = 20
+        r += 1
+
+    r += 1
 
     for i, h in enumerate(["序号", "模块名", "功能描述"], start=1):
         c = ws.cell(r, i, h)
@@ -897,7 +1051,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--positions", type=int, default=3,
                    help="AI Skills 岗位数（仅 --product AI 有效，默认 3，范围 2-6）")
     args = p.parse_args(argv)
-    valid_products = {"MI", "CRM", "AI"}
+    valid_products = {"MI", "CRM", "AI", "LNKCHATBI"}
     product_codes = [c.strip().upper() for c in args.product.split(",") if c.strip()]
     invalid = [c for c in product_codes if c not in valid_products]
     if not product_codes or invalid:
@@ -924,6 +1078,8 @@ def main(argv: list[str] | None = None) -> int:
             products_data.append(build_ai_data(args.positions))
         elif code == "CRM":
             products_data.append(CRM_DATA)
+        elif code == "LNKCHATBI":
+            products_data.append(build_lnkchatbi_data())
 
     if len(products_data) == 1:
         data = products_data[0]
@@ -953,9 +1109,9 @@ def main(argv: list[str] | None = None) -> int:
                   f"当前输出 SAAS 结构（定价可能不准）。", file=sys.stderr)
             print(f"[WARN] 请联系产品负责人确认私有化定价后补充。", file=sys.stderr)
 
-    # 输出路径：$LANLNK_BASE/out/quotes/<客户>/报价单_<产品>_<模式>_<客户>_<日期>.xlsx
-    quotes_dir = get_lanlnk_base() / "out" / "quotes"
-    out_dir = quotes_dir / args.customer
+    # 输出路径：$LANLNK_BASE/out/proposals/<客户>/报价单_<产品>_<模式>_<客户>_<日期>.xlsx
+    proposals_dir = get_lanlnk_base() / "out" / "proposals"
+    out_dir = proposals_dir / args.customer
     out_dir.mkdir(parents=True, exist_ok=True)
     product_str = "+".join(product_codes)
     out_file = (out_dir
