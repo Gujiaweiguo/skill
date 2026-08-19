@@ -141,13 +141,19 @@ uv run {baseDir}/scripts/validate_material.py $MATERIALS_DIR  # 校验已有素�
 #### PPTX / DOCX / PDF
 
 ```bash
-# 文本转换（Markdown）
-markitdown "incoming/原始文件.pptx" > "raw/原始文件.pptx.md"
+# 文本转换（Markdown）——PDF 必须用 skill venv 内的 markitdown（见下方陷阱）
+uv run markitdown "incoming/原始文件.pptx" > "raw/原始文件.pptx.md"
 
 # 图片提取（支持 PPTX/DOCX，自动修正 Markdown 图片路径）
 uv run {baseDir}/scripts/extract_images.py incoming/   # 批量处理
 uv run {baseDir}/scripts/extract_images.py incoming/ --json  # Agent 程序化读取
 ```
+
+> **转换陷阱（2026-08-19 实测）**：
+> 1. **PDF 转换必须用 `uv run markitdown`**（skill venv 内）。系统 PATH 上的 markitdown 通常缺 PDF 后端（pdfminer），对 PDF 返回 rc!=0 或空输出；venv 内版本正常。
+> 2. **.doc（OLE2 老格式）不在直接支持列表**：需先 `soffice --headless --convert-to docx --outdir <tmp> <file>` 转 docx 再 markitdown（与 .xls 的处理同理）。
+> 3. **convert_excel.py 不递归子目录**：多目录批量转换须逐目录调用（`for d in ...; do uv run scripts/convert_excel.py <in> <out>; done`）。
+> 4. **文件名含 `[` 时 `find -name "stem*"` 会误判**（glob 字符类）：核对产物是否存在用 `ls` 而不是 find -name。
 
 #### XLSX / XLS — 按复杂度分流
 
@@ -298,6 +304,10 @@ source: "raw/原始文件.pptx.md"
 uv run {baseDir}/scripts/scan_raw_index.py                 # 与现有索引合并
 uv run {baseDir}/scripts/scan_raw_index.py --no-merge       # 完全覆盖
 ```
+
+> **scan_raw_index.py 已知限制（2026-08-19 实测）**：
+> 1. `imported_from` 为推断值，**跨主题目录结构时可能推断错**（如 raw/prd-商管系统/02-competitors/明源/ 下推断成 incoming/prd-商管系统/... 而真实入口在 incoming/商管系统竞对/...）——重建后应抽查修正。
+> 2. 素材被消费后 `needs_review` **不会自动翻转**——人工蒸馏入库后需手工置 false 并清理占位性 unconsumed_sections。
 扫描 raw/ 下所有 .md 文件（排除 _media/），对每个文件检测 materials/ 引用，自动推断源路径和时间戳。默认合并模式保留手动维护的字段。
 
 **证照有效期检查**：
