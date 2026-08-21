@@ -374,3 +374,30 @@ def test_product_payload_ai_vision_mvp_accepted() -> None:
     data["details"] = {"capabilities": [{"title": "通道拥堵"}, {"title": "火灾烟雾"}]}
     payload = parse_product_payload(json.dumps(data).encode())
     assert payload.slug == "mallsense-ai"
+
+
+def test_product_payload_lnkvision_slug_accepted() -> None:
+    """Rebrand MallSenseAI → LnkVision: slug="lnkvision" still passes validation."""
+
+    data = _valid_product_payload()
+    data["slug"] = "lnkvision"
+    data["details"] = {
+        "capabilities": [
+            {"title": "通道拥堵"},
+            {"title": "火灾烟雾"},
+            {"title": "地面脏污"},
+        ]
+    }
+    payload = parse_product_payload(json.dumps(data).encode())
+    assert payload.slug == "lnkvision"
+
+
+def test_product_payload_lnkvision_roadmap_rejected() -> None:
+    """AI Vision MVP boundary still triggers for slug="lnkvision" (contains "vision")."""
+
+    data = _valid_product_payload()
+    data["slug"] = "lnkvision"
+    data["details"] = {"capabilities": [{"title": "通道拥堵"}, {"title": "精准客流"}]}
+    with pytest.raises(PayloadValidationError) as exc_info:
+        parse_product_payload(json.dumps(data).encode())
+    assert any(i.code == "ai_vision_mvp_boundary" for i in exc_info.value.issues)

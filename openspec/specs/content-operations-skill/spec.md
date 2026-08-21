@@ -34,7 +34,7 @@ The Skill SHALL validate a Product payload before CMS import. The payload SHALL 
 - **THEN** the Skill SHALL reject the payload
 
 #### Scenario: AI Vision product claims non-MVP capability
-- **WHEN** a Product payload has slug="mallsense-ai" and details.capabilities includes "精准客流"
+- **WHEN** a Product payload has slug="mallsense-ai" or slug="lnkvision" and details.capabilities includes "精准客流"
 - **THEN** the Skill SHALL reject the payload (roadmap item in capabilities)
 
 ### Requirement: The Skill creates drafts only
