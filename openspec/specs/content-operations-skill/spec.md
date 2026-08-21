@@ -23,7 +23,7 @@ The Skill SHALL validate a Case payload before CMS import. The payload SHALL con
 
 ### Requirement: Product payloads conform to the draft-import contract
 
-The Skill SHALL validate a Product payload before CMS import. The payload SHALL contain non-empty `product_type`, `slug`, `title`; it MAY contain `headline`, `description`, `seo_title`, `seo_description`, `image`, and `details` (JSON). The Skill SHALL reject payloads with forbidden brand terms. If the product references AI Vision (`slug` contains `mallsense` or `vision`), `details.capabilities` SHALL only claim MVP items (通道拥堵, 火灾烟雾, 地面脏污); roadmap items MUST be absent from `capabilities`.
+The Skill SHALL validate a Product payload before CMS import. The payload SHALL contain non-empty `product_type`, `slug`, `title`; it MAY contain `headline`, `description`, `seo_title`, `seo_description`, `image`, and `details` (JSON). The Skill SHALL reject payloads with forbidden brand terms. If the product references AI Vision (`slug` contains `mallsense` or `vision`; e.g. legacy `mallsense-ai`, current `lnkvision`), `details.capabilities` SHALL only claim MVP items (通道拥堵, 火灾烟雾, 地面脏污); roadmap items MUST be absent from `capabilities`.
 
 #### Scenario: Valid product payload is accepted
 - **WHEN** a Product payload has all required fields, valid product_type, and no forbidden terms
