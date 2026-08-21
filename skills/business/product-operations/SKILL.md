@@ -32,7 +32,7 @@ description: |-
 | product-research-pack | markdown | ✅ | 含 PRD 来源、能力定义、MVP vs Roadmap 区分 |
 | product_type | enum | ✅ | 合法 ProductType 取值 |
 | slug | string | ✅ | URL-friendly（如 `ai-customer-service`） |
-| ai_vision_mvp_only | boolean | 可选 | slug 含 mallsense/vision 时强制 true |
+| ai_vision_mvp_only | boolean | 可选 | slug 含 mallsense/vision（现品牌 LnkVision）时强制 true |
 
 ## Outputs and Required Artifacts
 
@@ -71,7 +71,7 @@ description: |-
 - 1 个 capability 页端到端跑通
 - 字段完整性（slug / title / product_type / description 全非空）
 - 禁词检查通过
-- AI Vision MVP 校验通过（mallsense-ai 类 slug 只声明 `通道拥堵` / `火灾烟雾` / `地面脏污`）
+- AI Vision MVP 校验通过（mallsense-ai / lnkvision 类 slug 只声明 `通道拥堵` / `火灾烟雾` / `地面脏污`；现品牌 LnkVision）
 
 ## Promotion Rule
 
