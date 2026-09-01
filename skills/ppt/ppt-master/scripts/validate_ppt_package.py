@@ -311,8 +311,12 @@ class PPTPackageValidator:
             ))
 
     def _expand_path(self, path_str: str) -> str:
-        lanlnk = os.environ.get("LANLNK_BASE", "")
-        return path_str.replace("$LANLNK_BASE", lanlnk)
+        """展开 $LANLNK_BASE（COMPANIES.md §3：含变量而基座未设时报错退出，无静默默认）。"""
+        if "$LANLNK_BASE" not in path_str:
+            return path_str
+        from _company_base import resolve_company_base
+
+        return path_str.replace("$LANLNK_BASE", str(resolve_company_base()))
 
     def _is_valid_hex(self, val: str) -> bool:
         h = val.lstrip("#")
