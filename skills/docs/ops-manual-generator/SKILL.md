@@ -189,24 +189,24 @@ $USERGUIDE_BASE/{name}/
 
 ### 示例 1：生成部署手册
 
-> 用户："为 /opt/code/mi 写部署手册"
+> 用户："为 /opt/code/lnkcre 写部署手册"
 
 ```text
 Agent:
-   1. 扫描 /opt/code/mi → 发现 Dockerfile + docker-compose.yml + nginx.conf + .env.example
+   1. 扫描 /opt/code/lnkcre → 发现 Dockerfile + docker-compose.yml + nginx.conf + .env.example
    2. 加载 references/部署手册-模板.md
    3. 逐章填充：
       - 环境要求：从 compose 读出 MySQL 8.0 + Redis 7 + 端口 8080/3306/6379
       - 环境变量：从 .env.example 读出 12 个变量名（脱敏）
       - 安装步骤：从 compose 的 depends_on 推断启动顺序
       - 【需提供】批量问用户：SSL 证书来源？域名？最小硬件配置？
-   4. 用户回答后 → 生成 $USERGUIDE_BASE/mi/部署手册.md
+   4. 用户回答后 → 生成 $USERGUIDE_BASE/lnkcre/部署手册.md
    5. 交付：列出文件路径 + 提示"维护手册可用同一方式生成"
 ```
 
 ### 示例 2：用历史 SOP 生成维护手册
 
-> 用户："整理 mi 项目的运维 SOP"，且提供了厂商交付的运维 docx
+> 用户："整理 lnkcre 项目的运维 SOP"，且提供了厂商交付的运维 docx
 
 ```text
 Agent:
