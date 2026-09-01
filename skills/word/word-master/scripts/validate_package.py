@@ -20,6 +20,9 @@ from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src._company_base import resolve_company_base  # noqa: E402
+
 # ============================================================
 # 常量
 # ============================================================
@@ -359,18 +362,21 @@ class PackageValidator:
     # ── 工具方法 ────────────────────────────────────────
 
     def _resolve_path(self, path_str: str, pkg_path: Path) -> Path | None:
-        """展开 $ 变量并解析路径"""
-        # 展开 $LANLNK_BASE / $MATERIALS_DIR 等
-        lanlnk = os.environ.get("LANLNK_BASE", "")
-        materials = str(Path(lanlnk) / "materials") if lanlnk else ""
+        """展开 $ 变量并解析路径。
 
-        resolved_str = (
-            path_str
-            .replace("$LANLNK_BASE", lanlnk)
-            .replace("$MATERIALS_DIR", materials)
-        )
+        COMPANIES.md §3：路径含 $ 变量而公司基座未设/非法时，
+        resolve_company_base 直接报错退出（无静默默认，不回落 lanlnk）。
+        不含 $ 变量的路径不依赖环境。
+        """
+        if "$" in path_str:
+            base = resolve_company_base()
+            path_str = (
+                path_str
+                .replace("$LANLNK_BASE", str(base))
+                .replace("$MATERIALS_DIR", str(base / "materials"))
+            )
 
-        p = Path(resolved_str)
+        p = Path(path_str)
         if p.is_absolute():
             return p
         # 相对于内容包目录
@@ -440,7 +446,7 @@ def main():
             print("未找到 .word-content.md 文件")
         sys.exit(0)
 
-    lanlnk_base = os.environ.get("LANLNK_BASE", "")
+    lanlnk_base = os.environ.get("COMPANY_BASE") or os.environ.get("LANLNK_BASE") or ""
     validator = PackageValidator(lanlnk_base=lanlnk_base)
 
     results = [validator.validate_file(f) for f in files]

@@ -18,16 +18,30 @@ from docx.oxml import parse_xml
 
 from .parser import ContentPackage, Chapter, TableData
 from .table_styles import render_table
+from ._company_base import resolve_company_base
 
 
 # ============================================================
 # 路径变量解析
 # ============================================================
 
-ENV_VARS = {
-    "$MATERIALS_DIR": os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk") + "/materials",
-    "$LANLNK_BASE": os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk"),
-}
+def resolve_path(path_str: str) -> str:
+    """解析路径中的环境变量（$LANLNK_BASE / $MATERIALS_DIR）。
+
+    仅当路径确实包含 $ 变量时才解析公司基座（COMPANIES.md §3：
+    COMPANY_BASE ∥ LANLNK_BASE，无静默默认，需 config/company.yaml），
+    避免 lianyou 等其他公司会话静默回落 lanlnk 素材。
+    """
+    if "$" not in path_str:
+        return path_str
+    base = resolve_company_base()
+    env_vars = {
+        "$MATERIALS_DIR": str(base / "materials"),
+        "$LANLNK_BASE": str(base),
+    }
+    for var, val in env_vars.items():
+        path_str = path_str.replace(var, val)
+    return path_str
 
 WORD_TEMPLATES_DIR = Path(
     os.environ.get(
@@ -35,13 +49,6 @@ WORD_TEMPLATES_DIR = Path(
         "/opt/code/skill/skills/word/word-master/templates",
     )
 )
-
-
-def resolve_path(path_str: str) -> str:
-    """解析路径中的环境变量"""
-    for var, val in ENV_VARS.items():
-        path_str = path_str.replace(var, val)
-    return path_str
 
 
 # ============================================================
