@@ -1,6 +1,6 @@
 # ─── How to run ───
 #   cd skills/business/product-prd-generator
-#   uv run scripts/extract_code_map.py --code-root /opt/code/mi --output parsed/current-code-map.json
+#   uv run scripts/extract_code_map.py --code-root /opt/code/lnkcre --output parsed/current-code-map.json
 
 from __future__ import annotations
 
@@ -229,7 +229,7 @@ def _to_dict(code_map: CodeMap) -> dict[str, object]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Extract code-side capability map from OpenSpec specs + alignment matrix.")
-    parser.add_argument("--code-root", default="/opt/code/mi")
+    parser.add_argument("--code-root", default="/opt/code/lnkcre")
     parser.add_argument("--project", default="商管系统")
     parser.add_argument("--output", default="-", help="output JSON path; '-' for stdout")
     args = parser.parse_args()

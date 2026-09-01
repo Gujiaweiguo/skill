@@ -231,7 +231,7 @@ def to_json(code_map: CodeMap) -> dict[str, object]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Extract code-side capability map from OpenSpec specs + alignment matrix.")
-    parser.add_argument("--code-root", default="/opt/code/mi")
+    parser.add_argument("--code-root", default="/opt/code/lnkcre")
     parser.add_argument("--project", default="商管系统")
     parser.add_argument("--skill-root", default="")
     parser.add_argument("--output", default="-")

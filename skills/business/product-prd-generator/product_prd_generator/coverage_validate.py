@@ -1036,9 +1036,9 @@ def _write_suggested_changes_yaml(output_dir: Path, rows: list[CapabilityRow]) -
 
 
 def _write_mi_consumption_prompt(output_dir: Path, suggested_path: Path) -> Path:
-    prompt = f"""# MI / 目标项目消费提示词（coverage-validate 增量）
+    prompt = f"""# LnkCRE / 目标项目消费提示词（coverage-validate 增量）
 
-在目标项目目录（如 `/opt/code/mi`）启动 OpenCode 后使用。
+在目标项目目录（如 `/opt/code/lnkcre`）启动 OpenCode 后使用。
 
 ```text
 请先读取当前项目 AGENTS.md、openspec/specs/、相关代码和测试基线，再消费 PRD 覆盖度校验结果，不要直接创建 change。

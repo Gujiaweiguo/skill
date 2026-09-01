@@ -36,7 +36,7 @@ def _doc_map_args(args: argparse.Namespace, output: str) -> list[str]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="product-prd-generator")
     parser.add_argument("--project", default="商管系统", type=validate_project)
-    parser.add_argument("--code-root", default="/opt/code/mi")
+    parser.add_argument("--code-root", default="/opt/code/lnkcre")
     parser.add_argument("--docs-root", default=str(Path.cwd()))
     parser.add_argument("--skill-root", default=str(Path(__file__).resolve().parents[1]))
     parser.add_argument("--parsed-dir", default="parsed")
@@ -76,8 +76,9 @@ def main() -> int:
     if _run("product_prd_generator.reconcile", ["--code-map", str(code_map_path), "--doc-map", str(doc_map_path), "--output", str(reconcile_path)]) != 0:
         return 1
 
+    review_dir = Path(args.output_dir).parent / "review"
+
     if args.mode == "coverage-validate":
-        review_dir = Path("review")
         coverage_args = [
             "--reconcile", str(reconcile_path),
             "--doc-map", str(doc_map_path),
@@ -118,7 +119,6 @@ def main() -> int:
     if args.docx_output:
         render_docx(content_package_path, args.docx_output, args.word_master_root)
 
-    review_dir = Path("review")
     review_dir.mkdir(parents=True, exist_ok=True)
     return _run("product_prd_generator.review", ["--reconcile", str(reconcile_path), "--output-dir", str(review_dir)])
 
