@@ -79,7 +79,7 @@ DEVKIT_RATE = _load_devkit_rate()
 
 
 def _load_mi_feature_baseline() -> dict[str, Any]:
-    """读取 MI 商管系统功能基线（feature-baseline.yaml）统计信息。
+    """读取 LnkCRE 商管系统功能基线（feature-baseline.yaml）统计信息。
 
     功能基线权威源：$LANLNK_BASE/30-products/mi-cre/feature-baseline/feature-baseline.yaml
 
@@ -104,13 +104,13 @@ def _load_mi_feature_baseline() -> dict[str, Any]:
             "source": str(path),
         }
     except Exception as e:
-        print(f"[WARN] MI 功能基线读取失败({e})，功能清单使用内置模块说明", file=sys.stderr)
+        print(f"[WARN] LnkCRE 功能基线读取失败({e})，功能清单使用内置模块说明", file=sys.stderr)
         return {}
 
-# === MI 商管系统数据（v1 硬编码，用于验证；后续版本改为读模板动态生成）===
+# === LnkCRE 商管系统数据（v1 硬编码，用于验证；后续版本改为读模板动态生成）===
 MI_DATA: dict[str, Any] = {
-    "product_name": "MI 商管系统",
-    "product_label": "MI",
+    "product_name": "LnkCRE 商管系统",
+    "product_label": "LnkCRE",
     # 标准产品（必选）：序号 / 名称 / 内容说明 / 首年报价 / 次年报价 / 备注
     "standard_items": [
         ("1.1", "商管平台 SAAS 租用",
@@ -1001,7 +1001,7 @@ def _fill_modules_from_data(ws, data: dict[str, Any]) -> None:
         c = ws.cell(
             r, 1,
             f"功能基线：共 {bm.get('item_count', 0)} 项能力（{dist}），"
-            "源自 MI 功能基线 feature-baseline.yaml。",
+            "源自 LnkCRE 功能基线 feature-baseline.yaml。",
         )
         style_cell(c, size=9, color=COLOR_INFO_FG, h="left", v="center", border=False)
         ws.row_dimensions[r].height = 20
