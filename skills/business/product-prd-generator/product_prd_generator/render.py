@@ -56,14 +56,56 @@ def _status_stats(capabilities: list[dict[str, Any]]) -> Counter[str]:  # noqa: 
     return Counter(cap.get("reconciled_status", "missing") for cap in capabilities)
 
 
-def _render_project_context(project: str, stats: Counter[str], code_root: str) -> str:
+def _git_dirty(code_root: str) -> bool:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", code_root, "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return bool(completed.stdout.strip())
+
+
+def _baseline_notes(doc_map: dict[str, Any] | None, code_root: str) -> tuple[str, str]:
+    """Build the 来源 line and dirty-worktree note from actual doc_map evidence."""
+    features = []
+    if isinstance(doc_map, dict):
+        raw_features = doc_map.get("features", [])
+        if isinstance(raw_features, list):
+            features = [f for f in raw_features if isinstance(f, dict)]
+    has_customer = any(str(f.get("source_type", "")) == "customer-requirements" for f in features)
+    has_competitor = any(str(f.get("source_type", "")) == "competitor" for f in features)
+    sources = [f"当前产品代码基线（{code_root}）"]
+    if has_customer:
+        sources.insert(0, "客户需求")
+    if has_competitor:
+        sources.insert(0 if has_customer else 0, "竞品资料")
+    dirty_note = ""
+    if _git_dirty(code_root):
+        dirty_note = "- 基线说明：代码仓库当前存在未提交修改，能力基线以功能清单 pinned 的 HEAD commit 为准"
+    return " + ".join(sources), dirty_note
+
+
+def _render_project_context(
+    project: str,
+    stats: Counter[str],
+    code_root: str,
+    sources_desc: str = "",
+    dirty_note: str = "",
+) -> str:
     total = sum(stats.values())
+    sources_line = sources_desc or f"客户需求 + 竞品资料 + 当前产品代码基线（{code_root}）"
+    extra = f"\n{dirty_note}" if dirty_note else ""
     return f"""## 1. 背景
 
 - 项目：{project}
-- 来源：客户需求 + 竞品资料 + 当前产品代码基线（{code_root}）
+- 来源：{sources_line}
 - 能力总数：{total}
-- 状态分布：existing {stats.get("existing", 0)} / partial {stats.get("partial", 0)} / missing {stats.get("missing", 0)} / explicitly-not-do {stats.get("explicitly-not-do", 0)}
+- 状态分布：existing {stats.get("existing", 0)} / partial {stats.get("partial", 0)} / missing {stats.get("missing", 0)} / explicitly-not-do {stats.get("explicitly-not-do", 0)}{extra}
 
 ## 2. 当前产品基线
 
@@ -73,7 +115,7 @@ def _render_project_context(project: str, stats: Counter[str], code_root: str) -
 | partial | {stats.get("partial", 0)} |
 | missing | {stats.get("missing", 0)} |
 | explicitly-not-do | {stats.get("explicitly-not-do", 0)} |
-	"""
+"""
 
 
 def _approval_flows_from_file(docs_root: str) -> list[tuple[str, str, str, str, str]]:
@@ -162,7 +204,7 @@ def _render_approval_flow_evidence(requirements: list[dict[str, Any]], docs_root
 
 def _render_customer_summary(doc_map: dict[str, Any] | None) -> str:  # noqa: ANY_OK
     if not doc_map:
-        return "## 3. 客户需求汇总\n\n（待 doc-map 提供 source_type=customer-requirements 的 features 后填充）\n"
+        return "## 2A. 客户需求汇总\n\n（待 doc-map 提供 source_type=customer-requirements 的 features 后填充）\n"
     grouped: dict[str, dict[str, list[str]]] = defaultdict(lambda: {"files": [], "items": []})
     by_file: dict[str, list[dict[str, Any]]] = defaultdict(list)  # noqa: ANY_OK
     for feat in doc_map.get("features", []):
@@ -181,7 +223,7 @@ def _render_customer_summary(doc_map: dict[str, Any] | None) -> str:  # noqa: AN
                 continue
             if term not in grouped[current_module]["items"]:
                 grouped[current_module]["items"].append(term)
-    lines = ["## 3. 客户需求汇总", "", f"共 {len(grouped)} 个模块。", ""]
+    lines = ["## 2A. 客户需求汇总", "", f"共 {len(grouped)} 个模块。", ""]
     for module, payload in grouped.items():
         files = ", ".join(dict.fromkeys(payload["files"]))
         items = payload["items"]
@@ -242,7 +284,7 @@ def _git_revision(code_root: str) -> tuple[str | None, str | None]:
 def _render_feature_list(
     capabilities: list[dict[str, Any]],  # noqa: ANY_OK
     project: str = "商管系统",
-    code_root: str = "/opt/code/mi",
+    code_root: str = "/opt/code/lnkcre",
 ) -> str:
     commit, commit_date = _git_revision(code_root)
     status_counts = Counter(
@@ -255,10 +297,10 @@ def _render_feature_list(
         "generator": "product-prd-generator",
         "generator_version": "0.1.0",
         "project": project,
-        "mi_code_root": code_root,
-        "mi_commit": commit,
-        "mi_commit_date": commit_date,
-        "mi_commits_since_last_prd": None,
+        "code_root": code_root,
+        "code_commit": commit,
+        "code_commit_date": commit_date,
+        "commits_since_last_prd": None,
         "item_count": len(capabilities),
         "status_distribution": {
             "existing": status_counts.get("existing", 0),
@@ -488,7 +530,8 @@ def _render_prd_handoff(inputs: RenderInputs, output_dir: Path, code_root: str) 
         lines.append("|---|---|---|---|---|")
         for item in items:
             customers = ", ".join(item["customers"][:4]) if item["customers"] else "—"
-            gap_summary = "; ".join(item["gaps"])[:120] or "—"
+            raw_summary = "; ".join(item["gaps"])
+            gap_summary = (raw_summary[:117] + "…") if len(raw_summary) > 120 else (raw_summary or "—")
             lines.append(
                 f"| `{_md_cell(item['change_id'])}` | {_md_cell(item['title'])} | {_md_cell(item['current_status'])} | {_md_cell(customers)} | {_md_cell(gap_summary)} |"
             )
@@ -509,7 +552,7 @@ def _render_prd_handoff(inputs: RenderInputs, output_dir: Path, code_root: str) 
 def _render_mi_consumption_prompt(project: str, output_dir: Path, code_root: str) -> str:
     handoff = (output_dir / "PRD实施交接包.md").resolve()
     changes = (output_dir / "suggested-openspec-changes.yaml").resolve()
-    return f"""# MI / 目标项目消费提示词
+    return f"""# LnkCRE / 目标项目消费提示词
 
 在目标项目目录（如 `{code_root}`）启动 OpenCode 后使用。
 
@@ -710,8 +753,10 @@ def _render_module_summary(requirements: list[dict[str, Any]], project: str = "�
         else:
             stats["unmatched"] += 1
         stats[req.get("priority", "低")] += 1
+    if not requirements:
+        return "## 3A. 需求模块汇总\n\n（本次生成未纳入需求材料，无需求-模块映射。）\n"
     lines = [
-        "## 3.6 需求模块汇总",
+        "## 3A. 需求模块汇总",
         "",
         f"按业务模块聚合 {len(requirements)} 条需求：",
         "",
@@ -856,6 +901,7 @@ def _render_blueprint_modules(
     capabilities: list[dict[str, Any]],  # noqa: ANY_OK
     ontology: dict[str, Any],  # noqa: ANY_OK
     tables_by_module: dict[str, list[TableMeta]] | None = None,
+    project: str = "商管系统",
 ) -> str:
     """Render PRD by business module — blueprint style with field-level specs."""
     modules = ontology.get("modules", {})
@@ -869,8 +915,8 @@ def _render_blueprint_modules(
     mod_names = list(modules.keys())
     lines = ["## 3. 业务模块详细设计", ""]
 
-    # Load field specs for resource management
-    field_specs = _load_field_specs()
+    # Load field specs for resource management (商管 only; other products return {})
+    field_specs = _load_field_specs(project)
 
     for idx, (mod_name, mod_data) in enumerate(modules.items()):
         if not isinstance(mod_data, dict):
@@ -1041,8 +1087,12 @@ def _render_blueprint_modules(
     return "\n".join(lines)
 
 
-def _load_field_specs() -> dict[str, Any]:  # noqa: ANY_OK
+def _load_field_specs(project: str = "商管系统") -> dict[str, Any]:  # noqa: ANY_OK
     import os
+    if project not in {"商管系统", "mi-cre"}:
+        # config/field-specs 是商管域专属实体库；其他产品按子功能名匹配会
+        # 把商管字段表错误渲染进无关产品（如 lnkreport 的"组织管理"）。
+        return {}
     base = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "config" / "field-specs"
     specs: dict[str, Any] = {}  # noqa: ANY_OK
     # Source 1: resource-field-specs.yaml (flat entity keys)
@@ -1171,7 +1221,35 @@ def _render_data_model_index(tables_by_module: dict[str, list[TableMeta]], unmat
     return "\n".join(lines)
 
 
-def render_prd(inputs: RenderInputs, code_root: str = "/opt/code/mi") -> str:
+def _render_engineering_notes(
+    capabilities: list[dict[str, Any]],  # noqa: ANY_OK
+    ontology: dict[str, Any],  # noqa: ANY_OK
+) -> str:
+    """List capabilities that map to no ontology business module.
+
+    These are deploy/compat/test engineering specs or cross-domain IDs; they
+    stay in the feature list but are not expanded in §3 modules. Keeps the
+    inventory arithmetic (modules + engineering = total) explicit.
+    """
+    if not isinstance(ontology, dict) or not ontology.get("modules"):
+        return ""
+    mapped: set[str] = set()
+    for module in ontology["modules"].values():
+        if not isinstance(module, dict):
+            continue
+        for sub in module.get("sub_functions", {}).values():
+            if isinstance(sub, dict):
+                mapped.update(str(c) for c in sub.get("capabilities", []))
+    unmapped = [str(c.get("id", "")) for c in capabilities if str(c.get("id", "")) not in mapped]
+    if not unmapped:
+        return ""
+    return (
+        f"其中 {len(unmapped)} 项未映射到 §3 业务模块（部署/兼容/测试等工程类能力），"
+        f"仅在功能清单中列出：\n\n- {'、'.join(unmapped)}\n"
+    )
+
+
+def render_prd(inputs: RenderInputs, code_root: str = "/opt/code/lnkcre") -> str:
     project = inputs.reconcile.get("project", "商管系统")
     capabilities = inputs.reconcile.get("capabilities", [])
     requirements = inputs.reconcile.get("requirements", [])
@@ -1187,13 +1265,14 @@ def render_prd(inputs: RenderInputs, code_root: str = "/opt/code/mi") -> str:
         tables_by_module=tables_by_mod,
         unmatched_table_count=len(unmatched_tables),
     ))
+    sources_desc, dirty_note = _baseline_notes(inputs.doc_map, code_root)
     parts = [
         f"# {project} 产品 PRD\n",
         review_brief,
-        _render_project_context(str(project), stats, code_root),
+        _render_project_context(str(project), stats, code_root, sources_desc, dirty_note),
         _render_customer_summary(inputs.doc_map),
         _render_structure_summary(requirements),
-        _render_blueprint_modules(requirements, capabilities, ontology, tables_by_mod) if ontology else _render_requirement_list(requirements),
+        _render_blueprint_modules(requirements, capabilities, ontology, tables_by_mod, project=str(project)) if ontology else _render_requirement_list(requirements),
         _render_data_model_index(tables_by_mod, unmatched_tables),
         _render_approval_flow_evidence(requirements, inputs.docs_root),
         _render_module_summary(requirements, project=str(project)),
@@ -1201,6 +1280,7 @@ def render_prd(inputs: RenderInputs, code_root: str = "/opt/code/mi") -> str:
         "",
         f"共 {len(capabilities)} 项能力，详见 [功能清单.md](功能清单.md)。",
         "",
+        _render_engineering_notes(capabilities, ontology),
         _render_unmatched_requirements(capabilities),
         _render_version_plan(capabilities),
         _render_image_refs(capabilities),
@@ -1221,7 +1301,7 @@ def main() -> int:
     parser.add_argument("--docs-root", default="")
     parser.add_argument("--output-dir", default="output")
     parser.add_argument("--project", default="商管系统")
-    parser.add_argument("--code-root", default="/opt/code/mi")
+    parser.add_argument("--code-root", default="/opt/code/lnkcre")
     args = parser.parse_args()
 
     doc_map_path = args.doc_map if args.doc_map else None

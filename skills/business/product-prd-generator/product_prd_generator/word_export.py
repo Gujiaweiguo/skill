@@ -60,7 +60,11 @@ def _stringify_table(rows: list[list[Any]]) -> list[list[str]]:
 def _frontmatter_lines(reconcile: dict[str, Any], doc_map: dict[str, Any] | None) -> list[str]:
     project = str(reconcile.get("project", "商管系统"))
     today = str(reconcile.get("generated_at", date.today().isoformat()))
-    sources = [{"path": reconcile.get("source_code_root", "/opt/code/mi"), "type": "code-baseline"}]
+    code_baseline = str(reconcile.get("source_path") or reconcile.get("source_code_root") or "")
+    if code_baseline:
+        sources = [{"path": code_baseline, "type": "code-baseline"}]
+    else:
+        sources = []
     if doc_map and doc_map.get("source_root"):
         sources.append({"path": doc_map["source_root"], "type": "doc-baseline"})
 
@@ -176,10 +180,17 @@ def _render_customer_section(doc_map: dict[str, Any] | None) -> list[str]:
     return _chapter_with_lines("2. 客户需求汇总", lines, page_break=False)
 
 
-def _render_baseline_section(stats: dict[str, int], capabilities: list[dict[str, Any]]) -> list[str]:
+def _render_baseline_section(
+    stats: dict[str, int],
+    capabilities: list[dict[str, Any]],
+    project: str = "",
+    sources_desc: str = "",
+) -> list[str]:
+    project_name = project or str(capabilities[0].get("project", "商管系统")) if capabilities else (project or "商管系统")
+    sources_line = sources_desc or "客户需求 + 竞品资料 + 当前产品代码基线"
     lines = [
-        f"- 项目：{capabilities[0].get('project', '商管系统') if capabilities else '商管系统'}",
-        "- 来源：客户需求 + 竞品资料 + 当前产品代码基线（/opt/code/mi）",
+        f"- 项目：{project_name}",
+        f"- 来源：{sources_line}",
         f"- 能力总数：{sum(stats.values())}",
         f"- 状态分布：existing {stats.get('existing', 0)} / partial {stats.get('partial', 0)} / missing {stats.get('missing', 0)} / explicitly-not-do {stats.get('explicitly-not-do', 0)}",
         "",
@@ -209,7 +220,7 @@ def _render_feature_section(capabilities: list[dict[str, Any]]) -> list[str]:
             str(len(cap.get("evidence", []))),
         ])
     return _chapter_with_lines(
-        "3. 功能清单",
+        "4. 功能清单",
         [
             "```yaml",
             *_yaml_block({
@@ -237,7 +248,7 @@ def _render_gap_section(capabilities: list[dict[str, Any]]) -> list[str]:
         lines.append(f"- **{name}** ({status}): {'; '.join(gaps)}")
     if not lines:
         lines.append("- （暂无明显差距）")
-    return _chapter_with_lines("4. 差距分析", lines, page_break=False)
+    return _chapter_with_lines("5A. 差距分析", lines, page_break=False)
 
 
 def _render_evidence_section(capabilities: list[dict[str, Any]]) -> list[str]:
@@ -247,7 +258,7 @@ def _render_evidence_section(capabilities: list[dict[str, Any]]) -> list[str]:
         for ev in cap.get("evidence", []):
             rows.append([name, str(ev.get("kind", "")), str(ev.get("ref", ""))])
     return _chapter_with_lines(
-        "5. 需求证据表",
+        "5B. 需求证据表",
         [
             "```yaml",
             *_yaml_block({
@@ -649,12 +660,23 @@ def build_content_package(reconcile_path: str | Path, doc_map_path: str | Path |
     output_dir.mkdir(parents=True, exist_ok=True)
     content_path = output_dir / "产品PRD.word-content.md"
 
+    features = (doc_map or {}).get("features", []) or []
+    has_customer = any(isinstance(f, dict) and str(f.get("source_type", "")) == "customer-requirements" for f in features)
+    has_competitor = any(isinstance(f, dict) and str(f.get("source_type", "")) == "competitor" for f in features)
+    code_root = str(reconcile.get("source_path") or "")
+    sources_parts = ([f"当前产品代码基线（{code_root}）"] if code_root else [])
+    if has_customer:
+        sources_parts.insert(0, "客户需求")
+    if has_competitor:
+        sources_parts.insert(0 if has_customer else 0, "竞品资料")
+    sources_desc = " + ".join(sources_parts)
+
     sections = [
         *_frontmatter_lines(reconcile, doc_map),
         "",
         *review_brief.splitlines(),
         "",
-        *_render_baseline_section(stats, capabilities),
+        *_render_baseline_section(stats, capabilities, project=project, sources_desc=sources_desc),
         *_render_customer_section(doc_map),
         *_render_blueprint_section(requirements, capabilities, docs_root, project=project),
         *_render_approval_flow_section(docs_root),

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Mapping
 
@@ -92,6 +92,25 @@ def build_report(reconcile: Mapping[str, object]) -> ReviewReport:
             status = str(capability.get("reconciled_status", "missing"))
             if confidence == "low" or status == "explicitly-not-do" or (status == "partial" and has_gaps):
                 items.append(_build_item(capability))
+                continue
+            evidence = capability.get("evidence", [])
+            if isinstance(evidence, list):
+                kinds = {
+                    str(entry.get("kind", ""))
+                    for entry in evidence
+                    if isinstance(entry, Mapping)
+                } - {""}
+                if kinds and kinds <= {"openspec-archive", "code"}:
+                    item = _build_item(capability)
+                    items.append(
+                        replace(
+                            item,
+                            problem=(
+                                f"{item.title} 仅有 {'/'.join(sorted(kinds))} 单一证据来源，"
+                                "建议人工复核实现完整性（无现行 spec 佐证）"
+                            ),
+                        )
+                    )
     return ReviewReport(project=project, items=tuple(items))
 
 
