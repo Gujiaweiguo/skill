@@ -21,6 +21,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
+from _company_base import resolve_company_base  # noqa: E402
+
 
 def find_raw_md_files(raw_dir: Path) -> list[Path]:
     """遍历 raw/ 目录，收集所有 .md 文件（排除 _media/）。"""
@@ -117,15 +120,7 @@ def main() -> int:
     parser.add_argument("--no-merge", dest="merge", action="store_false", help="完全覆盖现有索引")
     args = parser.parse_args()
 
-    base = os.environ.get("COMPANY_BASE") or os.environ.get("LANLNK_BASE")
-    if not base:
-        print("错误: 未设置 COMPANY_BASE（或兼容变量 LANLNK_BASE）。\n"
-              "  export COMPANY_BASE=/opt/code/docs/<company>   # 如 lianyou / lanlnk", file=sys.stderr)
-        return 1
-    base = Path(base)
-    if not (base / "config" / "company.yaml").is_file():
-        print(f"错误: {base} 不是已注册公司（缺 config/company.yaml）。", file=sys.stderr)
-        return 1
+    base = resolve_company_base()
     raw_dir = Path(args.raw_dir) if args.raw_dir else base / "raw"
     materials_dir = Path(args.materials_dir) if args.materials_dir else base / "materials"
 

@@ -8,13 +8,14 @@
 从 raw/prd-商管系统/02-competitors/ 的转换产物创建结构化 materials .md。
 """
 
-import os
 import re
 import sys
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+from _company_base import resolve_company_base
 from sanitize_markdown import sanitize_content
 
 
@@ -32,53 +33,40 @@ def read_text_auto(path: Path) -> str:
             continue
     return raw.decode("utf-8", errors="replace")
 
-def resolve_company_base() -> Path:
-    """多公司变量协议（COMPANIES.md §3）：COMPANY_BASE ∥ LANLNK_BASE，无静默默认。"""
-    base = os.environ.get("COMPANY_BASE") or os.environ.get("LANLNK_BASE")
-    if not base:
-        sys.exit(
-            "错误: 未设置 COMPANY_BASE（或兼容变量 LANLNK_BASE）。\n"
-            "  export COMPANY_BASE=/opt/code/docs/<company>   # 如 lianyou / lanlnk"
-        )
-    base = Path(base)
-    if not (base / "config" / "company.yaml").is_file():
-        sys.exit(
-            f"错误: {base} 不是已注册公司（缺 config/company.yaml）。\n"
-            "  新公司请在 docs 仓库运行 scripts/onboard.sh company <slug> 创建。"
-        )
-    return base
-
-
-BASE: Path | None = None
-
 # 子路径解析优先级：CLI 参数 > 目录存在性守卫的兼容默认（prd-商管系统，lanlnk 存量行为）> 报错列候选
 _LEGACY_RAW_SUBDIR = "prd-商管系统"
 
 
-def resolve_competitor_dirs(raw_flag: str | None, materials_flag: str | None) -> tuple[Path, Path]:
+@dataclass(frozen=True, slots=True)
+class ImportContext:
+    """一次批量导入的路径上下文（由 main 解析后向下传递）。"""
+
+    base: Path
+    raw_dir: Path
+    mat_dir: Path
+
+
+def resolve_competitor_dirs(base: Path, raw_flag: str | None, materials_flag: str | None) -> tuple[Path, Path]:
     if raw_flag:
         raw_dir = Path(raw_flag)
         if not raw_dir.is_dir():
-            sys.exit(f"错误: --raw-competitors 指定的目录不存在: {raw_dir}")
+            sys.exit(f"错误: --raw-competitors 指定的目录不存在: {raw_flag}")
     else:
-        legacy = BASE / "raw" / _LEGACY_RAW_SUBDIR / "02-competitors"
+        legacy = base / "raw" / _LEGACY_RAW_SUBDIR / "02-competitors"
         if legacy.is_dir():
             raw_dir = legacy
         else:
-            candidates = sorted(p.parent.name for p in (BASE / "raw").glob("prd-*/02-competitors") if p.is_dir()) \
-                if (BASE / "raw").is_dir() else []
+            candidates = sorted(p.parent.name for p in (base / "raw").glob("prd-*/02-competitors") if p.is_dir()) \
+                if (base / "raw").is_dir() else []
             hint = f"  候选: {', '.join(candidates)}\n" if candidates else ""
             sys.exit(
                 "错误: 无法定位竞品 raw 目录（raw/prd-*/02-competitors）。\n"
                 f"{hint}"
                 "  请用 --raw-competitors <dir> 显式指定。"
             )
-    materials_dir = Path(materials_flag) if materials_flag else BASE / "materials" / "13-competitors"
+    materials_dir = Path(materials_flag) if materials_flag else base / "materials" / "13-competitors"
     return raw_dir, materials_dir
 
-
-RAW_COMPETITORS: Path | None = None
-MATERIALS_COMPETITORS: Path | None = None
 
 VENDOR_MAP = {
     "悦商": ("yueshang", "商管"),
@@ -138,9 +126,9 @@ source_file: "{raw_path}"
 """
 
 
-def process_vendor(vendor_cn: str, vendor_en: str, domain: str) -> int:
-    raw_dir = RAW_COMPETITORS / vendor_cn
-    mat_dir = MATERIALS_COMPETITORS / vendor_en
+def process_vendor(ctx: ImportContext, vendor_cn: str, vendor_en: str, domain: str) -> int:
+    raw_dir = ctx.raw_dir / vendor_cn
+    mat_dir = ctx.mat_dir / vendor_en
 
     if not raw_dir.is_dir():
         print(f"  [SKIP] raw/ 不存在: {raw_dir}")
@@ -185,13 +173,13 @@ def process_vendor(vendor_cn: str, vendor_en: str, domain: str) -> int:
             print(f"  [SKIP] 内容太少: {rel}")
             continue
 
-        raw_rel = str(raw_file.relative_to(BASE))
+        raw_rel = str(raw_file.relative_to(ctx.base))
         name = infer_name(rel.name)
         fm = build_frontmatter(vendor_en, vendor_cn, domain, seq, name, raw_rel)
 
         content, _ = sanitize_content(content)
         mat_file.write_text(fm + content, encoding="utf-8")
-        print(f"  [OK] {mat_file.relative_to(MATERIALS_COMPETITORS)}")
+        print(f"  [OK] {mat_file.relative_to(ctx.mat_dir)}")
         seq += 1
         created += 1
 
@@ -206,17 +194,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--materials-competitors", help="竞品 materials 目录（默认: <base>/materials/13-competitors）")
     args = parser.parse_args(argv)
 
-    global BASE, RAW_COMPETITORS, MATERIALS_COMPETITORS
-    BASE = resolve_company_base()
-    RAW_COMPETITORS, MATERIALS_COMPETITORS = resolve_competitor_dirs(args.raw_competitors, args.materials_competitors)
-    print(f"公司基座: {BASE}")
-    print(f"竞品 raw: {RAW_COMPETITORS}")
-    print(f"竞品 materials: {MATERIALS_COMPETITORS}")
+    base = resolve_company_base()
+    raw_dir, mat_dir = resolve_competitor_dirs(base, args.raw_competitors, args.materials_competitors)
+    ctx = ImportContext(base=base, raw_dir=raw_dir, mat_dir=mat_dir)
+    print(f"公司基座: {ctx.base}")
+    print(f"竞品 raw: {ctx.raw_dir}")
+    print(f"竞品 materials: {ctx.mat_dir}")
 
     total = 0
     for vendor_cn, (vendor_en, domain) in VENDOR_MAP.items():
         print(f"\n=== {vendor_cn} ({vendor_en}) ===")
-        count = process_vendor(vendor_cn, vendor_en, domain)
+        count = process_vendor(ctx, vendor_cn, vendor_en, domain)
         print(f"  创建 {count} 个 .md")
         total += count
 

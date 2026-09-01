@@ -36,6 +36,9 @@ from typing import Any
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).parent))
+from _company_base import resolve_company_base  # noqa: E402
+
 
 # ── 数据结构 ──────────────────────────────────────────
 
@@ -273,16 +276,7 @@ def main():
 
     args = parser.parse_args()
 
-    base = os.environ.get("COMPANY_BASE") or os.environ.get("LANLNK_BASE")
-    if not base:
-        print("错误: 未设置 COMPANY_BASE（或兼容变量 LANLNK_BASE）。\n"
-              "  export COMPANY_BASE=/opt/code/docs/<company>   # 如 lianyou / lanlnk", file=sys.stderr)
-        sys.exit(1)
-    base = Path(base)
-    if not (base / "config" / "company.yaml").is_file():
-        print(f"错误: {base} 不是已注册公司（缺 config/company.yaml）。\n"
-              "  新公司请在 docs 仓库运行 scripts/onboard.sh company <slug> 创建。", file=sys.stderr)
-        sys.exit(1)
+    base = resolve_company_base()
 
     cases_dir = base / "materials" / "04-cases"
 

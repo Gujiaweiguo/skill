@@ -7,6 +7,10 @@ import sys
 import zipfile
 from pathlib import Path
 
+import _company_base
+
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+
 
 def extract_images_from_zip(zip_path: str, media_dir: str) -> dict[str, str]:
     """从 ZIP 中提取图片，返回 原名→新名 的映射。"""
@@ -212,6 +216,26 @@ def fix_markdown_paths(md_path: str, media_dir: str, rel_map: dict[str, str], st
     return fix_count
 
 
+def resolve_raw_dir(raw_flag: str | None) -> Path:
+    """解析 raw 输出根目录；绝不允许落在 skill 仓库内部。
+
+    - 未显式指定时：默认 $COMPANY_BASE/raw（需通过 company.yaml 守卫）。
+    - 显式指定时：按 CWD 解析相对路径，但解析结果若位于 skill 仓库内则报错，
+      防止相对路径（如 ``lanlnk/raw/...``）把转换产物写进 skill 目录。
+    """
+    if raw_flag:
+        raw_dir = Path(raw_flag).resolve()
+    else:
+        raw_dir = _company_base.resolve_company_base() / "raw"
+    if raw_dir == SKILL_ROOT or SKILL_ROOT in raw_dir.parents:
+        sys.exit(
+            f"错误: raw 输出目录不能位于 skill 仓库内（{raw_dir}）。\n"
+            "  转换产物必须写入 docs 仓库（$COMPANY_BASE/raw）。请 export COMPANY_BASE 后重跑，\n"
+            "  或用 --raw-dir 显式指定 docs 仓库内的绝对路径。"
+        )
+    return raw_dir
+
+
 def process_file(file_path: str, raw_dir: str) -> None:
     """处理单个文件：提取图片 + 修正 Markdown 路径。"""
     ext = Path(file_path).suffix.lower()
@@ -240,17 +264,20 @@ def process_file(file_path: str, raw_dir: str) -> None:
         print(f"  ⏭️ 跳过 (不支持格式): {file_path}")
 
 
-def main():
+def main(argv: list[str] | None = None) -> int:
     import argparse
     parser = argparse.ArgumentParser(description="从 PPT/Word/Excel 提取图片")
     parser.add_argument("target", help="文件或目录路径")
     parser.add_argument("--json", action="store_true", help="JSON 输出")
-    parser.add_argument("--raw-dir", help="raw 输出目录（默认: target 同级的 raw/）")
-    parsed = parser.parse_args()
+    parser.add_argument(
+        "--raw-dir",
+        help="raw 输出目录（默认: $COMPANY_BASE/raw；禁止指向 skill 仓库内部）",
+    )
+    parsed = parser.parse_args(argv)
 
     use_json = parsed.json
     target = parsed.target.rstrip("/\\")
-    raw_dir = parsed.raw_dir or (os.path.join(target, "raw") if os.path.isdir(target) else os.path.dirname(target))
+    raw_dir = str(resolve_raw_dir(parsed.raw_dir))
 
     results = []
 
@@ -282,6 +309,7 @@ def main():
         for r in results:
             print(f"  📄 {r['file']}: {r['images']} 张图片")
         print("\n✅ 图片提取完成")
+    return 0
 
 
 if __name__ == "__main__":

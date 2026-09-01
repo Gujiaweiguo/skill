@@ -170,6 +170,7 @@ uv run {baseDir}/scripts/extract_images.py incoming/ --json  # Agent 程序化�
 > 2. **.doc（OLE2 老格式）不在直接支持列表**：需先 `soffice --headless --convert-to docx --outdir <tmp> <file>` 转 docx 再 markitdown（与 .xls 的处理同理）。
 > 3. **convert_excel.py 不递归子目录**：多目录批量转换须逐目录调用（`for d in ...; do uv run scripts/convert_excel.py <in> <out>; done`）。
 > 4. **文件名含 `[` 时 `find -name "stem*"` 会误判**（glob 字符类）：核对产物是否存在用 `ls` 而不是 find -name。
+> 5. **extract_images.py 默认输出到 `$COMPANY_BASE/raw`**（2026-09-01 事故后收紧行为）：必须先 `export COMPANY_BASE=<绝对路径>`；`COMPANY_BASE` 为相对路径（如裸 `lanlnk`）或根下缺 `config/company.yaml` 时直接报错，无静默默认。显式 `--raw-dir` 解析结果若落在 skill 仓库内部（相对路径事故形态）会被硬拦截——转换产物永远属于 docs 仓库。
 
 #### XLSX / XLS — 按复杂度分流
 
