@@ -180,7 +180,7 @@ slides:
     connection: "↑ 数据驱动　　　↓ 智能决策"   # 两层之间的连接文字
     layer1:                            # 下层：底座
       mi:                              # MI 商管
-        label: "MI商管系统"
+        label: "LnkCRE商管系统"
         modules: ["资源", "合同", "计费财务", "调账", "营运", "物业"]  # 3列×2行网格
       crm:                             # 会员 CRM
         label: "会员CRM"
@@ -204,7 +204,7 @@ slides:
     columns: 3                         # 网格列数（默认 3）
     bottom_bar: { text: "自定义字段：盐步老龙加'文保级别' · 奇遇里加'盒子编号'", color: "teal" }
     so_what: [...]
-    source: "MI商管系统 · 已生产验证"
+    source: "LnkCRE商管系统 · 已生产验证"
 
   # ════════════════════════════════════════════════════════════════════════
   # TYPE: domain_lifecycle — 生命周期阶段图（如合同管理）
@@ -221,7 +221,7 @@ slides:
       - { key: "审批流", val: "法务→财务→总经理逐级签批" }
     bottom_bar: { text: "到期前3-6个月主动预警 · 变更全流程留痕 · 续租从被动变主动", color: "teal" }
     so_what: [...]
-    source: "MI商管合同管理 · 已生产验证"
+    source: "LnkCRE商管合同管理 · 已生产验证"
 
   # ════════════════════════════════════════════════════════════════════════
   # TYPE: domain_big_number_flow — 大数字 + 流程步骤（如计费财务）
@@ -231,9 +231,9 @@ slides:
     big_number: { num: "70%+", label: "出账人力下降", color: "green" }
     flow: ["计费配置", "一键出账", "收款核销", "账龄催缴", "发票管理"]
     flow_description: "11类条款智能计算 → 聚合支付自动核销 → 账龄分级流程化催缴 → 业财凭证集成"
-    bottom_bar: { text: "MI最强链路：计费→出账→收款→账龄→发票 全闭环", color: "green" }
+    bottom_bar: { text: "LnkCRE最强链路：计费→出账→收款→账龄→发票 全闭环", color: "green" }
     so_what: [...]
-    source: "MI商管系统 · 已生产验证"
+    source: "LnkCRE商管系统 · 已生产验证"
 
   # ════════════════════════════════════════════════════════════════════════
   # TYPE: domain_comparison — before/after 对比框（如调账域）
@@ -246,7 +246,7 @@ slides:
       description: "差错多 · 时滞长\n逐笔人工核对冲红重算"
       bg: "gray_light"              # 浅灰背景
     after:
-      label: "MI 自动调账"
+      label: "LnkCRE 自动调账"
       value: "5分钟"
       description: "合同变更→自动识别→冲红→重算→新账单→推送\n全链路事务性保障"
       bg: "green_light"             # 浅绿背景
@@ -254,7 +254,7 @@ slides:
     arrow: "→"                      # 转换箭头（默认 →）
     bottom_bar: { text: "18个集成测试 + 11606个单元测试覆盖 · 生产已验证GO状态", color: "blue" }
     so_what: [...]
-    source: "MI商管调账引擎 · G1已归档"
+    source: "LnkCRE商管调账引擎 · G1已归档"
 
   # ════════════════════════════════════════════════════════════════════════
   # TYPE: domain_funnel — 漏斗递减（如营运域5源归集）

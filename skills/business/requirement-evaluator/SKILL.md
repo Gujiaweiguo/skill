@@ -3,7 +3,7 @@ name: requirement-evaluator
 description: |-
   需求满足度与二开成本评估 Skill。基于 `客户需求解析 + 产品功能清单匹配 + 二开复杂度分级 + 成本估算` 方案，
   把一份客户需求书评估成"产品满足多少、差多少、二开要多少人天多少钱、能不能打这个单"。
-  触发场景："评估一下这个需求我们满足多少"、"MI能满足这个客户吗"、"帮我算算二开量和成本"、
+  触发场景："评估一下这个需求我们满足多少"、"LnkCRE能满足这个客户吗"、"帮我算算二开量和成本"、
   "这个标能不能打"、"需求差距分析"、"功能覆盖率评估"。
   仅面向售前打单的需求评估与应标决策，不负责写方案/报价单/投标文件（那些交给后续兄弟 Skill）。
 
@@ -25,7 +25,7 @@ compatibility: >
   ```
 
   用户只需告诉 Agent 客户需求文档路径和评估基准产品，Agent 自动完成：
-  - "评估一下 incoming/需求-XX招商管理.docx，看 MI 满足多少"
+   - "评估一下 incoming/需求-XX招商管理.docx，看 LnkCRE 满足多少"
   - "这份需求书，商管系统能覆盖吗，差多少，二开多少钱"
   - "客户给了需求，帮我算算能不能打这个单"
 ---
@@ -58,7 +58,7 @@ compatibility: >
 
 | 产品代号 | 功能清单路径 | 说明 |
 |---|---|---|
-| MI / 商管系统 | `$LANLNK_BASE/30-products/mi-cre/feature-baseline/feature-baseline.yaml` | 270 项功能（208 existing / 60 missing），yaml 格式（document-control-plane 迁移后权威位置） |
+| LnkCRE / 商管系统 | `$LANLNK_BASE/30-products/mi-cre/feature-baseline/feature-baseline.yaml` | 270 项功能（208 existing / 60 missing），yaml 格式（document-control-plane 迁移后权威位置；CLI 产品代号仍为 MI） |
 | CRM / 会员系统 | `$MATERIALS_DIR/03-products/CRM会员系统功能清单.md` | 会员 CRM 功能 |
 | AI Skills | `$MATERIALS_DIR/11-cre-ai-skills/02_机会与产品/岗位 AI Skills 增强性与摩擦消除分析矩阵.md` | AI 岗位 Skill 能力 |
 
@@ -237,11 +237,11 @@ Agent：好的，继续评估。报告头部会标注"基于过期快照"。
 
 ```
 Step 0: grep 代码库验证（防"功能清单漏抽"误判，必跑）
-    └── 用需求关键词 + 路由前缀 + 模块名，扫 mi_code_root（默认 /opt/code/mi）
+    └── 用需求关键词 + 路由前缀 + 模块名，扫 lnkcre_code_root（默认 /opt/code/lnkcre）
     └── 命中代码（路由/模型/前端组件）→ 重新走 Step 1（很可能判 ✅ 而非 🔨/🔗）
     └── 无命中 → 进入 Step 1
     └── 必查项：所有 🔨 二开判定、所有 🔗 第三方判定
-    └── 工具：grep -r <kw> /opt/code/mi/{backend,backend-mobile,frontend,frontend-staff,frontend-tenant}
+    └── 工具：grep -r <kw> /opt/code/lnkcre/{backend,backend-mobile,frontend,frontend-staff,frontend-tenant}
     └── 反例：v1 评估把"预约看房+接待"判 🔨 二开（M 11 人天），实际 leasingfunnel 模块已存在
     └── 反例：v1 评估把"电子巡检"8 项全判 🔗 第三方，实际 backend/internal/patrol/ 已原生实现
 
@@ -257,7 +257,7 @@ Step 3: 本产品有 API/接口能力，需求是"让外部系统接"？
 
 Step 4: missing，但蓝联另一产品有此能力？
     └── 是 → 🤖 其他蓝联产品承接（标注哪个产品）
-    └── 如：活动ROI归因 → langchat 工作流；数据问数 → LnkChatBI；会员积分 → CRM
+     └── 如：活动ROI归因 → langchat 工作流；数据问数 → LnkChatBI；会员积分 → CRM
 
 Step 5: missing，但行业惯例是第三方专业系统做？
     └── 是 → 🔗 第三方集成（标注哪类第三方）
@@ -285,7 +285,7 @@ Step 8: 技术上难以可靠实现？
 | 满足度 | 替代方案要求 | 示例 |
 |---|---|---|
 | ⚙️ | 说明"配置即可"，标注在哪个模块配置 | "预警模块配置 7天/15天阈值" |
-| 🔌 | 说明"本产品提供 API，外部系统对接"，标注接口 | "MI 提供 external integration API，POS 自己接" |
+| 🔌 | 说明"本产品提供 API，外部系统对接"，标注接口 | "LnkCRE 提供 external integration API，POS 自己接" |
 | 🔨 | 标注二开复杂度 + 人天（见 P3）| "L 复杂，30 人天" |
 | 🤖 | 标注由哪个蓝联产品承接 + 为什么归那个产品 | "langchat 活动复盘 Skill 承接（属 AI Skills 范围）" |
 | 🔗 | 标注第三方系统类型 + 集成方式 + 是否单独计费 | "客流系统负责热力图，集成费另算" |
@@ -299,7 +299,7 @@ Step 8: 技术上难以可靠实现？
 |---|---|---|---|---|---|---|
 | 5.1.1 | 写字楼房源建档 | ✅ | 铺位管理、空间结构管理 | — | router.go:1946 `/structure/stores` | — |
 | 5.4.4 | 活动 ROI 自动归因 | 🤖 | — | langchat 活动复盘 Skill 承接 | grep 命中 langchat/skills/ | — |
-| 6.3 | 客流热力图 | 🔗 | — | 客流系统（第三方）负责，MI 接收数据 | grep `heatmap` 未命中 | low |
+| 6.3 | 客流热力图 | 🔗 | — | 客流系统（第三方）负责，LnkCRE 接收数据 | grep `heatmap` 未命中 | low |
 | 6.8 | 防瞒报校验 | ❌ | — | 技术不可靠，建议运营人工核查 | grep 未命中 | — |
 ```
 
@@ -349,7 +349,7 @@ Step 8: 技术上难以可靠实现？
 ```
 对所有 🔨 项：
   1. 用需求关键词（中英文 + 路由前缀 + 模块名）grep mi_code_root
-     grep -r -l <kw> /opt/code/mi/{backend,backend-mobile,frontend,frontend-staff,frontend-tenant}
+     grep -r -l <kw> /opt/code/lnkcre/{backend,backend-mobile,frontend,frontend-staff,frontend-tenant}
   2. 命中代码（路由/模型/前端组件）→ 标记"误判修正"，重走 §2.2 决策树
      很可能修正为 ✅（已实现），从而移出二开清单
   3. 未命中 → P2 表"代码验证"列填 "grep <kw> 未命中（确认 missing）"
@@ -532,7 +532,7 @@ high_value_feedback:
     generality_reason: 产业园区赛道通用能力，所有产业园客户均会要求；可复用到厦门象屿产发、深圳安居等项目
     suggested_phase: P1
     estimated_complexity: L
-    code_evidence: "grep 'enterprise_profile|tax_collection|social_security' /opt/code/mi 未命中"
+    code_evidence: "grep 'enterprise_profile|tax_collection|social_security' /opt/code/lnkcre 未命中"
     related_customers: [厦门象屿产发]
 ```
 
