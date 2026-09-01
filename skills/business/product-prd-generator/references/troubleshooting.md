@@ -476,7 +476,7 @@ for kw in ['m3newcontract', 'm3modifycontract']:
 
 ## PRD→实施：上下文漂移成代码实现
 
-**症状**：PRD skill 会话中，agent 开始直接修改业务系统代码（如 `/opt/code/mi/backend`），而不是输出交接文档。
+**症状**：PRD skill 会话中，agent 开始直接修改业务系统代码（如 `/opt/code/lnkcre/backend`），而不是输出交接文档。
 
 **根因**：PRD 生成上下文和代码实现上下文混在一个会话里，agent 倾向于"顺手改了"。
 
