@@ -19,17 +19,17 @@ The skill SHALL execute the documentation pipeline in fixed phase order: **P0 �
 
 ### Requirement: UserGUIDE_BASE Environment Variable
 
-The skill SHALL read `$USERGUIDE_BASE` to determine the documentation root. When unset, the skill SHALL default to `/opt/code/docs/lanlnk/UserGuide/`. The skill SHALL NOT write any documentation output outside `$USERGUIDE_BASE`.
+The skill SHALL read `$USERGUIDE_BASE` to determine the documentation root. When unset, the skill SHALL derive it from the company base (`COMPANY_BASE` ∥ `LANLNK_BASE`, validated by `config/company.yaml` per COMPANIES.md §3) as `<base>/materials/03-products/user-guides/`. The skill SHALL NOT fall back to the deprecated `/opt/code/docs/lanlnk/UserGuide/` path or any hardcoded company default. The skill SHALL NOT write any documentation output outside `$USERGUIDE_BASE`.
 
 #### Scenario: Env var explicitly set
 
 - **WHEN** `$USERGUIDE_BASE=/some/path` is set in the environment
 - **THEN** all input is read from `$USERGUIDE_BASE/_input/{name}/` and all output is written to `$USERGUIDE_BASE/{name}/`
 
-#### Scenario: Env var unset uses default
+#### Scenario: Env var unset derives from company base
 
-- **WHEN** `$USERGUIDE_BASE` is not set
-- **THEN** the skill uses `/opt/code/docs/lanlnk/UserGuide/` and informs the user that the default is being used
+- **WHEN** `$USERGUIDE_BASE` is not set and `COMPANY_BASE` (or `LANLNK_BASE`) resolves to a registered company
+- **THEN** the skill uses `<base>/materials/03-products/user-guides/` and informs the user of the resolved path
 
 ### Requirement: Software Name Discovery
 

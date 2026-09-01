@@ -16,7 +16,7 @@ Two skill types:
 | OpenCode symlinks | `.opencode/skills/<name>` → `../../skills/...` (relative) or `/opt/code/skill/skills/...` (absolute) |
 | OpenSpec commands | `.opencode/command/opsx-*.md` |
 | External data (business skills) | `$LANLNK_BASE` = `/opt/code/docs/lanlnk` (not in this repo) |
-| External data (user guides) | `$USERGUIDE_BASE` = `/opt/code/docs/lanlnk/UserGuide` (not in this repo) |
+| External data (user guides) | `$USERGUIDE_BASE` = `<COMPANY_BASE>/materials/03-products/user-guides` (derived from company base, see COMPANIES.md §3) |
 | Config | `config/lanlnk.yaml` |
 | Cross-skill document quality | `references/docspec/` |
 
@@ -26,7 +26,7 @@ Two skill types:
 
 ```bash
 export LANLNK_BASE=/opt/code/docs/lanlnk           # required for business/ppt/word skills
-export USERGUIDE_BASE=/opt/code/docs/lanlnk/UserGuide     # required for doc-generator skill
+export USERGUIDE_BASE=$LANLNK_BASE/materials/03-products/user-guides   # required for doc-generator skill（COMPANIES.md §3：从 COMPANY_BASE 派生）
 ```
 
 Python skills use **uv exclusively** (never pip). Each skill has its own `.venv`:
@@ -188,7 +188,7 @@ LSP reports many false errors in this repo:
 - **No CI, no linting, no formatter** — repo is markdown + Python scripts
 - **Generated artifacts gitignore 约定**（跨 skill）：skill 仓库的 `.gitignore` 覆盖三类生成产物：(1) **统一 `output/` 目录** — 各 skill 的 `skills/<path>/<skill>/output/`；(2) **运行时状态** — `.playwright-mcp/`（Playwright 日志）、`.omo/`（OpenCode 会话）；(3) **lock 文件** — `*.lock`（匹配 `uv.lock`）和 `package-lock.json`（`*.lock` **不匹配** `package-lock.json`，因为扩展名是 `.json` 不是 `.lock`，Node skill 必须显式加这条）。新建 skill 后检查是否有未 gitignore 的生成产物（如一次性 PPT 生成脚本 `slides/compile.js`）。
 - **DocSpec 文档质量基线**（跨文档 skill）：所有生成 PRD、方案、投标、报价、Word、PPT、操作手册、部署维护手册、知识库文档，或修改 `SKILL.md` / `references/` 的任务，都必须遵守 `references/docspec/`。跨 2 个以上文档类 skill 的质量规则写入 DocSpec；只影响单个 skill 的限制或坑写入该 skill 的 `SKILL.md` 或 `references/troubleshooting.md`。
-- **文档输出路径统一在 lanlnk 下**（跨 skill）：所有 skill 的文档输出基目录都必须解析到 `/opt/code/docs/lanlnk/` 下。`$LANLNK_BASE = /opt/code/docs/lanlnk`，`$USERGUIDE_BASE = /opt/code/docs/lanlnk/UserGuide`（在 lanlnk 内）。新 skill 的默认路径不要写成独立的 `/opt/code/docs/xxx/`，必须挂到 lanlnk 子目录。
+- **文档输出路径统一在公司基座下**（跨 skill）：所有 skill 的文档输出基目录都必须解析到公司基座（`COMPANY_BASE` ∥ `LANLNK_BASE`，COMPANIES.md §3，无静默默认）下。`$USERGUIDE_BASE = <base>/materials/03-products/user-guides`（从基座派生；旧默认 `/opt/code/docs/lanlnk/UserGuide` 已废弃）。新 skill 的默认路径不要写成独立的 `/opt/code/docs/xxx/`，必须挂到公司基座子目录。
 - **Gitignored 文件中的旧路径不需要手动修正**（跨 skill）：全局路径迁移时，`openspec/changes/archive/`（历史快照，只读）和 `*/parsed/`（生成产物）中的旧路径不需要手动改——前者是不可变历史，后者下次运行自动刷新。只修 git tracked 的源文件。
 - **Domain tags** in `material-importer/references/domain-tags.md` are read by material-importer (owner), product-prd-generator, and compound-learning — update the owner and notify readers when changing tags. (Historical note: company-intro-generator was originally planned as a reader but doesn't currently reference the file; if it starts consuming domain tags, update the §「Shared files」 table below.)
 - **winshang-crawler** is self-contained (own `src/`, `pyproject.toml`, separate git history)
