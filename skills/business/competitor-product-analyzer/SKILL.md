@@ -13,7 +13,7 @@ description: |-
   - 不做战略定位/市场判断（交给 strategy-brief-generator）
   - 不写方案/报价/投标（交给 company-intro-generator / pricing-generator / bid-doc-master）
   - 不评估客户需求满足度（交给 requirement-evaluator）
-  - 不修改业务系统代码（/opt/code/mi）
+  - 不修改业务系统代码（/opt/code/lnkcre）
   - 不绕过登录/验证码/权限/反爬，不做漏洞测试
 compatibility: >
   纯提示词 skill，无 Python 依赖。
@@ -29,7 +29,7 @@ compatibility: >
 
   用户只需告诉 Agent 竞品名、资料来源（手册路径 / demo URL / 两者）和对照产品，Agent 自动完成：
   - "分析一下旗茂商管系统，操作手册在 materials/13-competitors/qimao/"
-  - "用 demo 账号 llkj/llkj123 探测 http://oa.1qmall.cn/SMallTest/，对比 MI 给改进建议"
+  - "用 demo 账号 llkj/llkj123 探测 http://oa.1qmall.cn/SMallTest/，对比 LnkCRE 给改进建议"
   - "这份竞品手册 + 这个 demo 账号，做交叉验证，输出能力矩阵和借鉴清单"
 ---
 
@@ -49,7 +49,7 @@ compatibility: >
 
 - 竞品实际有哪些产品能力（不是销售话术）？
 - 每条能力的证据来自哪里？可信度多高？
-- 蓝联当前产品（MI / CRM / AI）相对竞品是 existing / partial / missing / better？
+- 蓝联当前产品（LnkCRE / CRM / AI）相对竞品是 existing / partial / missing / better？
 - 竞品的哪些设计值得蓝联借鉴？哪些必须补齐？哪些只是观察？
 - 产品改进建议如何排优先级（P0/P1/P2/P3）？
 
@@ -80,7 +80,7 @@ strategy-brief-generator（战略定位 / 竞对打法）     ←─ 你的能�
 - 不写战略定位、市场判断、客户路线（→ strategy）
 - 不写方案汇报、报价、投标（→ company-intro / pricing / bid-doc）
 - 不评估客户需求满足度（→ requirement-evaluator）
-- 不直接修改业务系统代码（/opt/code/mi）
+- 不直接修改业务系统代码（/opt/code/lnkcre）
 - 不绕过登录/验证码/权限/反爬，不做漏洞测试或压力测试
 - 不把竞品截图/UI 文字直接用于客户材料
 
@@ -296,7 +296,7 @@ S1.6: 交互确认与交付
 | 竞品名 | 用于目录命名 | 旗茂 / 海鼎 / 明源 |
 | 资料来源 | manual 路径 / demo URL / 两者 | `incoming/competitor-qimao/manuals/` + `http://oa.1qmall.cn/SMallTest/` |
 | demo 凭据（如有）| 用户名/密码 | llkj / llkj123（只进 .auth.json 或会话临时使用）|
-| 对照产品 | 蓝联哪个产品作基准（S1 阶段用）| MI（商管系统）/ CRM / AI |
+| 对照产品 | 蓝联哪个产品作基准（S1 阶段用）| LnkCRE（商管系统）/ CRM / AI（CLI 兼容代号 MI）|
 | 客户业态（可选）| 辅助理解能力语义 | 购物中心 / 写字楼 / 产业园区 |
 
 判定模式：
@@ -483,7 +483,7 @@ markitdown "<原始文件>" -o "<raw 目录>/<6类>/<同名>.md"
 
 | 对照产品 | 功能清单路径 |
 |---|---|
-| MI / 商管系统 | `$LANLNK_BASE/30-products/mi-cre/feature-baseline/feature-baseline.yaml` |
+| LnkCRE / 商管系统 | `$LANLNK_BASE/30-products/mi-cre/feature-baseline/feature-baseline.yaml`（CLI 兼容代号：MI） |
 | CRM / 会员系统 | `$LANLNK_BASE/materials/03-products/CRM会员系统功能清单.md` |
 | AI Skills | `$LANLNK_BASE/materials/11-cre-ai-skills/02_机会与产品/岗位 AI Skills 增强性与摩擦消除分析矩阵.md` |
 
@@ -559,7 +559,7 @@ markitdown "<原始文件>" -o "<raw 目录>/<6类>/<同名>.md"
 
 ### 示例 1：manual + demo（旗茂）
 
-> 用户："分析旗茂 BS 商管系统，手册在 materials/13-competitors/qimao/，demo 账号 llkj/llkj123，URL http://oa.1qmall.cn/SMallTest/Login.html，对比 MI"
+> 用户："分析旗茂 BS 商管系统，手册在 materials/13-competitors/qimao/，demo 账号 llkj/llkj123，URL http://oa.1qmall.cn/SMallTest/Login.html，对比 LnkCRE"
 
 ```
 Agent:

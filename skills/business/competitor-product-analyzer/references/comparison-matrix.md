@@ -20,7 +20,7 @@
 {
   "schema_version": "1.0",
   "vendor": "qimao",
-  "lanlnk_product": "MI（商管系统）",
+  "lanlnk_product": "LnkCRE（商管系统）",
   "generated_at": "2026-07-06T11:30:00+08:00",
   "weight_source": "requirement-evaluator 客户需求频率 + 岗位病药矩阵",
   "dimensions": [
