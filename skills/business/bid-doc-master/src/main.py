@@ -14,24 +14,26 @@ bid-doc-master CLI — 招标文件解析 + 内容包生成
 
 import argparse
 import json
-import os
 import sys
 from dataclasses import asdict
 from pathlib import Path
 
+from ._company_base import resolve_company_base
 from .generator import generate_commercial_bid, generate_slide_content, generate_technical_bid
 from .models import TenderInfo
 from .reader import read_document
 
 
 def _resolve_output_dir(bidding_path: str, project_name: str) -> Path:
-    """确定输出目录"""
-    lanlnk_base = os.environ.get("LANLNK_BASE", "")
-    if lanlnk_base:
-        base = Path(lanlnk_base) / "bidding" / (project_name or Path(bidding_path).stem)
-    else:
-        base = Path(bidding_path).parent.resolve()
-    content_dir = base / "content-packages"
+    """输出目录：$COMPANY_BASE/bidding/<项目>/content-packages（COMPANIES.md §3，无静默默认）。
+
+    基座未设/非法时报错退出；不再回落「招标文件所在目录」——该兜底曾把
+    内容包写到任意位置（tender 放哪写哪），绕过 docs 仓 bidding/ 约定。
+    """
+    base = resolve_company_base()
+    content_dir = (
+        base / "bidding" / (project_name or Path(bidding_path).stem) / "content-packages"
+    )
     content_dir.mkdir(parents=True, exist_ok=True)
     return content_dir
 
