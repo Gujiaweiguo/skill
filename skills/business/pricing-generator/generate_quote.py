@@ -52,8 +52,11 @@ PROVIDER = {
 }
 
 
-def get_lanlnk_base() -> Path:
-    return Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk"))
+def get_company_base() -> Path:
+    """当前公司基座（COMPANIES.md §3：COMPANY_BASE ∥ LANLNK_BASE，无静默默认）。"""
+    from _company_base import resolve_company_base
+
+    return resolve_company_base()
 
 
 def _load_devkit_rate() -> int:
@@ -62,7 +65,7 @@ def _load_devkit_rate() -> int:
     配置文件：$LANLNK_BASE/config/pricing/pricing-basis.yaml
     回退：配置缺失或解析失败时回退到 2000 并打印警告。
     """
-    config_path = get_lanlnk_base() / "config" / "pricing" / "pricing-basis.yaml"
+    config_path = get_company_base() / "config" / "pricing" / "pricing-basis.yaml"
     fallback = 2000
     try:
         import yaml
@@ -87,7 +90,7 @@ def _load_mi_feature_baseline() -> dict[str, Any]:
         { "item_count": int, "status": {existing: n, partial: n, missing: n}, "source": str }
     读取失败时返回空 dict 并打印警告（功能清单降级为模块级展示，不影响报价生成）。
     """
-    path = (get_lanlnk_base()
+    path = (get_company_base()
             / "30-products" / "mi-cre" / "feature-baseline" / "feature-baseline.yaml")
     try:
         import yaml
@@ -270,7 +273,8 @@ CRM_DATA: dict[str, Any] = {
         ("系统管理",
          "组织架构/权限管理/门店管理/数据隔离/日志审计/系统配置"),
     ],
-    "modules_xlsx": "/opt/code/docs/lanlnk/out/proposals/正祥会员系统/蓝联CRM功能清单.xlsx",
+    # CRM 功能清单 Excel（受管副本，来自正祥交付物；相对路径按公司基座解析）
+    "modules_xlsx": "materials/03-products/CRM功能清单.xlsx",
     "service_notes": [
         "1. 服务承诺：提供首次上线的后台数据切换，包括会员数据切入、积分数据切入、订单数据切入、历史会员资产备份；",
         f"2. 二开单价：未来新需求，二开人天单价按 {DEVKIT_RATE:,} 元/人天结算；",
@@ -862,6 +866,11 @@ def build_modules_sheet(wb: Workbook, data: dict[str, Any]) -> None:
     ws = wb.create_sheet(title=f"{data['product_label']}功能清单")
 
     xlsx_path = data.get("modules_xlsx")
+    if xlsx_path:
+        p = Path(xlsx_path)
+        if not p.is_absolute():
+            p = get_company_base() / p
+        xlsx_path = str(p)
     if xlsx_path and Path(xlsx_path).exists():
         _fill_modules_from_xlsx(ws, xlsx_path, data)
     else:
@@ -1110,7 +1119,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[WARN] 请联系产品负责人确认私有化定价后补充。", file=sys.stderr)
 
     # 输出路径：$LANLNK_BASE/out/proposals/<客户>/报价单_<产品>_<模式>_<客户>_<日期>.xlsx
-    proposals_dir = get_lanlnk_base() / "out" / "proposals"
+    proposals_dir = get_company_base() / "out" / "proposals"
     out_dir = proposals_dir / args.customer
     out_dir.mkdir(parents=True, exist_ok=True)
     product_str = "+".join(product_codes)
