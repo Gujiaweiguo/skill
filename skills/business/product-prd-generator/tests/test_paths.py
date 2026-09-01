@@ -14,13 +14,53 @@ from pathlib import Path
 import pytest
 
 from product_prd_generator._paths import (
+    _lanlnk_base,
     ontology_path_for_project,
     term_aliases_path_for_project,
 )
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_LANLNK_BASE = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk"))
+
+# 单测依赖真实 docs 仓的 yaml 资产：仅在两个基座变量都未设时补一个
+# 已注册公司默认（任一变量已设时尊重调用方，不覆盖）。
+if not (os.environ.get("COMPANY_BASE") or os.environ.get("LANLNK_BASE")):
+    os.environ["LANLNK_BASE"] = "/opt/code/docs/lanlnk"
+
+DEFAULT_LANLNK_BASE = _lanlnk_base()
+
+
+# ─── _lanlnk_base（COMPANIES.md §3 契约）───────────────────────────────
+
+
+def test_lanlnk_base_exits_when_both_env_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("COMPANY_BASE", raising=False)
+    monkeypatch.delenv("LANLNK_BASE", raising=False)
+    with pytest.raises(SystemExit):
+        _lanlnk_base()
+
+
+def test_lanlnk_base_exits_on_relative_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """复现事故形态：COMPANY_BASE=lanlnk（裸 slug 相对路径）必须被拒。"""
+    monkeypatch.setenv("COMPANY_BASE", "lanlnk")
+    monkeypatch.delenv("LANLNK_BASE", raising=False)
+    with pytest.raises(SystemExit):
+        _lanlnk_base()
+
+
+def test_lanlnk_base_exits_on_unregistered_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("COMPANY_BASE", str(tmp_path))
+    monkeypatch.delenv("LANLNK_BASE", raising=False)
+    with pytest.raises(SystemExit):
+        _lanlnk_base()
+
+
+def test_lanlnk_base_prefers_company_base(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("COMPANY_BASE", "/opt/code/docs/lanlnk")
+    monkeypatch.setenv("LANLNK_BASE", "/opt/code/docs/lianyou")
+    assert _lanlnk_base() == Path("/opt/code/docs/lanlnk")
 
 
 # ─── ontology_path_for_project ─────────────────────────────────────────
@@ -36,7 +76,7 @@ def test_ontology_path_商管_falls_back_to_business_ontology():
 def test_ontology_path_langchat_returns_project_specific():
     """langchat ontology.yaml migrated to 30-products/langchat/."""
     p = ontology_path_for_project("langchat")
-    assert p == DEFAULT_LANLNK_BASE / "30-products" / "langchat" / "ontology.yaml"
+    assert p == DEFAULT_LANLNK_BASE / "30-products" / "lnkchat" / "ontology.yaml"
     assert p.is_file(), f"langchat ontology.yaml must exist: {p}"
 
 
@@ -78,7 +118,7 @@ def test_term_aliases_path_商管_falls_back_to_skill_references():
 def test_term_aliases_path_langchat_returns_project_specific():
     """langchat term-aliases.yaml migrated to 30-products/langchat/."""
     p = term_aliases_path_for_project("langchat", SKILL_ROOT)
-    assert p == DEFAULT_LANLNK_BASE / "30-products" / "langchat" / "term-aliases.yaml"
+    assert p == DEFAULT_LANLNK_BASE / "30-products" / "lnkchat" / "term-aliases.yaml"
     assert p.is_file(), f"langchat term-aliases.yaml must exist: {p}"
 
 

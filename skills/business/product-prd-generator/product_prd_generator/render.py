@@ -13,7 +13,7 @@ from typing import Any
 
 import yaml
 
-from ._paths import ontology_path_for_project
+from ._paths import _lanlnk_base, ontology_path_for_project
 from .competitor_render import render_competitor_feature_list
 from .data_model import (
     TableMeta,
@@ -1093,7 +1093,7 @@ def _load_field_specs(project: str = "商管系统") -> dict[str, Any]:  # noqa:
         # config/field-specs 是商管域专属实体库；其他产品按子功能名匹配会
         # 把商管字段表错误渲染进无关产品（如 lnkreport 的"组织管理"）。
         return {}
-    base = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")) / "config" / "field-specs"
+    base = _lanlnk_base() / "config" / "field-specs"
     specs: dict[str, Any] = {}  # noqa: ANY_OK
     # Source 1: resource-field-specs.yaml (flat entity keys)
     p1 = base / "resource-field-specs.yaml"

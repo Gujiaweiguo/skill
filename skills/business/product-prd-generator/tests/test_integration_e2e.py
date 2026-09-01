@@ -21,7 +21,10 @@ import pytest
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-LANLNK_BASE = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk"))
+# 仅在两个基座变量都未设时补已注册公司默认（任一已设时尊重调用方）。
+if not (os.environ.get("COMPANY_BASE") or os.environ.get("LANLNK_BASE")):
+    os.environ["LANLNK_BASE"] = "/opt/code/docs/lanlnk"
+LANLNK_BASE = Path(os.environ["COMPANY_BASE"] if os.environ.get("COMPANY_BASE") else os.environ["LANLNK_BASE"])
 
 SHANGGUAN_CODE_ROOT = Path("/opt/code/lnkcre")
 SHANGGUAN_DOCS_ROOT = LANLNK_BASE / "raw" / "prd-商管系统"
