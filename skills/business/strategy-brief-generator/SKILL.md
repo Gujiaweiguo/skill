@@ -1,35 +1,69 @@
 ---
 name: strategy-brief-generator
 description: |-
-  商业地产信息化战略简报生成 Skill。以明源战略模板为主方法论（四看：看市场、看竞对、
-  看自己、看机会 → 定战略 → 执行计划），整合战略参考资料、竞品材料、行业 SOP、市场趋势
-  和蓝联自身资产，生成证据型内部战略简报。
-  触发场景："做商管战略分析"、"基于明源模板分析蓝联怎么定位"、"整理一份商业地产信息化
-  战略简报"、"分析竞品给出产品路线和差异化建议"、"做一份四看战略分析"、"商业地产 AI
-  问数 RAG 机会分析"。
+  通用战略简报生成 Skill（多公司）。以四看方法论（看市场/看竞对/看自己/看机会 → 定战略 → 执行计划）
+  为通用框架，看市场内含政策与监管环境子项（政策驱动型行业升格为独立分析），整合战略参考资料、
+  竞品材料、行业 SOP、市场趋势和公司自身资产（company.yaml products），生成证据型内部战略简报，
+  并输出「产品机会清单」反哺公司产品台账（onboard.sh product）。
+  触发场景："做战略分析"、"基于模板分析我们公司怎么定位"、"整理一份XX行业战略简报"、
+  "分析竞品给出产品路线和差异化建议"、"做一份四看战略分析"、"政策驱动型行业机会分析"、
+  "通过战略分析看还有哪些产品机会"。
   当用户提供战略参考资料、竞品材料、行业 SOP，并要求做战略层面的分析判断（不是 PRD、
   不是客户方案、不是投标文件）时，触发此 skill。
   仅面向内部产品/经营决策，不生成 PRD、不生成客户方案、不生成投标文件、不生成报价。
 compatibility: >
   纯提示词 skill，无 Python 依赖。
   资料转换复用 material-importer（markitdown + 图片提取）。
-  市场趋势资料可通过 web search 补充。
+  市场趋势资料可通过 web search 补充；政策驱动型行业必须联网检索政府文件。
+  多公司契约（company.yaml schema / 变量协议）见 /opt/code/docs/COMPANIES.md。
   后续如需战略汇报 PPT/Word，通过内容包调用 mckinsey-pptx / word-master，不在本 skill
   内嵌入渲染逻辑。
 
   Quick start:
   ```bash
-  export LANLNK_BASE=/opt/code/docs/lanlnk
+  export COMPANY_BASE=/opt/code/docs/<company>   # 如 lanlnk / lianyou
+  # 兼容变量 LANLNK_BASE 等价；路径下必须有 config/company.yaml
   ```
 ---
 
-# Strategy Brief Generator — 商业地产信息化战略简报 Agent Pipeline
+# Strategy Brief Generator — 战略简报 Agent Pipeline（多公司通用引擎）
 
 ## DocSpec 质量基线
 
 本 skill 生成的战略简报、机会分析、竞品判断和路线建议必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md`、`方案与投标文档质量规范.md` 和 `文档验收清单.md`。事实、判断、建议必须分层；假设和资料缺口必须进入 review。
 
-基于 `明源战略模板（四看方法论）+ 多源资料整合 + 证据型分析 + Markdown 输出` 的方案。
+基于 `四看方法论（通用引擎）+ 多源资料整合 + 证据型分析 + Markdown 输出 + 产品机会反哺` 的方案。
+
+## P0 公司确定（多公司路由，必跑第一步）
+
+按优先级确定当前公司，绝不猜默认：
+
+| 顺序 | 判定 | 动作 |
+|---|---|---|
+| ① | cwd 位于 `/opt/code/docs/<company>/` 下 | 该公司 |
+| ② | 用户消息点名公司（如「给 lianyou 做战略分析」） | 该公司 |
+| ③ | 均无法判定 | 用 question 询问（列出已发现公司：`ls /opt/code/docs/*/config/company.yaml`） |
+
+```bash
+export COMPANY_BASE=/opt/code/docs/<company> COMPANY_ID=<id>
+```
+
+**公司叙事加载**：P0 确定公司后，立即检查 `$COMPANY_BASE/config/sales-playbook/strategy-brief.md`；存在则通读全文作为本项目的写作约束（如 lanlnk 的 B/D 路线、岗位病药矩阵、内部汇报视角、交付口径）；不存在则跳过，按通用引擎执行。
+
+**配置读取**（company.yaml 驱动，schema 见 `/opt/code/docs/COMPANIES.md` §2）：
+
+| 变量 | 来源 | 说明 |
+|------|------|------|
+| `$BRAND` | company.yaml `brand` | 报告主语（如 广州联友 / 蓝联科技） |
+| `$STRATEGY_ROOT` | `<COMPANY_BASE>/<strategy.root>/<主题>` | out 平铺根，主题默认 `<domain>战略`（domain 取自 company.yaml），用户可指定 |
+| `$INCOMING_DIR` | `<COMPANY_BASE>/incoming/<主题>/` | 全部原始输入 +《资料来源清单》（**无主题级 input/**） |
+| `$RAW_WORKDIR` | `<COMPANY_BASE>/raw/<主题>/` | 转换件、OCR、四看工作底稿、PPT 生成脚本等可再生工具 |
+| `$MATERIALS_DIR` | `<COMPANY_BASE>/materials` | 可复用结构化素材（含本 skill 直产的分析产物） |
+| `$METHODOLOGY_REF` | company.yaml `strategy.methodology_ref` | null=内置四看；否则指向方法论资料目录 |
+| `$POLICY_DRIVEN` | company.yaml `industry_profile.policy_driven` | true=政策维度升格（见 P5） |
+| `$PRODUCTS` | company.yaml `products[]` | 自身盘点与机会清单的产品台账 |
+
+**四锚点纪律（COMPANIES.md §6）**：输入一律 incoming、中间一律 raw/<主题>/、复用件直产 materials（带 frontmatter）、交付物平铺 `$STRATEGY_ROOT`（零子目录）。**唯一例外**：`evidence-ledger.json` 是 CLM 溯源根，随 git 分发，平铺在 `$STRATEGY_ROOT/` 下。
 
 ## 核心定位
 
@@ -37,12 +71,11 @@ compatibility: >
 
 它回答的是：
 
-- 蓝联在商业地产信息化领域应该怎么定位？
-- 相对明源/海鼎/猫酷等竞品，差异化在哪？
-- 商管、会员、AI问数、RAG 应该怎么组合？
-- 产品路线图应该先做什么、后做什么？
-- AI问数和 RAG 应该嵌入哪些业务场景？
-- 售前叙事应该突出什么？
+- 当前公司在目标行业应该怎么定位？
+- 相对竞品，差异化在哪？
+- 产品怎么组合、先做什么后做什么？
+- AI/数据能力应该嵌入哪些业务场景？
+- **还有哪些产品机会值得进入产品台账？**（输出产品机会清单 → 反哺 onboard.sh product）
 
 它不回答：
 
@@ -69,21 +102,18 @@ company-intro-generator（客户方案）/ bid-doc-master（投标）
 - 不写客户面向的方案叙事（那是 company-intro）
 - 不写投标响应、报价、偏离表（那是 bid-doc）
 - 不写具体项目立项的 ROI 测算（那是 project-proposal）
-- 不直接修改业务系统代码（/opt/code/mi）
+- 不直接修改业务系统代码
 - 不生成 PPT/Word（MVP 只输出 Markdown；后续如需汇报材料，输出内容包交给 mckinsey-pptx / word-master）
 
-## 方法论：明源四看战略模板
-
-战略分析以 **明源战略模板** 为主方法论框架。明源模板的多份资料需要先归纳成统一结构。
-
-### 四看 → 定战略 → 执行计划
+## 方法论：通用四看框架
 
 ```
 一、看市场（Market）
    ├── 行业趋势与宏观环境
    ├── 客户变化与需求演变
    ├── 技术变化（含 AI/RAG/BI 趋势）
-   └── 政策与经营压力
+   └── 政策与监管环境（政府行业政策 / 监管趋势 / 合规压力 / 政策机会窗口）
+        ★ $POLICY_DRIVEN=true 时升格：独立分析小节 + 专项信号文件（见 P5）
 
 二、看竞对（Competitors）
    ├── 竞品定位与产品矩阵
@@ -93,7 +123,7 @@ company-intro-generator（客户方案）/ bid-doc-master（投标）
    └── AI/数据能力对比
 
 三、看自己（Self）
-   ├── 现有产品能力盘点
+   ├── 现有产品能力盘点（company.yaml products）
    ├── 客户案例与交付能力
    ├── 技术资产与可复用资源
    └── 组织/资源短板
@@ -102,7 +132,8 @@ company-intro-generator（客户方案）/ bid-doc-master（投标）
    ├── 市场缺口与空白
    ├── 竞品弱点
    ├── 自身优势交叉点
-   └── AI/RAG 新机会窗口
+   ├── AI/RAG 新机会窗口
+   └── ★ 产品机会清单（输出反哺，见 P8）
 
 五、定战略（Strategy）
    ├── 战略定位
@@ -117,237 +148,142 @@ company-intro-generator（客户方案）/ bid-doc-master（投标）
    └── 交付能力建设
 ```
 
-### 明源模板的双重角色
+### 方法论实例化（methodology_ref 机制）
 
-明源在战略分析中有两个角色，必须严格分开管理：
+- `$METHODOLOGY_REF = null`（如 lianyou）：P2 跳过方法论归纳，直接使用上方内置四看框架。
+- `$METHODOLOGY_REF ≠ null`（如 lanlnk → 明源战略模板资料位）：P2 从该目录归纳实例化框架。
+  **双重角色管理**：同一份资料可能既是方法论模板又是竞品证据——归纳框架时它是模板，P3 竞品抽取时它是证据之一，必须严格分开，且「模板是参考框架不是真理」，公司战略判断必须基于自身优势和客户实际。
 
-| 角色 | 目录位置 | 用途 |
-|------|---------|------|
-| **战略方法论模板** | `input/00-methodology/明源战略模板/` | 提供四看分析框架、章节结构、推导逻辑 |
-| **商管竞品** | `input/03-competitors/商管系统/明源/` | 作为竞品证据之一，与海鼎/悦商等并列 |
+## 输入与落盘规范（公司级四锚点，无主题流水线）
 
-**明源模板是参考框架，不是真理。** 蓝联的战略判断必须基于自身优势和客户实际，不能照抄明源结论。
-
-## 输入目录规范
-
-战略分析专用资料放在独立目录，与 PRD 资料、materials 素材库隔离：
+战略分析不建主题级目录树。输入走公司级 incoming，中间产物进 raw/<主题>/，可复用分析产物直产 materials（带 frontmatter），最终交付平铺 $STRATEGY_ROOT：
 
 ```text
-$LANLNK_BASE/out/strategy/商业地产信息化战略/
-├── input/                         # 原始资料，只放原文件，不修改
-│   ├── 00-methodology/            # 战略方法论模板
-│   │   └── 明源战略模板/            # 明源多份战略模板资料
-│   ├── 01-market/                 # 市场趋势资料（看市场）
-│   │   ├── 商业地产市场趋势/
-│   │   └── AI趋势/
-│   ├── 02-industry-workflow/      # 行业业务流程 / SOP
-│   │   └── 商业地产SOP/            # 真实运营流程证据
-│   ├── 03-competitors/            # 竞品资料（看竞对）
-│   │   ├── 商管系统/
-│   │   │   ├── 明源/
-│   │   │   ├── 海鼎/
-│   │   │   ├── 安盛旗/
-│   │   │   ├── 酆泽/
-│   │   │   └── 科传/
-│   │   └── 会员系统/
-│   │       ├── 猫酷/
-│   │       ├── 灵智数科/
-│   │       └── 海鼎/
-│   └── 04-self/                   # 蓝联自身资料（看自己）
-│       ├── 商管/                   # 源码路径引用 + 已有 PRD
-│       ├── 会员/                   # materials 已分解资料引用
-│       └── AI/                     # 源码路径引用
-│           ├── lnkchatbi/
-│           └── langchat/
-├── raw/                           # markitdown 转换后的 markdown + 图片
-├── parsed/                        # 结构化抽取结果
-├── review/                        # 待确认、冲突、缺口
-└── output/                        # 最终战略分析输出
+<COMPANY_BASE>/
+├── incoming/<主题>/                 # 全部原始文件 + 《资料来源清单.md》（指针登记，指向 raw 实际转换件）
+├── raw/<主题>/                      # markitdown/OCR 转换件、SOP 映射底稿、PPT 生成脚本（方法论归纳已升格 materials）
+├── materials/                       # 可复用产物直产位：
+│   ├── 13-competitors/              #   ← P3 竞品能力矩阵（frontmatter）
+│   ├── 03-products/政策与市场/       #   ← P5 市场信号 + 政策监管信号（frontmatter）
+│   └── 10-methodology/              #   ← P2 方法论归纳产物（frontmatter，仅 methodology_ref 非空时）
+└── out/<类型>/<主题>/ = $STRATEGY_ROOT   # 平铺零子目录：总报告、产品机会清单、待确认事项、
+                                       # 自身能力盘点、evidence-ledger.json（唯一 json 例外）、pptx
 ```
+
+> lanlnk 存量主题（如 out/strategy/商业地产信息化战略/）的旧五层树按原样保留可读，不做迁移；新主题一律按本契约。
 
 ### 资料放置规则
 
 | 资料类型 | 放在哪里 | 说明 |
 |---------|---------|------|
-| 明源战略模板（多份） | `input/00-methodology/明源战略模板/` | 用于归纳四看方法论框架 |
-| 商业地产市场报告 | `input/01-market/商业地产市场趋势/` | 本地没有则联网搜索补 |
-| AI/RAG/BI 趋势报告 | `input/01-market/AI趋势/` | 本地没有则联网搜索补 |
-| 商业地产运营 SOP | `input/02-industry-workflow/商业地产SOP/` | 真实业务流程证据，对 AI/RAG 场景推导极重要 |
-| 商管竞品资料 | `input/03-competitors/商管系统/<厂商>/` | 明源/海鼎/安盛旗/酆泽/科传 |
-| 会员竞品资料 | `input/03-competitors/会员系统/<厂商>/` | 猫酷/灵智数科/海鼎 |
-| 蓝联商管源码 | 不复制；在 `input/04-self/商管/` 放路径说明 | 路径指向 `/opt/code/mi` 或 PRD output |
-| 蓝联会员资料 | 引用 `$LANLNK_BASE/materials/` 已分解资料 | 在 `input/04-self/会员/` 放引用清单 |
-| 蓝联 AI 源码 | 不复制；在 `input/04-self/AI/` 放路径说明 | lnkchatbi / langchat 源码路径 |
+| 方法论模板（$METHODOLOGY_REF 非空） | 其配置的资料目录（多为 `incoming/<主题>/` 或既有 materials 位） | P2 归纳产物入库 materials/10-methodology/ |
+| 政策/监管文件、市场报告 | `incoming/<主题>/` | 政策驱动型行业的关键输入 |
+| 行业运营 SOP | `incoming/<主题>/` | 真实业务流程证据 |
+| 竞品原始资料 | `incoming/prd-<pid>/02-competitors/` 或 `incoming/<主题>/` | 抽取结果由 P3 直产到 materials/13-competitors/ |
+| 自身源码资产 | 不复制；`source-ref.md` 记录 code_root 路径，放 `incoming/<主题>/` | 路径取自 company.yaml products[].code_root |
+| 自身产品资料 | 引用 `$MATERIALS_DIR/` 已分解资料，在《资料来源清单》登记 | 不建 04-self 目录 |
 
 ### 源码类资料处理
 
-商管和 AI 主要是源码，不要复制进 input 目录。处理方式：
+产品资产以源码为主的（code_root 非空）：不复制。处理方式：
 
-1. 在对应 input 子目录放一个 `source-ref.md`，记录源码根路径
-2. 后续由 Agent 读取源码，抽取能力清单到 `parsed/self/`
-3. 商管可复用已有 PRD：`$LANLNK_BASE/30-products/mi-cre/prd/PRD-MI-001-product-baseline.md`
+1. 在《资料来源清单.md》登记源码根路径（来自 company.yaml）与盘点范围
+2. 后续由 Agent 读取源码，抽取能力清单写入自身能力盘点（P4）
+3. 有 PRD 产物的产品（prd_ready: true）直接复用其 PRD/功能清单作盘点输入
 
 ## 处理流程
 
 ```
-input/（原始资料）
+P0: 公司确定 + 叙事加载 + 配置读取
     ↓
 P1: 资料转换（复用 material-importer：markitdown + 图片提取）
-    ↓ raw/（markdown + 图片）
-P2: 明源模板归纳（多份模板 → 统一四看框架）
-    ↓ parsed/methodology/
-P3: 竞品能力抽取（商管 + 会员分开）
-    ↓ parsed/competitors/
-P4: 自身能力盘点（源码 + materials + PRD）
-    ↓ parsed/self/
-P5: 市场信号整理（本地资料 + 联网搜索）
-    ↓ parsed/market/
+    ↓ raw/<主题>/（markdown + 图片）
+P2: 方法论归纳（$METHODOLOGY_REF 非空时；null 则跳过，用内置四看）
+    ↓ materials/10-methodology/（带 frontmatter，可复用资产；仅归纳工作过程稿留 raw）
+P3: 竞品能力抽取（按 incoming 实际分类）
+    ↓ materials/13-competitors/<名称>.md（带 frontmatter，直产入库）
+P4: 自身能力盘点（company.yaml products + materials + PRD）
+    ↓ $STRATEGY_ROOT/自身能力盘点.md（平铺交付件）
+P5: 市场信号整理（本地资料 + 联网搜索；$POLICY_DRIVEN=true 时政策信号独立成文）
+    ↓ materials/03-products/政策与市场/*.md（带 frontmatter，直产入库）
 P6: SOP → 业务场景映射（流程清单 + AI问数/RAG 机会）
-    ↓ parsed/industry-workflow/
+    ↓ raw/<主题>/SOP场景映射底稿
 P7: 四看综合分析 + 证据台账
-    ↓ parsed/evidence/
-P8: 战略简报生成
-    ↓ output/
+    ↓ $STRATEGY_ROOT/evidence-ledger.json（唯一 json 例外，随 git 分发）
+P8: 战略简报生成 + 产品机会清单
+    ↓ $STRATEGY_ROOT/ 平铺（总报告、产品机会清单、待确认事项 等，零子目录）
 ```
 
 ### P1 资料转换
 
-复用 `material-importer` 的 markitdown 能力：
+复用 `material-importer` 的 markitdown 能力（该 skill 遵循同一 COMPANY_BASE 协议）：
 
 ```bash
-# 批量转换 input/ 下的文档到 raw/
-# 保持目录结构一致
+# 批量转换 incoming/<主题>/ 下的文档到 raw/<主题>/，保持目录结构一致
 cd skills/business/material-importer
-uv run scripts/extract_images.py "$STRATEGY_INPUT_DIR"
-# markitdown 逐文件转换，输出到 raw/ 对应子目录
+uv run scripts/extract_images.py "$INCOMING_DIR"
+# markitdown 逐文件转换，输出到 raw/<主题>/ 对应子目录
 ```
 
-转换规则与 material-importer 一致：
+转换规则与 material-importer 一致：PPTX/DOCX/XLSX/PDF → markdown；图片提取到 `raw/…_media/`；空章节清理、base64 噪音清理；保持来源目录层级。同时在 `incoming/<主题>/` 维护《资料来源清单.md》：每个原始文件 ↔ 实际转换件（含合并文件名，如 all-ocr.md）的指针。
 
-- PPTX/DOCX/XLSX/PDF → markdown
-- 图片提取到 `raw/<filename>_media/`
-- 空章节清理、base64 噪音清理
-- 保持 input 的目录层级
+### P2 方法论归纳（条件执行）
 
-### P2 明源模板归纳
+仅当 `$METHODOLOGY_REF` 非空。归纳 `$METHODOLOGY_REF` 指向的多份资料成**一个统一的方法论框架**，产物分两层：
 
-明源有多份战略模板资料，需要归纳成**一个统一的方法论框架**。
+- **入库层（materials/10-methodology/，带 frontmatter）**：`方法论归纳-<来源>-<日期>.md` —— 统一框架、共同分析维度、来源映射。可复用资产，随 git 分发，后续主题直接复用不必重归纳。
+- **过程层（raw/<主题>/）**：归纳工作稿（逐份资料的差异记录、被舍弃的框架版本、冲突标注）。可再生的中间产物。
 
-输出到 `parsed/methodology/`：
-
-```text
-明源模板清单.md          # 列出所有明源资料及其定位
-明源战略框架归纳.md       # 合并后的统一四看框架
-four-look-framework.json # 机器可读的结构化框架
-```
-
-归纳要点：
-
-- 提取每份模板的章节结构
-- 找出共同的分析维度
-- 合并成统一的"看市场/看竞对/看自己/看机会 → 定战略 → 执行计划"结构
-- 标注每个分析维度的来源模板
+归纳要点：提取章节结构 → 找共同分析维度 → 合并统一框架 → 标注来源。frontmatter `status` 如实表达归纳完整度（资料只有大纲时用 partial）。
 
 ### P3 竞品能力抽取
 
-商管和会员竞品分开整理。
+按 `incoming/` 中竞品原始资料的实际分类分组整理（如 lanlnk 分商管/会员两组；lianyou 可分溯源/监管科技等）。**直产入库** `$MATERIALS_DIR/13-competitors/`，带完整 frontmatter（id/type/name/domain/tags/status/created/source；status 如实表达核验程度）：分类能力矩阵 + 每家竞品结构化主张。若该公司已形成 `13-competitors/<vendor>/<分类>/` 目录体系（如 lanlnk 的明源/海鼎/凯捷等 7 家），矩阵与结构化文件落入对应分组位，不强求根目录平铺。
 
-输出到 `parsed/competitors/`：
-
-```text
-商管竞品能力矩阵.md      # 明源/海鼎/安盛旗/酆泽/科传 横向对比
-会员竞品能力矩阵.md      # 猫酷/灵智数科/海鼎 横向对比
-商管竞品战略主张.json    # 每家竞品的结构化主张
-会员竞品战略主张.json
-```
-
-每个竞品抽取维度：
-
-| 维度 | 说明 |
-|------|------|
-| 公司/产品定位 | 这家竞品怎么定位自己 |
-| 目标客户 | 主攻哪类客户 |
-| 核心模块 | 产品主要模块 |
-| 特色能力 | 差异化能力 |
-| AI/数据能力 | AI问数/BI/RAG 相关能力 |
-| 行业打法 | 怎么卖、怎么交付 |
-| 优势 | 强在哪 |
-| 短板 | 弱在哪 |
-| 可借鉴点 | 蓝联可以学什么 |
-| 对蓝联威胁 | 威胁程度评估 |
+每个竞品抽取维度：公司/产品定位、目标客户、核心模块、特色能力、AI/数据能力、行业打法、优势、短板、**可借鉴点（当前公司可以学什么）**、**对当前公司威胁**。
 
 ### P4 自身能力盘点
 
-蓝联三块资产分开盘点：
+按 `$PRODUCTS`（company.yaml products）逐产品盘点，**平铺交付** `$STRATEGY_ROOT/自身能力盘点.md`（属四看正式产物，供总报告链接，不沉 raw）：
 
-输出到 `parsed/self/`：
-
-```text
-蓝联商管能力盘点.md      # 基于源码 + 已有 PRD
-蓝联会员能力盘点.md      # 基于 materials 已分解资料
-蓝联AI能力盘点.md        # 基于 lnkchatbi / langchat 源码
-self-capability-map.json
-```
-
-盘点维度：
-
-| 资产 | 来源 | 盘点内容 |
+| 资产来源 | 判定 | 盘点内容 |
 |------|------|---------|
-| 商管 | `/opt/code/mi` 源码 + `$LANLNK_BASE/30-products/mi-cre/` | 已有模块、能力成熟度、技术栈 |
-| 会员 | `$LANLNK_BASE/materials/03-products/` + `04-cases/` | 产品功能、已交付案例、行业覆盖 |
-| AI | lnkchatbi / langchat 源码 | AI问数能力、RAG 能力、大模型集成方式 |
+| code_root 非空 | 读源码（source-ref.md 指路） | 已有模块、能力成熟度、技术栈 |
+| code_root 空 + materials 有资料 | 引用 `$MATERIALS_DIR/03-products/` 等 | 产品功能、案例、行业覆盖 |
+| prd_ready: true | 复用 PRD/功能清单 | 权威能力基线 |
 
-### P5 市场信号整理
+### P5 市场信号整理（含政策升格）
 
-市场资料来自两个来源：
+市场资料来自两个来源：**本地资料**（`incoming/<主题>/`）+ **联网搜索**（补充最新趋势）。
 
-1. **本地资料**：`input/01-market/` 下的行业报告、趋势资料
-2. **联网搜索**：用 web search 补充最新趋势
+**政策驱动型行业（`$POLICY_DRIVEN: true`）必须单独产出** `$MATERIALS_DIR/03-products/政策与市场/政策监管信号.md`（带 frontmatter，直产入库）：
 
-输出到 `parsed/market/`：
+- 本地政策文件逐份摘录（发文字号、发布单位、核心条款、与公司的关联）
+- 联网检索补充（政府官网、征求意见稿、行业解读），逐条带 URL
+- 提炼：监管趋势、合规压力、**政策机会窗口**（如政策要求 XX 系统化 → 产品机会）
+- 每条信号必须标注来源
 
-```text
-商业地产市场信号.md      # 存量运营、招商压力、会员运营、数据化运营趋势
-AI趋势市场信号.md        # AI问数、企业知识库、RAG、BI Copilot、私有化大模型趋势
-```
+非政策驱动型（false）：政策并入常规市场信号文件，不独立成文（维度保留、权重降低）。
 
-每条市场信号必须标注来源（本地资料引用 / 联网搜索 URL）。
+输出到 `$MATERIALS_DIR/03-products/政策与市场/`：`<行业>市场信号.md` +（政策驱动时）`政策监管信号.md`，均带 frontmatter。
 
 ### P6 SOP → 业务场景映射
 
-商业地产 SOP 是推导 AI问数和 RAG 场景的关键输入。
-
-输出到 `parsed/industry-workflow/`：
-
-```text
-商业地产SOP流程清单.md           # 招商/合同/财务/运营/物业/会员等 SOP 流程
-商业地产角色与岗位.md            # 谁发起、谁审批、谁执行
-SOP痛点与系统机会.md             # 每个 SOP 环节的痛点和系统化机会
-SOP到AI问数场景映射.md           # 哪些 SOP 暴露的管理动作可转成 AI问数
-SOP到RAG知识场景映射.md          # 哪些 SOP 文档/制度可转成 RAG 问答
-```
+行业 SOP 是推导 AI问数和 RAG 场景的关键输入。输出到 `raw/<主题>/SOP场景映射底稿.md`：流程清单、角色与岗位、SOP 痛点与系统化机会、SOP 到 AI问数/RAG 场景映射。底稿结论由总报告「看机会」承载。
 
 ### P7 四看综合分析 + 证据台账
 
-把前面所有 parsed 结果综合成四看分析。
-
-输出到 `parsed/evidence/`：
-
-```text
-evidence-ledger.json     # 全局证据台账
-```
-
-证据台账结构：
+把前面所有产物综合成四看分析。输出 **`$STRATEGY_ROOT/evidence-ledger.json`**（唯一 json 例外：随 git 分发，保证克隆后所有 CLM 编号可回查）：
 
 ```json
 {
   "claims": [
     {
       "id": "CLM-001",
-      "claim": "商业地产正在从增量开发转向存量运营",
+      "claim": "<一句话声明>",
       "section": "看市场",
-      "source_type": "market_report | competitor_material | self_asset | sop | web_search",
-      "source_ref": "input/01-market/商业地产市场趋势/xxx.pdf §3.2",
+      "source_type": "market_report | policy_document | competitor_material | self_asset | sop | web_search",
+      "source_ref": "incoming/<主题>/xxx.pdf §3.2、materials/13-competitors/yyy.md 或 URL",
       "confidence": "high | medium | low",
       "notes": ""
     }
@@ -355,84 +291,52 @@ evidence-ledger.json     # 全局证据台账
 }
 ```
 
-### P8 战略简报生成
+### P8 战略简报生成 + 产品机会清单
 
-最终输出到 `output/`：
+最终**平铺**输出到 `$STRATEGY_ROOT/`（零子目录）：
 
 ```text
 战略分析总报告.md          # 完整战略简报（管理层可读）
-四看分析.md               # 四看详细分析
-商管竞品分析.md            # 商管竞品深度对比
-会员竞品分析.md            # 会员竞品深度对比
-AI趋势与机会分析.md        # AI问数/RAG 机会分析
-蓝联战略定位建议.md         # 战略定位 + 差异化打法
-产品组合与路线图.md         # 产品组合策略 + 分阶段路线图
-执行计划.md               # 产品/市场/售前/交付动作
-证据台账.md               # 全部证据的可读视图
+产品机会清单.md           # ★ 必产出：反哺公司产品台账
+待确认事项.md             # 假设验证 / 证据升级 / 缺口跟踪（原 review/pending-items）
+自身能力盘点.md           # P4 产物平铺
+evidence-ledger.json      # P7 台账（唯一 json 例外）
 ```
+
+**产品机会清单.md 结构**（反哺闭环的入口）：
+
+```markdown
+# 产品机会清单（战略分析产出）
+> 操作指引：用户确认某机会后，在 docs 仓库执行
+> `scripts/onboard.sh product <company> <pid> --name "<机会名>"` 加入 company.yaml 产品台账。
+
+| # | 机会名 | 证据 ID | 目标客户 | 建议优先级 | 与现有产品关系 |
+|---|--------|---------|----------|-----------|---------------|
+| 1 | <如：监管检查报告自动生成> | CLM-0xx, CLM-0yy | <目标客群> | P1 | 新产品（与 溯源APP 互补） |
+```
+
+每条机会的证据 ID 必须能在 evidence-ledger 中查到（证据纪律同样约束机会清单）；「与现有产品关系」对照 `$PRODUCTS` 台账填写（新/扩展/替代）。
 
 ## 战略简报标准结构
 
 ```markdown
-# 商业地产信息化战略简报
+# <行业>战略简报（$BRAND）
 
 ## 1. 管理层摘要
-   - 战略判断一句话
-   - 核心机会窗口
-   - 建议的产品组合
-   - 关键风险
-
-## 2. 方法论说明
-   - 采用明源四看战略模板
-   - 资料来源与覆盖度
-
+## 2. 方法论说明（内置四看 / 实例化来源、资料覆盖度）
 ## 3. 看市场
-   3.1 商业地产市场趋势
+   3.1 <行业>市场趋势
    3.2 客户需求演变
    3.3 AI 与技术趋势
-   3.4 政策与经营压力
-
-## 4. 看竞对
-   4.1 商管系统竞品矩阵
-   4.2 会员系统竞品矩阵
-   4.3 竞品 AI/数据能力对比
-   4.4 竞品战略分组
-
-## 5. 看自己
-   5.1 商管能力盘点
-   5.2 会员能力盘点
-   5.3 AI 能力盘点
-   5.4 案例与交付能力
-   5.5 短板与缺口
-
-## 6. 看机会
-   6.1 市场缺口
-   6.2 竞品弱点
-   6.3 自身优势交叉点
-   6.4 AI问数 / RAG 嵌入机会
-
+   3.4 政策与监管环境（$POLICY_DRIVEN=true 时为独立小节，false 时并入趋势）
+## 4. 看竞对（按公司竞品分组）
+## 5. 看自己（按 $PRODUCTS 逐产品）
+## 6. 看机会（含产品机会摘要，指向产品机会清单.md）
 ## 7. 战略定位
-   7.1 战略定位声明
-   7.2 目标客户画像
-   7.3 差异化主张
-
 ## 8. 产品组合策略
-   8.1 商管 + 会员 + AI 融合架构
-   8.2 AI问数嵌入路径
-   8.3 RAG 嵌入路径
-   8.4 产品打包策略
-
 ## 9. 执行计划
-   9.1 阶段目标（P0/P1/P2）
-   9.2 产品路线图
-   9.3 市场与售前动作
-   9.4 交付能力建设
-
 ## 10. 风险与待确认问题
-
 ## 11. 证据台账
-   - 每条战略判断的证据来源
-   - 标注 Assumption 的未证实假设
 ```
 
 ## 证据纪律（核心规则）
@@ -441,11 +345,9 @@ AI趋势与机会分析.md        # AI问数/RAG 机会分析
 
 ### 三类声明标记
 
-战略简报中的每段判断必须用以下标记之一：
-
 | 标记 | 含义 | 要求 |
 |------|------|------|
-| `【证据】` | 来自资料的事实 | 必须引用具体来源（文件 + 章节/页码） |
+| `【证据】` | 来自资料的事实 | 必须引用具体来源（文件 + 章节/页码，政策文件含发文字号） |
 | `【判断】` | 基于证据的推理 | 必须列出依据的证据 ID |
 | `【假设】` | 未证实的假设 | 必须标注，并说明如何验证 |
 
@@ -453,22 +355,14 @@ AI趋势与机会分析.md        # AI问数/RAG 机会分析
 
 - 禁止无来源的战略断言
 - 禁止把竞品宣传话术当事实
-- 禁止把明源结论当蓝联结论
+- 禁止把方法论模板结论当公司结论
 - 禁止"所有企业都在做 AI"这类空话
 - 禁止在不看 SOP 的情况下推荐 AI/RAG 场景
+- 禁止政策驱动型行业不做政策文件分析就下市场判断
 
 ### 证据台账必填字段
 
-每条证据：
-
-```text
-- ID: CLM-XXX
-- 声明: <一句话>
-- 类型: 证据/判断/假设
-- 来源: <文件路径 + 章节>
-- 置信度: high/medium/low
-- 用于章节: <战略简报的哪个 section>
-```
+每条证据：ID（CLM-XXX）/ 声明 / 类型（证据/判断/假设）/ 来源（文件路径+章节 或 URL）/ 置信度（high/medium/low）/ 用于章节。
 
 ## AI问数 / RAG 分析的分层框架
 
@@ -476,155 +370,67 @@ AI趋势与机会分析.md        # AI问数/RAG 机会分析
 
 | AI 能力类型 | 战略价值 | 场景来源 |
 |------------|---------|---------|
-| **AI问数** | 经营分析、招商/租金/会员/销售数据自然语言查询 | SOP 中的管理动作和指标 |
-| **AI RAG** | 制度、合同、运营 SOP、系统操作手册问答 | SOP 文档库 |
-| **AI 助手** | 面向商管人员的业务操作辅助 | SOP 中的高频操作 |
+| **AI问数** | 经营/监管数据的自然语言查询 | SOP 中的管理动作和指标 |
+| **AI RAG** | 制度、法规、SOP、操作手册问答 | SOP/政策文档库 |
+| **AI 助手** | 面向岗位的业务操作辅助 | SOP 中的高频操作 |
 | **AI 决策** | 预警、预测、建议 | SOP 中的管理决策点 |
 
 **MVP 建议**：AI问数和 RAG 优先；AI 决策不过度承诺。
 
-## 设计决策：商业地产 AI 战略报告维护规则
+## 公司专属叙事（外置加载）
 
-### 客户路线必须分层
+本 skill 只保留通用引擎。各公司专属写作约束在 P0 加载 `$COMPANY_BASE/config/sales-playbook/strategy-brief.md`（存在时）。
 
-商业地产 AI 战略不能把所有客户混成一套打法。默认区分两条路线：
+当前已沉淀：
 
-| 路线 | 客户状态 | 价值主张 | 销售打法 |
-|---|---|---|---|
-| B 路线（主战场） | 中端/中腰部，已有商管、会员、POS、停车等系统 | 不换系统，用 AI 把已有系统用起来，降本、提效、增收 | 先卖简单 30 天、复杂 60 天交付验证和岗位价值 |
-| D 路线（样板验证） | 选择性低端/中小项目，无系统或系统弱 | 不是上一套传统系统，而是 AI + 商管/会员底座，让老板直接看到经营结果 | 只做少量样板，不大规模铺低价长尾 |
+| 公司 | 文件 | 内容 |
+|---|---|---|
+| lanlnk | `lanlnk/config/sales-playbook/strategy-brief.md` | B/D 客户路线分层、岗位病药矩阵对齐、需求表四类拆分、蓝联整体视角、30/60 天交付口径、可达度表述规则 |
 
-D 路线不是“长尾铺量”。如果报告同时写“长尾暂不做”和“低端客户 D 路线”，必须明确：低端/中小只做样板验证，不做低价规模化。
-
-### 岗位场景矩阵必须逐章对齐
-
-当第 3 章写“客户岗位场景需求”时，第 4 章竞对/自身响应矩阵必须使用同一套 `岗位 + 业务场景` 行集和顺序：
-
-```text
-3.2 商管岗位场景需求
-  → 4.2.1 蓝联自身产品响应
-  → 4.2.2 商管逐竞对矩阵
-
-3.3 会员岗位场景需求
-  → 4.3.1 蓝联自身产品响应
-  → 4.3.2 会员逐竞对矩阵
-```
-
-自检方法：抽取每个表格前两列，断言 `3.2 == 4.2.1 == 4.2.2`、`3.3 == 4.3.1 == 4.3.2`。不要用“招商漏斗周报/经营问数”等旧需求点行替代新的 SOP 场景行。
-
-### 需求表按四类需求拆分
-
-岗位场景需求表不要只写“AI 增强需求（Skill）”。更稳定的列结构是：
-
-```text
-岗位 | 业务场景 | 系统需求 | 商管需求 | 会员需求 | AI增强需求
-```
-
-场景优先来自客户 SOP；SOP 缺失但已有 PRD/竞品资料能证明的场景（如财务出账、账龄、保证金、发票、平台券分账）可以补入，但要在说明里标注来源。
-
-> **2026-07-05 补充：岗位病药矩阵数据源**。写"客户岗位场景需求"时，优先引用 `$LANLNK_BASE/materials/10-methodology/methodology/15-商业地产岗位病药矩阵.md`，它已提供 7 岗位（总经理/招商总/财务总/营运总/企划总/物业总/IT总）× 痛点/场景/功能/价值/证明的完整矩阵，可直接作为需求表的初稿来源，不必从零推导。证明列注意分级：Z1 实证/Z2 竞品行业对标/Z3 蓝联产品状态/Z4 待试点验证，避免把对标说成案例。
-
-### 内部汇报用蓝联整体视角
-
-当听众是蓝联合伙人和销售团队时，报告主语不要写成“蓝联创新单独要做什么”，否则容易形成组织割裂。推荐口径：
-
-- 标题用“蓝联商业地产 AI 战略分析总报告”。
-- 蓝联创新业务 = 商管系统 + LnkAgent 新增长线。
-- 蓝联科技会员业务 = 蓝联既有资产，维持现有客户经营，可作为客户关系、数据源和可选组件协同。
-- 对销售强调“蓝联从做会员升级到做商业地产岗位 AI”，不是“销售帮蓝联创新卖另一个团队的产品”。
-
-### 交付周期和团队配置
-
-战略报告中如涉及首批交付验证，默认口径：
-
-- 简单场景 30 天，复杂场景 60 天。
-- 不再写“90 天试点”作为主口径，除非用户明确要求。
-- 团队最小配置：AI工程师 + 实施/AgentOps + 销售各至少一个负责人。
-- AI coding 场景不必强行配置产品经理；但必须有人负责交付、托管和客户推进。
-
-### 可达度避免伪精确百分比
-
-竞对矩阵里的“蓝联可达 70%/80%”容易被理解为精确测算。战略报告中优先使用：
-
-```text
-高 / 中高 / 中 / 低 + 判断依据
-```
-
-例如：`高：RAG客服分流`、`中高：商管财务联动`、`中：问数先行，不硬拼驾驶舱`。
-
-## 配置读取
-
-```bash
-export LANLNK_BASE=/opt/code/docs/lanlnk
-```
-
-设置以下变量：
-
-| 变量 | 路径 |
-|------|------|
-| `$STRATEGY_ROOT` | `$LANLNK_BASE/out/strategy/商业地产信息化战略` |
-| `$STRATEGY_INPUT` | `$STRATEGY_ROOT/input` |
-| `$STRATEGY_RAW` | `$STRATEGY_ROOT/raw` |
-| `$STRATEGY_PARSED` | `$STRATEGY_ROOT/parsed` |
-| `$STRATEGY_OUTPUT` | `$STRATEGY_ROOT/output` |
-| `$MATERIALS_DIR` | `$LANLNK_BASE/materials`（蓝联自身资料引用） |
+新公司沉淀自己的叙事：在公司库建同名文件即可，零 skill 修改。
 
 ## 使用示例
 
-### 示例 1：完整四看战略分析
+### 示例 1：lianyou 完整战略分析（政策驱动型 + 机会发现）
 
-> 用户："帮我做商业地产信息化战略分析，明源模板和竞品资料都放好了"
+> 用户："给 lianyou 做战略分析，素材在 incoming/战略分析素材"
 
 ```
 Agent:
-  1. 扫描 input/ 目录，确认资料覆盖度
-  2. 转换资料到 raw/（复用 material-importer）
-  3. 归纳明源模板到 parsed/methodology/
-  4. 抽取竞品能力到 parsed/competitors/
-  5. 盘点自身能力到 parsed/self/
-  6. 整理市场信号到 parsed/market/（含联网搜索）
-  7. SOP → 场景映射到 parsed/industry-workflow/
-  8. 综合四看分析 + 证据台账
-  9. 生成 output/战略分析总报告.md
+  0. 公司=lianyou（用户点名）；加载 company.yaml（广州联友/policy_driven=true/1 产品/四看内置）
+     检查 sales-playbook → 无，用通用引擎
+  1. 原始素材在 incoming/战略分析素材；建《资料来源清单》（政策文件、证书、截图 ↔ raw/_extracted/all-ocr.md 指针）
+  2. 转换到 raw/<主题>/（PDF 政策件 markitdown + 截图 OCR）
+  3. P2 跳过（methodology_ref=null）
+  4. P3 竞品抽取（incoming 竞品资料按实际目录；暂无竞品资料则在待确认事项标注缺口）
+  5. P4 自身盘点 → $STRATEGY_ROOT/自身能力盘点.md
+  6. P5 市场信号 + ★政策监管信号.md 直产 materials（联网检索药监局/广东省 AI 政策补充）
+  7. P7 四看 + evidence-ledger.json 平铺（政策文件引用带发文字号）
+  8. $STRATEGY_ROOT 平铺：总报告 + 产品机会清单 + 待确认事项
+     提示用户确认机会后 onboard.sh product lianyou <pid> 反哺
 ```
 
-### 示例 2：只做竞品对比
+### 示例 2：lanlnk 竞品专项
 
 > 用户："先帮我分析商管竞品，明源海鼎安盛旗酆泽科传这几家"
 
 ```
-Agent:
-  只跑 P1 + P3，输出 parsed/competitors/商管竞品能力矩阵.md
-  不生成完整战略简报
+Agent: 公司=lanlnk；加载 sales-playbook；只跑 P1+P3，竞品矩阵直产 materials/13-competitors/商管竞品能力矩阵.md
 ```
 
-### 示例 3：AI 机会专项分析
-
-> 用户："基于商业地产 SOP，分析 AI问数和 RAG 应该嵌在哪些场景"
-
-```
-Agent:
-  只跑 P6，输出 parsed/industry-workflow/SOP到AI问数场景映射.md
-                                   SOP到RAG知识场景映射.md
-```
-
-### 示例 4：明确拒绝越界
+### 示例 3：明确拒绝越界
 
 > 用户："顺便帮我做一份客户方案 PPT"
 
 ```
-Agent:
-  我只做战略分析。客户方案请交给 company-intro-generator。
-  我可以输出"售前叙事建议"作为战略简报的一节，但不生成客户面向的 PPT。
+Agent: 我只做战略分析。客户方案请交给 company-intro-generator。
 ```
 
 ## 后续渲染（可选）
 
-战略简报稳定后，如需汇报材料：
-
 | 输出格式 | 处理方式 |
 |---------|---------|
-| 战略汇报 PPT | 输出 YAML 内容包 → 调用 mckinsey-pptx（最适合战略叙事） |
+| 战略汇报 PPT | 输出 YAML 内容包 → 调用 mckinsey-pptx |
 | 战略 Word 报告 | 输出 `.word-content.md` → 调用 word-master |
 | RAG 可查的战略知识 | 复用 doc-generator 的 chunks.jsonl 模式 |
 
@@ -632,24 +438,22 @@ Agent:
 
 ## 已知限制
 
-- **明源模板归纳质量依赖原始资料完整度**：如果明源模板资料只有 PPT 大纲没有正文，归纳出的框架会比较粗。
-- **市场资料需联网搜索补充**：本地市场资料不足时，市场分析依赖 web search 质量。
-- **源码类资产盘点较浅**：商管和 AI 主要是源码，第一版只做模块级能力盘点，不做字段/接口级。
-- **不生成 PPT/Word**：MVP 只输出 Markdown；后续通过内容包委托渲染 skill。
-- **不做定量市场预测**：不预测市场规模、份额、增长率等需要专业调研机构数据的指标。
-- **AI 能力建议是定性的**：不评估 AI 模型性能、token 成本、延迟等技术指标。
-- **路线和组织口径依赖听众**：面向蓝联合伙人/销售时要用蓝联整体视角；面向蓝联创新内部时才强调创新业务承接边界。
+- **方法论归纳质量依赖原始资料完整度**（$METHODOLOGY_REF 模式）：资料只有大纲没有正文时归纳较粗。
+- **市场资料需联网搜索补充**；政策驱动型行业的政策信号质量依赖 web search 与政府官网检索。
+- **源码类资产盘点较浅**：第一版只做模块级能力盘点，不做字段/接口级。
+- **不生成 PPT/Word**：后续通过内容包委托渲染 skill。
+- **不做定量市场预测**：不预测市场规模、份额、增长率等需专业调研机构数据的指标。
+- **AI 能力建议是定性的**：不评估模型性能、token 成本、延迟等技术指标。
+- **竞品资料缺失时**：P3 在待确认事项登记缺口，不虚构竞品能力。
 
 ## 维护规则
 
 修改本 skill 时：
 
-1. **判断归属**：通用战略方法论 → 留在本文件；特定项目域知识 → 写入 `$STRATEGY_ROOT/域知识.md`
+1. **判断归属**：通用战略方法论 → 留在本文件；公司专属叙事 → 写入对应公司 `config/sales-playbook/strategy-brief.md`；特定项目域知识 → 写入 `$STRATEGY_ROOT/域知识.md`
 2. **更新本文件**的「已知限制」章节
 3. **如是诊断流程**，更新 `references/troubleshooting.md`
-4. **方法论框架变更**（如明源模板归纳结构调整），同步更新 `references/four-look-framework.md`
-5. **新增竞品**时，在 input 目录建对应子目录，并更新竞品矩阵模板
-6. **改岗位场景需求表时**，同步更新自身响应表和逐竞对表，保持 `岗位 + 业务场景` 行集完全一致
-7. **改客户分层/路线时**，同步检查摘要、B/D 路线、产品包、行动计划、风险和已确认决策，避免一处写“长尾不做”、另一处写“低端铺量”
+4. **方法论框架变更**（如四看结构调整），同步更新 `references/four-look-framework.md` 与 COMPANIES.md §7
+5. **新增公司叙事**时，在公司库建 sales-playbook 文件并在本文件「公司专属叙事」表登记
 
 **判断标准**：如果一个战略分析行为或坑"下次的我"读到不一定能立刻理解为什么这么做，就应该记录。
