@@ -1,0 +1,67 @@
+# code-map-rules-lnkreport.yaml
+#
+# Code scanning rules for LnkReport（原 PyDataEase：DataEase 的 Python 重写版，开源 BI 工具；仓库与 backend 目录均已改名 lnkreport/backend）。
+#
+# 本配置覆盖：
+#   - specs_path: openspec/specs/ (45 个现行 spec)
+#   - matrix: 不适用（PyDataEase 无商管-style product-definition-matrix）
+#   - future_scanners: PyDataEase 域 scanner 占位（Phase B 不实现）
+#
+# 范围：PyDataEase 自身能力面（数据源 / 数据集 / 图表 / 仪表板与大屏 /
+# 分享嵌入导出 / 用户组织权限 / 系统设置 / 模板中心 / 数据填报 / mysqlbot AI 助手）。
+# 注意：capability 状态判定除 specs 外还有 reconcile 的 archive evidence
+# （openspec/changes/archive 35 个归档变更会自动提升 archive 声明的 capability）。
+#
+# 排除说明：
+#   - core/core-backend/target、sdk/**/target：Java 原版残留（仅编译产物，源码已删）
+#   - de-xpack：商业增强已剥离（空 submodule）
+#   - release-output、staticResource：构建产物/静态资源
+
+project: lnkreport
+description: PyDataEase（DataEase Python 重写版，开源 BI 工具）代码扫描规则。
+
+specs:
+  path: openspec/specs
+
+matrix:
+  enabled: false
+  # PyDataEase 无商管-style product-definition-matrix 文件。
+
+# Future scanner placeholders for PyDataEase domain.
+# Phase B 不激活；激活后扫描 FastAPI 路由、Vue 视图、驱动注册表等。
+future_scanners:
+  fastapi_routers:
+    enabled: false
+    include_patterns:
+      - "core/lnkreport-backend/app/routers/*.py"
+    note: "FastAPI 路由层（39 个 router 文件不含 __init__.py，功能面全集）；含 datasource/dataset/chart/visualization/share/export/user/role/org/template/data_filing/mysqlbot 等"
+  vue_views:
+    enabled: false
+    include_patterns:
+      - "core/core-frontend/src/views/**"
+    note: "Vue3 功能页面（panel/dashboard/data-visualization/chart/visualized/system/template-market/data-filing/sqlbot 等）"
+  datasource_drivers:
+    enabled: false
+    include_patterns:
+      - "core/lnkreport-backend/app/services/datasource_drivers.py"
+    note: "数据源驱动注册表（当前仅 postgresql/mysql；README 宣称矩阵为继承口径）"
+  menu_title_map:
+    enabled: false
+    include_patterns:
+      - "core/lnkreport-backend/app/services/menu_service.py"
+    note: "权威中文菜单名 TITLE_MAP"
+
+exclude_paths:
+  - "**/node_modules/**"
+  - "**/.venv/**"
+  - "**/__pycache__/**"
+  # Java 原版残留（仅编译产物）
+  - "core/core-backend/target/**"
+  - "sdk/**/target/**"
+  - "de-xpack/**"
+  # 前端构建产物
+  - "core/core-frontend/dist/**"
+  # 发布产物与静态资源
+  - "release-output/**"
+  - "staticResource/**"
+  - "mapFiles/**"
