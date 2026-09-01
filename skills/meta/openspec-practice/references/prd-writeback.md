@@ -9,7 +9,7 @@
 ## 输入
 
 - 默认只需短口令 `回写 PRD`，由 agent 从当前目录、最近对话和项目名默认解析推断目标项目。
-- 可选：项目名或项目路径，例如 `mi` / `langchat` / `/opt/code/mi`。
+- 可选：项目名或项目路径，例如 `mi` / `langchat` / `/opt/code/lnkcre`。
 - 可选：时间范围，例如 `今天` / `最近一次` / `本周归档`。
 - 可选：一个或多个 archived change id/path，用于精确指定回写对象。
 - 可选：PRD 输出目录，例如 `$LANLNK_BASE/30-products/mi-cre/`。

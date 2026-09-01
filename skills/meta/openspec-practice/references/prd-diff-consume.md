@@ -9,7 +9,7 @@
 ## 输入
 
 - PRD 差异报告或 gap 报告。
-- 目标项目路径，默认 `mi` 为 `/opt/code/mi`。
+- 目标项目路径，默认 `mi` 为 `/opt/code/lnkcre`。
 - 可选：`suggested-openspec-changes.yaml`、PRD 实施交接包。
 
 ## 步骤

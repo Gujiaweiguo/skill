@@ -36,7 +36,7 @@
 ## 不沉淀
 
 - 客户敏感信息、密钥、报价明细。
-- 一次性项目路径，除非是稳定示例路径如 `/opt/code/mi`。
+- 一次性项目路径，除非是稳定示例路径如 `/opt/code/lnkcre`。
 - 未完成、未验证、仍在猜测的判断。
 - 业务系统具体实现细节，除非它影响 OpenSpec 流程本身。
 
@@ -46,7 +46,7 @@
 
 ```bash
 cd /opt/code/skill/skills/meta/openspec-practice
-uv run python scripts/scan_openspec.py /opt/code/mi --json
+uv run python scripts/scan_openspec.py /opt/code/lnkcre --json
 uv run python scripts/scan_openspec.py /opt/code/langchat --json
 ```
 

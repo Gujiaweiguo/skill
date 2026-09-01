@@ -50,7 +50,7 @@ description: OpenSpec 实战工作流 Skill。用于用短口令处理真实项�
 
 项目名默认解析：
 
-- `mi` → `/opt/code/mi`
+- `mi` → `/opt/code/lnkcre`
 - `langchat` → `/opt/code/langchat`
 - `docs` → `/opt/code/docs`
 - `skill` → `/opt/code/skill`
