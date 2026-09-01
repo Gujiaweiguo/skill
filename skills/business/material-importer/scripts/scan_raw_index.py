@@ -111,15 +111,23 @@ def build_entry(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="扫描 raw/ 重建 _index.json")
-    parser.add_argument("--raw-dir", default=None, help="raw/ 目录路径（默认 $LANLNK_BASE/raw）")
-    parser.add_argument("--materials-dir", default=None, help="materials/ 目录路径（默认 $LANLNK_BASE/materials）")
+    parser.add_argument("--raw-dir", default=None, help="raw/ 目录路径（默认 $COMPANY_BASE/raw）")
+    parser.add_argument("--materials-dir", default=None, help="materials/ 目录路径（默认 $COMPANY_BASE/materials）")
     parser.add_argument("--merge", action="store_true", default=True, help="与现有索引合并（默认开启）")
     parser.add_argument("--no-merge", dest="merge", action="store_false", help="完全覆盖现有索引")
     args = parser.parse_args()
 
-    lanlnk_base = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk"))
-    raw_dir = Path(args.raw_dir) if args.raw_dir else lanlnk_base / "raw"
-    materials_dir = Path(args.materials_dir) if args.materials_dir else lanlnk_base / "materials"
+    base = os.environ.get("COMPANY_BASE") or os.environ.get("LANLNK_BASE")
+    if not base:
+        print("错误: 未设置 COMPANY_BASE（或兼容变量 LANLNK_BASE）。\n"
+              "  export COMPANY_BASE=/opt/code/docs/<company>   # 如 lianyou / lanlnk", file=sys.stderr)
+        return 1
+    base = Path(base)
+    if not (base / "config" / "company.yaml").is_file():
+        print(f"错误: {base} 不是已注册公司（缺 config/company.yaml）。", file=sys.stderr)
+        return 1
+    raw_dir = Path(args.raw_dir) if args.raw_dir else base / "raw"
+    materials_dir = Path(args.materials_dir) if args.materials_dir else base / "materials"
 
     if not raw_dir.is_dir():
         print(f"[ERROR] raw/ 目录不存在: {raw_dir}", file=sys.stderr)

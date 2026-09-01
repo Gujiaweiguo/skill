@@ -19,7 +19,8 @@ compatibility: >
 
   Quick start:
   ```bash
-  export LANLNK_BASE=/opt/code/docs/lanlnk
+  export COMPANY_BASE=/opt/code/docs/lanlnk    # 或 /opt/code/docs/lianyou 等其他公司
+  # 兼容变量 LANLNK_BASE 仍有效（等价）；多公司契约见 /opt/code/docs/COMPANIES.md
   cd skills/business/material-importer
   uv sync
   ```
@@ -70,7 +71,7 @@ change: >
 ## 目录结构（三级）
 
 ```
-$LANLNK_BASE/
+$COMPANY_BASE/                     ← 🏢 当前公司根（config/company.yaml 必须存在）
 ├── incoming/                      ← 🟢 原始素材入口
 │                                  只放原始文件（PPTX/DOCX/XLSX/图片）
 │                                  转换后由 Agent 清理，不留残余
@@ -81,16 +82,17 @@ $LANLNK_BASE/
 │   └── _index.json                 自动维护的使用关系索引
 │
 └── materials/                     ← 🔵 最终产出
-                                  结构化素材（8 大类，供查询/引用）
+                                   结构化素材（8 大类，供查询/引用）
 ```
 
 路径变量：
-- `$INCOMING_DIR` = `incoming/`（原始素材入口）
-- `$RAW_DIR` = `raw/`（Markdown + 图片 + _index.json）
-- `$MATERIALS_DIR` = `materials/`（结构化素材，8 大类）
+- `$COMPANY_BASE` = 当前公司根（变量协议：`COMPANY_BASE ∥ LANLNK_BASE`，路径下必须有 `config/company.yaml`，否则报错——无静默默认）
+- `$INCOMING_DIR` = `$COMPANY_BASE/incoming/`（原始素材入口）
+- `$RAW_DIR` = `$COMPANY_BASE/raw/`（Markdown + 图片 + _index.json）
+- `$MATERIALS_DIR` = `$COMPANY_BASE/materials/`（结构化素材，8 大类）
 - `$SCRIPTS_DIR` = `{baseDir}/scripts`
 
-完整目录结构见 `config/lanlnk.yaml`。
+公司清单与结构由各公司 `config/company.yaml` 自描述（契约见 `/opt/code/docs/COMPANIES.md`）；公司级行业/场景标签优先读 `$COMPANY_BASE` 下 company.yaml 的 `materials.domain_tags` 所指文件，缺失时回退本 skill 的 `references/domain-tags.md`。
 
 > ⚠️ **只有两个 raw**：转换结果统一进 `raw/`，不存在 `incoming/raw/`。  
 > 之前遗留的 `incoming/raw/` 是早期 pipeline 产物，应删除。
@@ -128,6 +130,20 @@ P5b: 关系索引维护 → raw/_index.json（记录 raw→materials 引用关�
 ```
 
 ### P0 环境检测
+
+**P0.0 公司确定（多公司路由，必跑第一步）**
+
+按优先级确定当前公司，绝不猜默认：
+
+| 顺序 | 判定 | 动作 |
+|---|---|---|
+| ① | cwd 位于 `/opt/code/docs/<company>/` 下 | 该公司 |
+| ② | 用户消息点名公司（如「入库 lianyou 的素材」） | 该公司 |
+| ③ | 均无法判定 | 用 question 询问（列出已发现公司：`ls /opt/code/docs/*/config/company.yaml`） |
+
+```bash
+export COMPANY_BASE=/opt/code/docs/<company>   # 确定后导出，后续脚本全走它
+```
 
 ```bash
 uv sync                    # 安装依赖（含 markitdown、python-pptx、openpyxl 等）
@@ -312,8 +328,8 @@ uv run {baseDir}/scripts/scan_raw_index.py --no-merge       # 完全覆盖
 
 **证照有效期检查**：
 ```bash
-uv run {baseDir}/scripts/check_cert.py $LANLNK_BASE/materials
-uv run {baseDir}/scripts/check_cert.py $LANLNK_BASE/materials --json  # Agent 程序化读取
+uv run {baseDir}/scripts/check_cert.py $COMPANY_BASE/materials
+uv run {baseDir}/scripts/check_cert.py $COMPANY_BASE/materials --json  # Agent 程序化读取
 ```
 
 **素材文件校验**：

@@ -32,9 +32,53 @@ def read_text_auto(path: Path) -> str:
             continue
     return raw.decode("utf-8", errors="replace")
 
-LANLNK_BASE = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk"))
-RAW_COMPETITORS = LANLNK_BASE / "raw" / "prd-商管系统" / "02-competitors"
-MATERIALS_COMPETITORS = LANLNK_BASE / "materials" / "13-competitors"
+def resolve_company_base() -> Path:
+    """多公司变量协议（COMPANIES.md §3）：COMPANY_BASE ∥ LANLNK_BASE，无静默默认。"""
+    base = os.environ.get("COMPANY_BASE") or os.environ.get("LANLNK_BASE")
+    if not base:
+        sys.exit(
+            "错误: 未设置 COMPANY_BASE（或兼容变量 LANLNK_BASE）。\n"
+            "  export COMPANY_BASE=/opt/code/docs/<company>   # 如 lianyou / lanlnk"
+        )
+    base = Path(base)
+    if not (base / "config" / "company.yaml").is_file():
+        sys.exit(
+            f"错误: {base} 不是已注册公司（缺 config/company.yaml）。\n"
+            "  新公司请在 docs 仓库运行 scripts/onboard.sh company <slug> 创建。"
+        )
+    return base
+
+
+BASE: Path | None = None
+
+# 子路径解析优先级：CLI 参数 > 目录存在性守卫的兼容默认（prd-商管系统，lanlnk 存量行为）> 报错列候选
+_LEGACY_RAW_SUBDIR = "prd-商管系统"
+
+
+def resolve_competitor_dirs(raw_flag: str | None, materials_flag: str | None) -> tuple[Path, Path]:
+    if raw_flag:
+        raw_dir = Path(raw_flag)
+        if not raw_dir.is_dir():
+            sys.exit(f"错误: --raw-competitors 指定的目录不存在: {raw_dir}")
+    else:
+        legacy = BASE / "raw" / _LEGACY_RAW_SUBDIR / "02-competitors"
+        if legacy.is_dir():
+            raw_dir = legacy
+        else:
+            candidates = sorted(p.parent.name for p in (BASE / "raw").glob("prd-*/02-competitors") if p.is_dir()) \
+                if (BASE / "raw").is_dir() else []
+            hint = f"  候选: {', '.join(candidates)}\n" if candidates else ""
+            sys.exit(
+                "错误: 无法定位竞品 raw 目录（raw/prd-*/02-competitors）。\n"
+                f"{hint}"
+                "  请用 --raw-competitors <dir> 显式指定。"
+            )
+    materials_dir = Path(materials_flag) if materials_flag else BASE / "materials" / "13-competitors"
+    return raw_dir, materials_dir
+
+
+RAW_COMPETITORS: Path | None = None
+MATERIALS_COMPETITORS: Path | None = None
 
 VENDOR_MAP = {
     "悦商": ("yueshang", "商管"),
@@ -141,7 +185,7 @@ def process_vendor(vendor_cn: str, vendor_en: str, domain: str) -> int:
             print(f"  [SKIP] 内容太少: {rel}")
             continue
 
-        raw_rel = f"raw/prd-商管系统/02-competitors/{vendor_cn}/{rel}"
+        raw_rel = str(raw_file.relative_to(BASE))
         name = infer_name(rel.name)
         fm = build_frontmatter(vendor_en, vendor_cn, domain, seq, name, raw_rel)
 
@@ -154,7 +198,21 @@ def process_vendor(vendor_cn: str, vendor_en: str, domain: str) -> int:
     return created
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="批量将 raw/ 竞品转换产物创建为 materials .md")
+    parser.add_argument("--raw-competitors", help="竞品 raw 目录（默认: 目录存在性守卫的 prd-商管系统，否则报错列候选）")
+    parser.add_argument("--materials-competitors", help="竞品 materials 目录（默认: <base>/materials/13-competitors）")
+    args = parser.parse_args(argv)
+
+    global BASE, RAW_COMPETITORS, MATERIALS_COMPETITORS
+    BASE = resolve_company_base()
+    RAW_COMPETITORS, MATERIALS_COMPETITORS = resolve_competitor_dirs(args.raw_competitors, args.materials_competitors)
+    print(f"公司基座: {BASE}")
+    print(f"竞品 raw: {RAW_COMPETITORS}")
+    print(f"竞品 materials: {MATERIALS_COMPETITORS}")
+
     total = 0
     for vendor_cn, (vendor_en, domain) in VENDOR_MAP.items():
         print(f"\n=== {vendor_cn} ({vendor_en}) ===")

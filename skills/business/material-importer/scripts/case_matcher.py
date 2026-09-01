@@ -3,7 +3,7 @@
 
 用法:
     cd skills/business/material-importer
-    export LANLNK_BASE=/opt/code/docs/lanlnk
+    export COMPANY_BASE=/opt/code/docs/<company>   # 如 lianyou / lanlnk（兼容 LANLNK_BASE）
 
     # 按行业 + 场景匹配
     uv run scripts/case_matcher.py --industry 商业地产 --scenarios 会员营销,积分
@@ -273,8 +273,18 @@ def main():
 
     args = parser.parse_args()
 
-    lanlnk_base = os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")
-    cases_dir = Path(lanlnk_base) / "materials" / "04-cases"
+    base = os.environ.get("COMPANY_BASE") or os.environ.get("LANLNK_BASE")
+    if not base:
+        print("错误: 未设置 COMPANY_BASE（或兼容变量 LANLNK_BASE）。\n"
+              "  export COMPANY_BASE=/opt/code/docs/<company>   # 如 lianyou / lanlnk", file=sys.stderr)
+        sys.exit(1)
+    base = Path(base)
+    if not (base / "config" / "company.yaml").is_file():
+        print(f"错误: {base} 不是已注册公司（缺 config/company.yaml）。\n"
+              "  新公司请在 docs 仓库运行 scripts/onboard.sh company <slug> 创建。", file=sys.stderr)
+        sys.exit(1)
+
+    cases_dir = base / "materials" / "04-cases"
 
     if not cases_dir.exists():
         print(f"错误: 案例目录不存在: {cases_dir}", file=sys.stderr)
