@@ -54,7 +54,7 @@ def _render_header(project: str, stats: Counter[str]) -> str:
 ## 1. 背景
 
 - 项目：{project}
-- 来源：客户需求 + 竞品资料 + 当前产品代码基线（/opt/code/mi）
+ - 来源：客户需求 + 竞品资料 + 当前产品代码基线（/opt/code/lnkcre）
 - 能力总数：{total}
 - 状态分布：existing {stats.get("existing", 0)} / partial {stats.get("partial", 0)} / missing {stats.get("missing", 0)} / explicitly-not-do {stats.get("explicitly-not-do", 0)}
 

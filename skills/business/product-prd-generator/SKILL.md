@@ -11,7 +11,7 @@ description: |-
   "商管/会员/CRM/供应链产品规划"、"基于现有产品做版本规划"。
   仅面向内部产品规划与决策，不生成报价/方案/投标文件（那些交给 company-intro-generator / pricing-generator / bid-doc-master），
   不直接修改业务系统代码（业务系统自己基于本 skill 输出的交接文档拆 OpenSpec change）。
-compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to-md conversion and image extraction. Reads code from specified code-root (default /opt/code/mi). Outputs to $LANLNK_BASE/out/prd/<项目>/output/.
+compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to-md conversion and image extraction. Reads code from specified code-root (default /opt/code/lnkcre). Outputs to $LANLNK_BASE/out/prd/<项目>/output/.
 ---
 
 # Product PRD Generator
@@ -70,7 +70,7 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 
 ### 1. 当前产品代码基线
 
-- `/opt/code/mi`
+- `/opt/code/lnkcre`
 
 ### 2. 原始文档
 
@@ -200,7 +200,7 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 ## 中间产物
 
 ### `parsed/current-code-map.json`
-代码侧事实，来自 `/opt/code/mi`。
+代码侧事实，来自 `/opt/code/lnkcre`。
 
 ### `parsed/current-doc-map.json`
 文档侧事实，来自 `raw/*.md` 和 `raw/*_media/`。
@@ -213,7 +213,7 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 
 ## 代码输入规则
 
-`/opt/code/mi` 作为当前产品基线，优先读取：
+`/opt/code/lnkcre` 作为当前产品基线，优先读取：
 
 - 路由
 - 页面组件
@@ -309,7 +309,7 @@ output/
 请使用 product-prd-generator 为“商管系统”生成首版 PRD、功能清单、差距分析和 PRD 实施交接包。
 
 上下文：
-- 当前产品代码基线：/opt/code/mi
+- 当前产品代码基线：/opt/code/lnkcre
 - PRD 原始/转换资料根：$LANLNK_BASE/raw/prd-商管系统
 - PRD 输出目录：$LANLNK_BASE/30-products/mi-cre
 - parsed 目录：$LANLNK_BASE/raw/prd-商管系统/parsed
@@ -319,7 +319,7 @@ output/
 2) 自动执行需要的内部命令，不要让我手工复制长命令
 3) 输出完成后列出关键产物路径
 4) 确认生成 PRD实施交接包.md、suggested-openspec-changes.yaml、mi-consumption-prompt.md
-5) 不修改 /opt/code/mi，不创建 MI 的 OpenSpec change
+5) 不修改 /opt/code/lnkcre，不创建 LnkCRE 的 OpenSpec change
 ```
 
 增量覆盖度校验：
@@ -328,7 +328,7 @@ output/
 请使用 product-prd-generator 对“商管系统”运行 coverage-validate，检查新材料带来的覆盖度变化和增量 gap。
 
 上下文：
-- 当前产品代码基线：/opt/code/mi
+- 当前产品代码基线：/opt/code/lnkcre
 - PRD 资料根：$LANLNK_BASE/raw/prd-商管系统
 - PRD 输出目录：$LANLNK_BASE/30-products/mi-cre
 - parsed 目录：$LANLNK_BASE/raw/prd-商管系统/parsed
@@ -338,8 +338,8 @@ output/
 1) 先读取 /opt/code/skill/skills/business/product-prd-generator/SKILL.md，再自动执行 coverage-validate 并更新 baseline
 2) 输出客户需求覆盖度矩阵、竞品覆盖度矩阵、增量gap报告
 3) 生成 suggested-openspec-changes.yaml 和 mi-consumption-prompt.md
-4) 汇总本轮 P0/P1/P2 缺口、待复核项和是否适合直接交给 MI
-5) 不修改 /opt/code/mi，不创建 MI 的 OpenSpec change
+4) 汇总本轮 P0/P1/P2 缺口、待复核项和是否适合直接交给 LnkCRE
+5) 不修改 /opt/code/lnkcre，不创建 LnkCRE 的 OpenSpec change
 ```
 
 ### CLI 执行参考（agent 内部）
@@ -354,7 +354,7 @@ output/
 cd skills/business/product-prd-generator
 uv sync
 uv run product-prd-generator --project 商管系统 \
-  --code-root /opt/code/mi \
+   --code-root /opt/code/lnkcre \
   --docs-root $LANLNK_BASE/raw/prd-商管系统 \
   --skill-root /opt/code/skill/skills/business/product-prd-generator \
   --parsed-dir parsed \
@@ -368,7 +368,7 @@ uv run product-prd-generator --project 商管系统 \
 ```bash
 cd skills/business/product-prd-generator
 uv run product-prd-generator --project 商管系统 \
-  --code-root /opt/code/mi \
+  --code-root /opt/code/lnkcre \
   --docs-root $LANLNK_BASE/raw/prd-商管系统 \
   --skill-root /opt/code/skill/skills/business/product-prd-generator \
   --parsed-dir $LANLNK_BASE/raw/prd-商管系统/parsed \
@@ -393,7 +393,7 @@ uv run product-prd-generator --project 商管系统 \
 | `output/PRD竞品覆盖度矩阵.json` / `.md` | 同上，竞品维度 |
 | `output/增量gap报告.md` | 本次新材料带来的新缺口（已匹配 + 未匹配分开） |
 | `output/suggested-openspec-changes.yaml` | 按 P0/P1/P2 给目标项目消费的建议 change 清单 |
-| `output/mi-consumption-prompt.md` | 到 `/opt/code/mi` 或目标项目后可直接粘贴的消费提示词 |
+| `output/mi-consumption-prompt.md` | 到 `/opt/code/lnkcre` 或目标项目后可直接粘贴的消费提示词 |
 | `review/evidence-weak-items.md` | 机器无法确定的证据强度，需人工确认 |
 
 两种模式对比：
@@ -442,7 +442,7 @@ uv run product-prd-generator --project 商管系统 \
 |---|---|
 | `PRD实施交接包.md` | 面向目标项目团队的人类可读交接包，包含边界、状态概览、建议拆分、回写要求 |
 | `suggested-openspec-changes.yaml` | 结构化建议 change 清单，供目标项目会话读取和二次确认 |
-| `mi-consumption-prompt.md` | 在 `/opt/code/mi` 或其他目标项目 OpenCode 会话中直接粘贴的提示词 |
+| `mi-consumption-prompt.md` | 在 `/opt/code/lnkcre` 或其他目标项目 OpenCode 会话中直接粘贴的提示词 |
 
 交接规则：
 
