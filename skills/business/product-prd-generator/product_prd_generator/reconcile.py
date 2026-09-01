@@ -10,7 +10,7 @@ from typing import Any
 
 import yaml
 
-from ._paths import codebase_features_path_for_project, ontology_path_for_project
+from ._paths import codebase_features_path_for_project, ontology_path_for_project, overrides_path_for_project
 from .archive_evidence import apply_archive_evidence, load_archive_evidence
 from .models import RequirementRecord
 
@@ -53,6 +53,7 @@ class ReconcileResult:
     project: str
     capabilities: tuple[ReconciledCapability, ...]
     requirements: tuple[RequirementRecord, ...] = ()
+    source_path: str = ""
 
 
 def _coerce_status(value: str) -> CapabilityStatus:
@@ -81,7 +82,7 @@ def _reconcile_pair(code_status: CapabilityStatus, doc_status: CapabilityStatus)
         gaps.append("phantom feature: doc claims it but code does not implement it")
         return CapabilityStatus.PARTIAL, Confidence.LOW, tuple(gaps)
     if code_status == CapabilityStatus.PARTIAL or doc_status == CapabilityStatus.PARTIAL:
-        gaps.append("partial on one side; reconcile to partial")
+        gaps.append("状态不对齐（代码/文档仅一侧 partial），按 partial 归一")
         return CapabilityStatus.PARTIAL, Confidence.MEDIUM, tuple(gaps)
     return code_status, Confidence.MEDIUM, tuple(gaps)
 
@@ -198,6 +199,8 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
         if archive_evidence:
             apply_archive_evidence(by_id, archive_evidence)
 
+    _apply_capability_overrides(by_id, project)
+
     _spec_doc_status_sweep(by_id)
 
     requirements = _build_requirement_records(doc_map, by_id)
@@ -206,6 +209,7 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
         project=project,
         capabilities=tuple(by_id.values()),
         requirements=requirements,
+        source_path=code_root_str,
     )
 
 
@@ -470,9 +474,108 @@ def _add_codebase_features(by_id: dict[str, ReconciledCapability], project: str)
         print(f"  codebase features: +{added} existing (added or corrected from missing)")
 
 
+def _override_evidence(spec: Mapping[str, object]) -> tuple[EvidenceRef, ...]:
+    out: list[EvidenceRef] = []
+    evidence = spec.get("evidence", [])
+    if isinstance(evidence, list):
+        for item in evidence:
+            if isinstance(item, Mapping):
+                ref = str(item.get("ref", ""))
+                if ref:
+                    out.append(EvidenceRef(kind=str(item.get("kind", "code")), ref=ref))
+    return tuple(out)
+
+
+def _apply_capability_overrides(
+    by_id: dict[str, ReconciledCapability], project: str
+) -> None:
+    """Apply project-scoped manual overrides after archive evidence.
+
+    File: $LANLNK_BASE/raw/prd-<project>/parsed/capability-overrides.yaml
+
+    Schema::
+
+        partial:                     # demote known capability to partial + gaps
+          <cap-id>:
+            gaps: ["..."]
+            evidence: [{kind: code, ref: "path"}]
+        existing:                    # add (or attach code evidence to) capability
+          <cap-id>:
+            name: "显示名"
+            evidence: [{kind: code, ref: "path"}]
+
+    Use cases: archive-declared deliberate stubs must not read as delivered
+    capability; code-only capabilities without spec/archive IDs must enter
+    the inventory with code evidence.
+    """
+    path = overrides_path_for_project(project)
+    if not path.is_file():
+        return
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, Mapping):
+        return
+
+    partial = data.get("partial", {})
+    if isinstance(partial, Mapping):
+        for raw_id, spec in partial.items():
+            if not isinstance(spec, Mapping):
+                continue
+            cap_id = str(raw_id)
+            current = by_id.get(cap_id)
+            if current is None:
+                continue
+            extra_gaps = tuple(str(g) for g in spec.get("gaps", []) if g)  # type: ignore[union-attr]
+            by_id[cap_id] = ReconciledCapability(
+                id=current.id,
+                name=current.name,
+                code_status=CapabilityStatus.PARTIAL.value,
+                doc_status=current.doc_status,
+                reconciled_status=CapabilityStatus.PARTIAL.value,
+                confidence=Confidence.MEDIUM.value,
+                gaps=current.gaps + extra_gaps,
+                evidence=current.evidence + _override_evidence(spec),
+            )
+
+    additions = data.get("existing", {})
+    if isinstance(additions, Mapping):
+        for raw_id, spec in additions.items():
+            if not isinstance(spec, Mapping):
+                continue
+            cap_id = str(raw_id)
+            extra_evidence = _override_evidence(spec)
+            current = by_id.get(cap_id)
+            if current is not None:
+                seen = {(e.kind, e.ref) for e in current.evidence}
+                merged = current.evidence + tuple(
+                    e for e in extra_evidence if (e.kind, e.ref) not in seen
+                )
+                by_id[cap_id] = ReconciledCapability(
+                    id=current.id,
+                    name=current.name,
+                    code_status=current.code_status,
+                    doc_status=current.doc_status,
+                    reconciled_status=current.reconciled_status,
+                    confidence=current.confidence,
+                    gaps=current.gaps,
+                    evidence=merged,
+                )
+                continue
+            by_id[cap_id] = ReconciledCapability(
+                id=cap_id,
+                name=str(spec.get("name", cap_id)),
+                code_status=CapabilityStatus.EXISTING.value,
+                doc_status=CapabilityStatus.MISSING.value,
+                reconciled_status=CapabilityStatus.EXISTING.value,
+                confidence=Confidence.HIGH.value,
+                gaps=(),
+                evidence=extra_evidence,
+            )
+
+
 def to_json(result: ReconcileResult) -> dict[str, object]:
     return {
         "project": result.project,
+        "source_path": result.source_path,
         "capabilities": [
             {
                 "id": cap.id,

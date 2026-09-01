@@ -70,6 +70,17 @@ def codebase_features_path_for_project(project: str) -> Path:
     return base / "raw" / f"prd-{project}" / "parsed" / "codebase-features.json"
 
 
+def overrides_path_for_project(project: str) -> Path:
+    """Return the optional manual capability-override file for a project.
+
+    Applied AFTER archive evidence so project-specific facts (deliberate
+    stubs, marketing-vs-code gaps, code-only capabilities) are not swept
+    away by the archive-to-existing promotion.
+    """
+    base = _lanlnk_base()
+    return base / "raw" / f"prd-{project}" / "parsed" / "capability-overrides.yaml"
+
+
 class InvalidProjectError(ValueError):
     """Raised when --project contains path-traversal or otherwise unsafe characters."""
 
