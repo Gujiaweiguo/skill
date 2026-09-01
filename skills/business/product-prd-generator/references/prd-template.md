@@ -6,7 +6,7 @@
 - 适用范围
 
 ## 2. 当前产品基线
-- 代码基线：/opt/code/mi
+- 代码基线：/opt/code/lnkcre
 - 当前已实现模块
 - partial / missing 能力
 - 已知技术约束

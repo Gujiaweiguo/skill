@@ -35,7 +35,7 @@
 ```
 product-prd-generator \
   --project 商管系统 \
-  --code-root /opt/code/mi \
+  --code-root /opt/code/lnkcre \
   --docs-root $LANLNK_BASE/raw/prd-商管系统 \
   --skill-root ... \
   --parsed-dir parsed \
@@ -479,7 +479,7 @@ cd skills/business/product-prd-generator
 export LANLNK_BASE=/opt/code/docs/lanlnk
 uv run product-prd-generator \
   --project 商管系统 \
-  --code-root /opt/code/mi \
+   --code-root /opt/code/lnkcre \
   --docs-root $LANLNK_BASE/raw/prd-商管系统 \
   --skill-root . \
   --parsed-dir $LANLNK_BASE/raw/prd-商管系统/parsed \

@@ -3,10 +3,10 @@
   "project": "商管系统",
   "generated_at": "2026-06-25T00:00:00Z",
   "source_paths": {
-    "code": "/opt/code/mi",
+    "code": "/opt/code/lnkcre",
     "docs": "/opt/code/docs/lanlnk/raw/prd-商管系统",
-    "specs": "/opt/code/mi/openspec/specs",
-    "alignment": "/opt/code/mi/artifacts/alignment"
+    "specs": "/opt/code/lnkcre/openspec/specs",
+    "alignment": "/opt/code/lnkcre/artifacts/alignment"
   },
   "capabilities": [
     {

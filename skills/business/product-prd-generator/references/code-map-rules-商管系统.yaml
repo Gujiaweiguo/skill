@@ -3,7 +3,7 @@
 # Code scanning rules for 商管系统 (MI - mall ERP). This is the baseline config
 # that mirrors the legacy hardcoded behavior in code_map.py before Phase B.
 #
-# Authoritative paths verified at /opt/code/mi:
+# Authoritative paths verified at /opt/code/lnkcre:
 #   - openspec/specs/ (125 spec directories)
 #   - artifacts/alignment/product-definition-matrix.md (MI-specific)
 #

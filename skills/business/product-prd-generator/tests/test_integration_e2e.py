@@ -23,7 +23,7 @@ import pytest
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 LANLNK_BASE = Path(os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk"))
 
-SHANGGUAN_CODE_ROOT = Path("/opt/code/mi")
+SHANGGUAN_CODE_ROOT = Path("/opt/code/lnkcre")
 SHANGGUAN_DOCS_ROOT = LANLNK_BASE / "raw" / "prd-商管系统"
 LANGCHAT_CODE_ROOT = Path("/opt/code/langchat")
 LANGCHAT_DOCS_ROOT = LANLNK_BASE / "raw" / "prd-langchat"

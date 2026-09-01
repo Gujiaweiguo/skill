@@ -62,10 +62,10 @@ def test_feature_list_front_matter_reports_source_revision_and_counts(tmp_path: 
         "generator": "product-prd-generator",
         "generator_version": "0.1.0",
         "project": "测试项目",
-        "mi_code_root": str(code_root),
-        "mi_commit": expected_commit,
-        "mi_commit_date": "2026-07-26",
-        "mi_commits_since_last_prd": None,
+        "code_root": str(code_root),
+        "code_commit": expected_commit,
+        "code_commit_date": "2026-07-26",
+        "commits_since_last_prd": None,
         "item_count": 5,
         "status_distribution": {
             "existing": 1,
@@ -96,8 +96,8 @@ def test_feature_list_front_matter_uses_null_revision_for_non_git_root(tmp_path:
 
     # Then
     metadata, _ = _front_matter(rendered)
-    assert metadata["mi_commit"] is None
-    assert metadata["mi_commit_date"] is None
+    assert metadata["code_commit"] is None
+    assert metadata["code_commit_date"] is None
     assert metadata["status_distribution"] == {
         "existing": 0,
         "partial": 0,
