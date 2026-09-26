@@ -12,8 +12,8 @@
 #    本表与其保持同步（改一边必须改另一边）。
 #
 # unresolved 字段由 docs 侧整理（docs-reorg-prompt）产出 registry-feedback 后回填
-# （2026-09-24 已回填：30-products/product-registry-feedback.yaml；proposed 项待
-# 产品 owner 确认后升 confirmed）。
+# （2026-09-24 已回填：30-products/product-registry-feedback.yaml；2026-09-26
+# owner 已确认全部 proposed docs_root 及 lnkvision ontology 路径）。
 
 products:
   lnkcre:
@@ -36,7 +36,7 @@ products:
   lnkreport:
     display_name: LnkReport 自助分析平台
     model_kind_hint: capability-model
-    docs_root: /opt/code/docs/lanlnk/30-products/lnkreport   # proposed（feedback 2026-09-24，owner 待确认）
+    docs_root: /opt/code/docs/lanlnk/30-products/lnkreport   # confirmed（feedback 2026-09-24，owner 确认 2026-09-26）
     code_root: /opt/code/lnkreport
     ontology: /opt/code/docs/lanlnk/out/prd/lnkreport/output/ontology.yaml
     ontology_note: generated/supporting（INDEX.md：canonical unresolved，authority 边界待裁决）
@@ -46,7 +46,7 @@ products:
   lnkchatbi:
     display_name: LnkChatBI（= mysqlbot = SQLBot，同一产品族）
     model_kind_hint: capability-model
-    docs_root: /opt/code/docs/lanlnk/30-products/lnkchatbi   # proposed（feedback 2026-09-24，owner 待确认）
+    docs_root: /opt/code/docs/lanlnk/30-products/lnkchatbi   # confirmed（feedback 2026-09-24，owner 确认 2026-09-26）
     code_root: null       # unresolved: /opt/code/lnkchatbi 未发现代码仓（INDEX.md）
     ontology: /opt/code/docs/lanlnk/out/prd/LnkChatBI/output/ontology.yaml
     term_aliases: /opt/code/docs/lanlnk/out/prd/LnkChatBI/output/term-aliases.yaml
@@ -64,16 +64,16 @@ products:
   lnkvision:
     display_name: LnkVision
     model_kind_hint: null
-    docs_root: /opt/code/docs/lanlnk/30-products/lnkvision   # proposed（feedback 2026-09-24，owner 待确认）
+    docs_root: /opt/code/docs/lanlnk/30-products/lnkvision   # confirmed（feedback 2026-09-24，owner 确认 2026-09-26）
     code_root: /opt/code/lnkvision
-    ontology: /opt/code/docs/lanlnk/out/prd/LnkVision/域知识.md   # proposed（generated/supporting，canonical unresolved）
+    ontology: /opt/code/docs/lanlnk/out/prd/LnkVision/域知识.md   # confirmed（owner 2026-09-26）；generated/supporting，canonical authority 待裁决
     term_aliases: null
     adapter_status: unsupported
 
   lnkgateway:
     display_name: LnkGateway
     model_kind_hint: null
-    docs_root: /opt/code/docs/lanlnk/30-products/lnkgateway   # proposed（feedback 2026-09-24，owner 待确认）
+    docs_root: /opt/code/docs/lanlnk/30-products/lnkgateway   # confirmed（feedback 2026-09-24，owner 确认 2026-09-26）
     code_root: /opt/code/lnkgateway
     ontology: null        # unresolved（INDEX.md：无已确认 docs ontology 候选）
     term_aliases: null
