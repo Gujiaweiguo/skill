@@ -47,7 +47,7 @@ products:
     display_name: LnkChatBI（= mysqlbot = SQLBot，同一产品族）
     model_kind_hint: capability-model
     docs_root: /opt/code/docs/lanlnk/30-products/lnkchatbi   # confirmed（feedback 2026-09-24，owner 确认 2026-09-26）
-    code_root: null       # unresolved: /opt/code/lnkchatbi 未发现代码仓（INDEX.md）
+    code_root: /opt/code/lnkchatbi   # confirmed（owner 确认 2026-09-26；仓库活跃，INDEX.md 的 not found 已过时，docs 侧待同步）
     ontology: /opt/code/docs/lanlnk/out/prd/LnkChatBI/output/ontology.yaml
     term_aliases: /opt/code/docs/lanlnk/out/prd/LnkChatBI/output/term-aliases.yaml
     adapter_status: partial

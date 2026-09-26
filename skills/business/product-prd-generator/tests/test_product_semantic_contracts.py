@@ -55,9 +55,14 @@ def test_product_registry_covers_registered_products() -> None:
     assert expected <= set(products)
     assert _yaml_mapping(products["lnkcre"])["code_root"] == "/opt/code/lnkcre"
     assert _yaml_mapping(products["lnkchat"])["code_root"] == "/opt/code/lnkchat"
-    # 2026-09-24 registry-feedback 回填：lnkvision / lnkgateway code_root 已确认
+    # 2026-09-24 registry-feedback 回填 + 2026-09-26 owner 确认：code_root 全部已确认
     assert _yaml_mapping(products["lnkvision"])["code_root"] == "/opt/code/lnkvision"
     assert _yaml_mapping(products["lnkgateway"])["code_root"] == "/opt/code/lnkgateway"
+    assert _yaml_mapping(products["lnkchatbi"])["code_root"] == "/opt/code/lnkchatbi"
+    for pid in expected:
+        code_root = _yaml_mapping(products[pid]).get("code_root")
+        if isinstance(code_root, str):
+            assert Path(code_root).is_dir(), f"{pid} code_root 应存在: {code_root}"
     # mi-cre 合并完成后注册表不得再携带 legacy_* fallback 字段
     for pid in expected:
         entry = _yaml_mapping(products[pid])
