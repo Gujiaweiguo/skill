@@ -87,7 +87,7 @@ compatibility: Pure prompt skill. No runtime dependency, no scripts, no schedule
 |---|---|
 | 项目运行时陷阱、环境配置、测试基线 | 目标项目 `AGENTS.md` |
 | 项目排障 SOP、部署/验证步骤 | 目标项目 `docs/troubleshooting.md`、`docs/*.md` |
-| 项目领域术语、边界、验收口径 | `$LANLNK_BASE/out/prd/<项目>/域知识.md`（skill 工作知识，生成区）或目标项目 docs；**产品 canonical 本体在 `$LANLNK_BASE/30-products/<产品>/ontology/`**（域知识双轨：out/ = 工作知识，30-products/ = canonical，2026-09-26 方案 B 迁移后 lnkvision 的域知识.md 已升格 canonical） |
+| 项目领域术语、边界、验收口径 | `$COMPANY_BASE/out/prd/<项目>/域知识.md`（skill 工作知识，生成区；$LANLNK_BASE 为兼容别名）或目标项目 docs；**产品 canonical 本体在 `$COMPANY_BASE/30-products/<产品>/ontology/`**（域知识双轨：out/ = 工作知识，30-products/ = canonical，2026-09-26 方案 B 迁移后 lanlnk 的 lnkvision 域知识.md 已升格 canonical） |
 | 需要改系统行为 | 回到目标项目 OpenSpec，不在复利工程里直接改代码 |
 
 例：LnkChatBI 的 `SECRET_KEY` 必须显式设置、`cre_bi_demo` 需要 `SET search_path`、某项目已知测试 fake 签名问题。
@@ -224,7 +224,7 @@ post-write 验证，至少检查：
 - 是否有新的产品术语口径？
 - 是否有 PRD→实施交接的新模式？
 - 是否有新的分期原则或验收链路？
-- 是否有新的域知识要放到 `$LANLNK_BASE/out/prd/<项目>/域知识.md`（skill 工作知识，生成区）？已注册产品的 canonical 本体在 `30-products/<产品>/ontology/`——经晋升并入，双源不并存。
+- 是否有新的域知识要放到 `$COMPANY_BASE/out/prd/<项目>/域知识.md`（skill 工作知识，生成区；$LANLNK_BASE 为兼容别名）？已注册产品的 canonical 本体在 `30-products/<产品>/ontology/`——经晋升并入，双源不并存。
 - 是否有代码实现边界需要写入交接包？
 
 ### 战略简报

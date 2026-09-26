@@ -525,7 +525,7 @@ markitdown "<原始文件>" -o "<raw 目录>/<6类>/<同名>.md"
 1. **用户在 P0 显式提供**——最高优先级
 2. **`requirement-evaluator` 的客户需求汇总**（频率高的能力维度加权）——最理想来源
 3. **`$LANLNK_BASE/materials/10-methodology/methodology/15-商业地产岗位病药矩阵.md`**（多岗位共同痛点加权）——长期参考
-4. **产品功能清单的 missing/partial 项分布**（canonical-first：`$LANLNK_BASE/30-products/<产品>/prd/功能清单.md`，回退 `$LANLNK_BASE/out/prd/<项目>/output/功能清单.md` 生成区）——反向推断客户痛点（missing 多的维度 = 蓝联弱项 = 应加权）
+4. **产品功能清单的 missing/partial 项分布**（canonical-first：`$COMPANY_BASE/30-products/<产品>/prd/功能清单.md`，回退 `$COMPANY_BASE/out/prd/<项目>/output/功能清单.md` 生成区；$LANLNK_BASE 为兼容别名）——反向推断客户痛点（missing 多的维度 = 蓝联弱项 = 应加权）
 5. **默认均匀分布**——仅当以上都缺失时，且必须在 `ability-comparison-matrix.json` 的 `weight_source` 标注 `"unweighted-fallback"`，并在 review/pending-items.md 提示"权重未校准"
 
 **降级规则**：每降一级，结果报告的"管理层摘要"必须显式标注权重来源和置信度。**禁止**把降级路径 4-5 的结果当作"客户真实优先级"陈述。

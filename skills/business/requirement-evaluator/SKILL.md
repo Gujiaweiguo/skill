@@ -16,7 +16,7 @@ description: |-
 compatibility: >
   依赖素材库 $MATERIALS_DIR（通过 LANLNK_BASE 环境变量配置）。
   依赖 markitdown 转化需求文档（docx/pdf → md）。
-  依赖产品功能清单（product-prd-generator 产物；canonical-first 解析：优先 $LANLNK_BASE/30-products/<产品>/prd/功能清单.md，回退 $LANLNK_BASE/out/prd/<项目>/output/功能清单.md 生成区）。
+  依赖产品功能清单（product-prd-generator 产物；canonical-first 解析：优先 $COMPANY_BASE/30-products/<产品>/prd/功能清单.md，回退 $COMPANY_BASE/out/prd/<项目>/output/功能清单.md 生成区；$LANLNK_BASE 为兼容别名）。
   纯提示词 skill，无 Python 依赖。
 
   Quick start:
@@ -43,14 +43,14 @@ compatibility: >
 
 ## 配置读取
 
-设置 `LANLNK_BASE` 环境变量指向素材根目录（默认当前目录），然后设置路径变量：
+设置 `COMPANY_BASE`（兼容别名 `LANLNK_BASE`，二者等价，见 docs 仓 COMPANIES.md §3）环境变量指向素材根目录（默认当前目录），然后设置路径变量：
 
 | 变量 | 路径 | 说明 |
 |------|------|------|
-| `$MATERIALS_DIR` | `$LANLNK_BASE/materials` | 素材库根 |
-| `$PROPOSALS_DIR` | `$LANLNK_BASE/out/proposals` | 评估报告输出位置 |
-| `$INCOMING_DIR` | `$LANLNK_BASE/incoming` | 需求文档暂存区 |
-| `$PRD_DIR` | `$LANLNK_BASE/out/prd` | 产品 PRD 生成区根（功能清单 canonical 优先、$PRD_DIR 回退，见下）|
+| `$MATERIALS_DIR` | `$COMPANY_BASE/materials` | 素材库根 |
+| `$PROPOSALS_DIR` | `$COMPANY_BASE/out/proposals` | 评估报告输出位置 |
+| `$INCOMING_DIR` | `$COMPANY_BASE/incoming` | 需求文档暂存区 |
+| `$PRD_DIR` | `$COMPANY_BASE/out/prd` | 产品 PRD 生成区根（功能清单 canonical 优先、$PRD_DIR 回退，见下）|
 
 ### 产品功能清单定位
 
@@ -64,8 +64,8 @@ compatibility: >
 
 **功能清单 canonical-first 解析顺序**（2026-09-26 方案 B 家族迁移后）：
 
-1. 优先 `$LANLNK_BASE/30-products/<产品>/prd/功能清单.md`（canonical）
-2. 回退 `$LANLNK_BASE/out/prd/<项目>/output/功能清单.md`（生成区，历史目录名）
+1. 优先 `$COMPANY_BASE/30-products/<产品>/prd/功能清单.md`（canonical）
+2. 回退 `$COMPANY_BASE/out/prd/<项目>/output/功能清单.md`（生成区，历史目录名）
 
 **产品 id 与目录名映射**（canonical 目录一律小写；生成区为历史目录名）：
 
@@ -131,7 +131,7 @@ markitdown "<需求文档>" -o "<同目录>/<同名>.md"
 
 ### 0.3 定位产品功能清单
 
-按上方「产品功能清单定位」的 canonical-first 顺序定位：优先 `$LANLNK_BASE/30-products/<产品>/prd/功能清单.md`，不存在时回退 `$PRD_DIR/<项目>/output/功能清单.md`（生成区历史目录名，见映射表）。
+按上方「产品功能清单定位」的 canonical-first 顺序定位：优先 `$COMPANY_BASE/30-products/<产品>/prd/功能清单.md`，不存在时回退 `$PRD_DIR/<项目>/output/功能清单.md`（生成区历史目录名，见映射表）。
 
 - 功能清单包含功能名、状态（existing/partial/missing）、置信度
 - `existing` = 产品已有该功能

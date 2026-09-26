@@ -16,7 +16,7 @@ compatibility: >
   Python + openpyxl（uv 管理），生成 .xlsx 报价单（双 sheet：报价单 + 功能清单）。
   依赖素材库 $MATERIALS_DIR（通过 LANLNK_BASE 环境变量配置）。
   依赖报价模板 references/报价模板_<模式>.md。
-  依赖产品功能清单（canonical-first 解析：优先 $LANLNK_BASE/30-products/<产品>/prd/功能清单.md，回退 $LANLNK_BASE/out/prd/<项目>/output/功能清单.md 生成区）。
+  依赖产品功能清单（canonical-first 解析：优先 $COMPANY_BASE/30-products/<产品>/prd/功能清单.md，回退 $COMPANY_BASE/out/prd/<项目>/output/功能清单.md 生成区；$LANLNK_BASE 为兼容别名）。
   可选接收 requirement-evaluator 的二开清单。
   Excel 格式参考正祥报价单（深蓝表头 001E5A8A / 浅红汇总 00F9E5DD / 微软雅黑）。
 
@@ -49,14 +49,14 @@ compatibility: >
 
 ## 配置读取
 
-设置 `LANLNK_BASE` 环境变量指向素材根目录（默认当前目录），然后设置路径变量：
+设置 `COMPANY_BASE`（兼容别名 `LANLNK_BASE`，二者等价，见 docs 仓 COMPANIES.md §3）环境变量指向素材根目录（默认当前目录），然后设置路径变量：
 
 | 变量 | 路径 | 说明 |
 |------|------|------|
-| `$MATERIALS_DIR` | `$LANLNK_BASE/materials` | 素材库根 |
-| `$PROPOSALS_DIR` | `$LANLNK_BASE/out/proposals` | 报价单输出位置 |
+| `$MATERIALS_DIR` | `$COMPANY_BASE/materials` | 素材库根 |
+| `$PROPOSALS_DIR` | `$COMPANY_BASE/out/proposals` | 报价单输出位置 |
 | `$REFERENCES_DIR` | `$MATERIALS_DIR/references` | 报价模板存放处 |
-| `$PRD_DIR` | `$LANLNK_BASE/out/prd` | 产品功能清单生成区（canonical 优先、$PRD_DIR 回退，见下） |
+| `$PRD_DIR` | `$COMPANY_BASE/out/prd` | 产品功能清单生成区（canonical 优先、$PRD_DIR 回退，见下） |
 
 ### 报价模板定位
 
@@ -67,7 +67,7 @@ compatibility: >
 
 ### 产品功能清单定位
 
-**canonical-first 解析顺序**（2026-09-26 方案 B 家族迁移后）：优先 `$LANLNK_BASE/30-products/<产品>/prd/功能清单.md`，回退 `$LANLNK_BASE/out/prd/<项目>/output/功能清单.md`（生成区，历史目录名）。
+**canonical-first 解析顺序**（2026-09-26 方案 B 家族迁移后）：优先 `$COMPANY_BASE/30-products/<产品>/prd/功能清单.md`，回退 `$COMPANY_BASE/out/prd/<项目>/output/功能清单.md`（生成区，历史目录名）。
 
 **产品 id 与目录名映射**（canonical 目录一律小写；生成区为历史目录名）：
 

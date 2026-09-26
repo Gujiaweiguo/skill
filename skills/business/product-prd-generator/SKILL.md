@@ -11,7 +11,7 @@ description: |-
   "商管/会员/CRM/供应链产品规划"、"基于现有产品做版本规划"。
   仅面向内部产品规划与决策，不生成报价/方案/投标文件（那些交给 company-intro-generator / pricing-generator / bid-doc-master），
   不直接修改业务系统代码（业务系统自己基于本 skill 输出的交接文档拆 OpenSpec change）。
-compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to-md conversion and image extraction. Reads code from specified code-root (default /opt/code/lnkcre). Outputs to $LANLNK_BASE/out/prd/<项目>/output/（纯生成区；30-products 在位产品的交付须附晋升清单，见正文「输出目录」）。
+compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to-md conversion and image extraction. Reads code from specified code-root (default /opt/code/lnkcre). Outputs to $COMPANY_BASE/out/prd/<项目>/output/（纯生成区；$LANLNK_BASE 为兼容别名，COMPANIES.md §3；30-products 在位产品的交付须附晋升清单，见正文「输出目录」）。
 ---
 
 # Product PRD Generator
@@ -65,7 +65,7 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 > c. `$LANLNK_BASE/30-products/lnkcre/INDEX.md`（声明的 authority/source_ref）
 > 未来新增会员/CRM 时创建 `$LANLNK_BASE/out/prd/会员系统/域知识.md`
 >
-> **域知识双轨（2026-09-26 方案 B 家族迁移后）**：`out/prd/<项目>/域知识.md` 是 **skill 工作知识**（生成区，留守不变）；产品的 **canonical 本体**在 `30-products/<产品>/ontology/`（lnkvision 的 `域知识.md` 已升格为 canonical 本体，位于 `$LANLNK_BASE/30-products/lnkvision/ontology/域知识.md`）。canonical 位置一律以 `30-products/<产品>/ontology/README.md` 权威指针为准。
+> **域知识双轨（2026-09-26 方案 B 家族迁移后）**：`$COMPANY_BASE/out/prd/<项目>/域知识.md` 是 **skill 工作知识**（生成区，留守不变；$LANLNK_BASE 为兼容别名）；产品的 **canonical 本体**在 `$COMPANY_BASE/30-products/<产品>/ontology/`（lanlnk 实例：lnkvision 的 `域知识.md` 已升格为 canonical 本体，位于 `/opt/code/docs/lanlnk/30-products/lnkvision/ontology/域知识.md`）。canonical 位置一律以 `30-products/<产品>/ontology/README.md` 权威指针为准。
 
 ## 不做什么
 
@@ -328,7 +328,7 @@ output/
 
 ### canonical 在位产品的晋升规则（2026-09-26 方案 B 家族迁移后）
 
-`out/prd/<项目>/output/` 是**纯生成区**。若 `$LANLNK_BASE/30-products/<产品>/` 已有 canonical 内容（当前：**lnkcre / lnkchat / lnkreport / lnkvision / lnkchatbi**）：
+`$COMPANY_BASE/out/prd/<项目>/output/` 是**纯生成区**（$LANLNK_BASE 为兼容别名）。若 `$COMPANY_BASE/30-products/<产品>/` 已有 canonical 内容（当前：**lnkcre / lnkchat / lnkreport / lnkvision / lnkchatbi**）：
 
 1. 生成产物仍落 `out/prd/<项目>/output/` 生成区（路径契约不变，CLI 默认输出不改）；
 2. 但交付说明**必须附晋升清单**——列出本次应覆盖 `30-products/<产品>/{prd,ontology}/` 的对应件（如 `产品PRD.md → 30-products/<产品>/prd/产品PRD.md`、`功能清单.md → 30-products/<产品>/prd/功能清单.md`），并指向该产品 `30-products/<产品>/prd/README.md` 的晋升流程；
@@ -517,9 +517,9 @@ uv run product-prd-generator --project 商管系统 \
 
 ### Step 1：设计并创建 ontology
 
-**路径**：`$LANLNK_BASE/out/prd/<project>/output/ontology.yaml`（生成区默认值，代码默认输出不变）
+**路径**：`$COMPANY_BASE/out/prd/<project>/output/ontology.yaml`（生成区默认值，代码默认输出不变；$LANLNK_BASE 为兼容别名）
 
-> **canonical 位置**以 `$LANLNK_BASE/30-products/<产品>/ontology/README.md` 权威指针为准（lnkreport / lnkchatbi / lnkvision 的 ontology 已在位 `30-products/<产品>/ontology/`）；无该目录的产品沿用 out/ 路径。lnkchat 的 ontology 双件在 `30-products/lnkchat/` 产品根目录（非 ontology/ 子目录）是已知家族变体，同样以该产品 ontology README/INDEX 权威指针为准。
+> **canonical 位置**以 `$COMPANY_BASE/30-products/<产品>/ontology/README.md` 权威指针为准（lnkreport / lnkchatbi / lnkvision 的 ontology 已在位 `30-products/<产品>/ontology/`）；无该目录的产品沿用 out/ 路径。lnkchat 的 ontology 双件在 `30-products/lnkchat/` 产品根目录（非 ontology/ 子目录）是已知家族变体，同样以该产品 ontology README/INDEX 权威指针为准。
 
 设计原则详见 `references/troubleshooting.md` 「如何为新项目设计 ontology」章节。要点：
 
@@ -535,7 +535,7 @@ uv run product-prd-generator --project 商管系统 \
 
 ### Step 2：创建 term-aliases
 
-**路径**：`$LANLNK_BASE/out/prd/<project>/output/term-aliases.yaml`（生成区默认值；canonical 位置同 Step 1 规则——以 `30-products/<产品>/ontology/README.md` 权威指针为准，lnkreport / lnkchatbi 已在位）
+**路径**：`$COMPANY_BASE/out/prd/<project>/output/term-aliases.yaml`（生成区默认值；canonical 位置同 Step 1 规则——以 `$COMPANY_BASE/30-products/<产品>/ontology/README.md` 权威指针为准，lnkreport / lnkchatbi 已在位）
 
 key = capability ID（与 ontology.sub_functions.capabilities 一致），value = 该 capability 的 CN/EN 别名列表。doc_map 加载时会按长度倒序匹配，最长的 alias 优先归一。
 
