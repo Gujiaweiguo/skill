@@ -39,13 +39,16 @@ lnkvision 的 canonical PRD 家族与本体已迁入 30-products/<pid>/{prd,onto
 out/prd/ 降为纯生成区（skill 生成产物仍落 out/，经 owner 审后晋升并入
 canonical，双源不并存）。canonical 布局登记见 references/product-registry.yaml；
 本模块的代码默认输出仍是生成区 out/prd/<project>/output/，不改行为。
-已知缺口：_PRODUCT_CANONICAL_DIR 尚未登记上述三个产品，
-ontology/term-aliases 解析暂不能命中它们的新 canonical 位置
-（见 SKILL.md「已知限制」——补条目属代码行为变更，须另行批准）。
+_PRODUCT_CANONICAL_DIR 已登记上述三个产品（2026-09-26 修复，回归闸在
+tests/test_paths.py）。lnkvision 无 ontology.yaml——canonical 本体为
+ontology/域知识.md，登记在 product-registry.yaml。未注册产品的 tier-4
+商管兜底带跨域污染闸门（_guard_unregistered_fallback）：非 lanlnk 公司
+直接报错引导注册，lanlnk 公司警告后兜底。
 """
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -273,6 +276,14 @@ _PRODUCT_CANONICAL_DIR: dict[str, str] = {
     # 已有 draft ontology v0.1（147 功能清单证据锚定）。必须注册——未注册的 CRM 会话
     # 会静默回落商管 business-ontology（registry 规则 2 明令禁止的跨域回落）。
     "lnkcrm": "lnkcrm",
+    # 2026-09-26 方案 B 家族迁移（owner 批准，补齐 SKILL.md 登记的解析缺口）：
+    # lnkreport / lnkchatbi / lnkvision 的 canonical ontology 双件已在
+    # 30-products/<pid>/ontology/。lnkvision 无 ontology.yaml/term-aliases.yaml
+    # （canonical 本体为 ontology/域知识.md，登记在 product-registry.yaml；
+    # 本映射仅供 tier-1 探测，不会误命中其他产品）。
+    "lnkreport": "lnkreport",
+    "lnkchatbi": "lnkchatbi",
+    "lnkvision": "lnkvision",
 }
 
 
@@ -314,6 +325,42 @@ def _lanlnk_base() -> Path:
     return path
 
 
+# 商管 business-ontology / 商管 term-aliases 的归属公司 slug：
+# 非 lanlnk 公司的未注册产品回落它们 = 跨域污染（registry 规则 2 禁止项）。
+_FALLBACK_OWNER_COMPANY = "lanlnk"
+
+
+def _guard_unregistered_fallback(project: str, base: Path, fallback: Path) -> None:
+    """registry 规则 2 闸门：未注册产品禁止静默回落商管默认件（先例 acbae37 lnkcrm）。
+
+    - 未注册 + 非 lanlnk 公司（如 lianyou 的「溯源APP」）→ 抛 MissingProductDataError
+      引导注册：商管 ontology/term-aliases 对异业产品是跨域污染，宁可失败不可污染。
+    - 未注册 + lanlnk 公司 → stderr 警告后保留兜底行为（兼容 onboarding 前的
+      exploratory 运行），不再静默。
+    - 已注册产品（含 商管系统→lnkcre，tier-4 是 registry 登记入口）不触发本闸门。
+    """
+    if _canonical_dirs_for(project):
+        return
+    if base.name == _FALLBACK_OWNER_COMPANY:
+        print(
+            f"警告: 未注册产品 {project!r} 回落商管默认件 {fallback}。"
+            "若该产品不属于商管域，请先在 references/product-registry.yaml 注册"
+            "（先例 lnkcrm，acbae37），否则输出将带商管跨域污染。",
+            file=sys.stderr,
+        )
+        return
+    raise MissingProductDataError(
+        f"未注册产品 {project!r} 在公司基座 {base}（非 lanlnk）下解析不到自有"
+        f"ontology/term-aliases，拒绝静默回落商管默认件 {fallback}"
+        "（跨域污染，registry 规则 2）。\n"
+        "修复路径（任选其一）：\n"
+        "  1. 在 skill 的 references/product-registry.yaml 注册该产品，并在"
+        " _paths._PRODUCT_CANONICAL_DIR 补目录映射（先例 lnkcrm，acbae37）；\n"
+        f"  2. 在 {base / '30-products' / '<pid>' / 'ontology'} 创建自有 ontology.yaml"
+        "（docs 仓 onboard.sh product 骨架），或在 out/prd/<项目>/output/ 生成区自建。"
+    )
+
+
 def ontology_path_for_project(project: str) -> Path:
     base = _lanlnk_base()
 
@@ -329,7 +376,9 @@ def ontology_path_for_project(project: str) -> Path:
     if legacy.is_file():
         return legacy
 
-    return base / "config" / "ontology" / "business-ontology.yaml"
+    fallback = base / "config" / "ontology" / "business-ontology.yaml"
+    _guard_unregistered_fallback(project, base, fallback)
+    return fallback
 
 
 def term_aliases_path_for_project(project: str, skill_root: Path) -> Path:
@@ -347,7 +396,9 @@ def term_aliases_path_for_project(project: str, skill_root: Path) -> Path:
     if legacy.is_file():
         return legacy
 
-    return skill_root / "references" / "term-aliases.yaml"
+    fallback = skill_root / "references" / "term-aliases.yaml"
+    _guard_unregistered_fallback(project, base, fallback)
+    return fallback
 
 
 def codebase_features_path_for_project(project: str) -> Path:

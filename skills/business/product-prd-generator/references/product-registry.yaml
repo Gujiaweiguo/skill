@@ -16,9 +16,10 @@
 #    双源不并存，晋升流程见各产品 30-products/<产品>/prd/README.md）。
 #    docs_root 字段即 canonical root（全部产品均在 30-products/ 下），不另设
 #    canonical_root 重复字段。
-# 8. 已知缺口：_paths._PRODUCT_CANONICAL_DIR 尚未登记 lnkreport/lnkchatbi/lnkvision，
-#    代码侧 ontology 解析暂不能命中这三个产品的新 canonical 位置（详见 SKILL.md 已知限制）；
-#    本表路径为 agent 读取的权威事实，先于代码修复更新。
+# 8. _PRODUCT_CANONICAL_DIR 已登记 lnkreport/lnkchatbi/lnkvision（2026-09-26 同日修复，
+#    回归闸 tests/test_paths.py；lnkvision 无 ontology.yaml，canonical 本体为域知识.md，
+#    以本表登记为准）。未注册产品 tier-4 商管兜底带跨域污染闸门（非 lanlnk 公司
+#    报错引导注册，lanlnk 公司警告）。本表与代码解析保持同步。
 #
 # unresolved 字段由 docs 侧整理（docs-reorg-prompt）产出 registry-feedback 后回填
 # （2026-09-24 已回填：30-products/product-registry-feedback.yaml；2026-09-26

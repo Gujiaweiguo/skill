@@ -68,6 +68,8 @@ def test_low_confidence_missing_is_not_suggested_change() -> None:
 def test_codebase_features_path_is_project_scoped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     (tmp_path / "config").mkdir()
     (tmp_path / "config" / "company.yaml").write_text("brand: test\n", encoding="utf-8")
+    # 环境隔离：_lanlnk_base() 优先 COMPANY_BASE，ambient 导出会压过 LANLNK_BASE monkeypatch
+    monkeypatch.delenv("COMPANY_BASE", raising=False)
     monkeypatch.setenv("LANLNK_BASE", str(tmp_path))
 
     expected = tmp_path / "raw" / "prd-langchat" / "parsed" / "codebase-features.json"

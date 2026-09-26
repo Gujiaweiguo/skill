@@ -100,15 +100,25 @@ def test_ontology_path_lnkcrm_returns_own_draft_ontology():
     assert not is_lnkre_product("lnkcrm")
 
 
-def test_ontology_path_LnkChatBI_returns_project_specific():
-    """Phase A deliverable: LnkChatBI/output/ontology.yaml exists."""
+def test_ontology_path_LnkChatBI_returns_canonical():
+    """2026-09-26 方案 B 迁移：LnkChatBI（混大小写输入）命中 30-products canonical。
+
+    原 out/prd/LnkChatBI/output/ontology.yaml 已随迁移删除（双源不并存）；
+    本测试是三产品 canonical 解析（_PRODUCT_CANONICAL_DIR 条目）的回归闸。
+    """
     p = ontology_path_for_project("LnkChatBI")
-    assert p == DEFAULT_LANLNK_BASE / "out" / "prd" / "LnkChatBI" / "output" / "ontology.yaml"
-    assert p.is_file(), f"LnkChatBI ontology.yaml must exist (Phase A deliverable): {p}"
+    assert p == DEFAULT_LANLNK_BASE / "30-products" / "lnkchatbi" / "ontology" / "ontology.yaml"
+    assert p.is_file(), f"LnkChatBI canonical ontology.yaml must exist: {p}"
+
+
+def test_ontology_path_lnkreport_returns_canonical():
+    p = ontology_path_for_project("lnkreport")
+    assert p == DEFAULT_LANLNK_BASE / "30-products" / "lnkreport" / "ontology" / "ontology.yaml"
+    assert p.is_file(), f"lnkreport canonical ontology.yaml must exist: {p}"
 
 
 def test_ontology_path_unknown_project_falls_back():
-    """Unknown project does not raise; falls back to business-ontology.yaml path."""
+    """Unknown project on lanlnk base: warns on stderr, still falls back to business-ontology.yaml."""
     p = ontology_path_for_project("不存在的项目_xyz_123")
     assert p == DEFAULT_LANLNK_BASE / "config" / "ontology" / "business-ontology.yaml"
 
@@ -142,15 +152,21 @@ def test_term_aliases_path_langchat_returns_project_specific():
     assert p.is_file(), f"langchat term-aliases.yaml must exist: {p}"
 
 
-def test_term_aliases_path_LnkChatBI_returns_project_specific():
-    """Phase A deliverable: LnkChatBI/output/term-aliases.yaml exists."""
+def test_term_aliases_path_LnkChatBI_returns_canonical():
+    """2026-09-26 方案 B 迁移：LnkChatBI（混大小写输入）命中 30-products canonical。"""
     p = term_aliases_path_for_project("LnkChatBI", SKILL_ROOT)
-    assert p == DEFAULT_LANLNK_BASE / "out" / "prd" / "LnkChatBI" / "output" / "term-aliases.yaml"
-    assert p.is_file(), f"LnkChatBI term-aliases.yaml must exist (Phase A deliverable): {p}"
+    assert p == DEFAULT_LANLNK_BASE / "30-products" / "lnkchatbi" / "ontology" / "term-aliases.yaml"
+    assert p.is_file(), f"LnkChatBI canonical term-aliases.yaml must exist: {p}"
+
+
+def test_term_aliases_path_lnkreport_returns_canonical():
+    p = term_aliases_path_for_project("lnkreport", SKILL_ROOT)
+    assert p == DEFAULT_LANLNK_BASE / "30-products" / "lnkreport" / "ontology" / "term-aliases.yaml"
+    assert p.is_file(), f"lnkreport canonical term-aliases.yaml must exist: {p}"
 
 
 def test_term_aliases_path_unknown_project_falls_back():
-    """Unknown project does not raise; falls back to skill references/."""
+    """Unknown project on lanlnk base: warns on stderr, still falls back to skill references/."""
     p = term_aliases_path_for_project("不存在的项目_xyz_123", SKILL_ROOT)
     assert p == SKILL_ROOT / "references" / "term-aliases.yaml"
 
@@ -160,6 +176,55 @@ def test_term_aliases_path_skill_root_none_returns_fallback():
     p = term_aliases_path_for_project("any_project", SKILL_ROOT)
     # No project-specific yaml for "any_project", so should fall back
     assert p == SKILL_ROOT / "references" / "term-aliases.yaml"
+
+
+# ─── 跨域污染闸门：未注册产品 tier-4 商管兜底（registry 规则 2）──────
+
+
+def test_ontology_unregistered_product_on_non_lanlnk_company_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """lianyou 等非 lanlnk 公司的未注册产品（如化妆品溯源APP）回落商管
+    business-ontology 属跨域污染——必须报错引导注册，不得静默（先例 acbae37）。"""
+    base = _fake_company_base(tmp_path, monkeypatch)  # tmp 目录名 != lanlnk
+    with pytest.raises(MissingProductDataError) as excinfo:
+        ontology_path_for_project("溯源APP")
+    msg = str(excinfo.value)
+    assert "溯源APP" in msg
+    assert str(base) in msg
+    assert "product-registry.yaml" in msg  # 引导注册
+
+
+def test_term_aliases_unregistered_product_on_non_lanlnk_company_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _fake_company_base(tmp_path, monkeypatch)
+    with pytest.raises(MissingProductDataError):
+        term_aliases_path_for_project("溯源APP", SKILL_ROOT)
+
+
+def test_ontology_unregistered_product_on_lanlnk_warns_and_falls_back(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """lanlnk 公司的未注册产品：stderr 显式警告（不再静默），保留商管兜底行为。"""
+    monkeypatch.setenv("COMPANY_BASE", "/opt/code/docs/lanlnk")
+    monkeypatch.delenv("LANLNK_BASE", raising=False)
+    p = ontology_path_for_project("不存在的项目_xyz_123")
+    assert p == Path("/opt/code/docs/lanlnk") / "config" / "ontology" / "business-ontology.yaml"
+    err = capsys.readouterr().err
+    assert "不存在的项目_xyz_123" in err
+    assert "警告" in err
+
+
+def test_ontology_registered_lnkcre_tier4_is_silent(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """已注册产品（商管系统→lnkcre）tier-4 兜底是 registry 登记入口，不触发闸门。"""
+    monkeypatch.setenv("COMPANY_BASE", "/opt/code/docs/lanlnk")
+    monkeypatch.delenv("LANLNK_BASE", raising=False)
+    p = ontology_path_for_project("商管系统")
+    assert p.name == "business-ontology.yaml"
+    assert capsys.readouterr().err == ""
 
 
 # ─── LnkCRE canonical id 别名归一（MI / MI-CRE / LnkCRE / lnkcre / 商管系统）───
