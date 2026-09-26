@@ -202,6 +202,35 @@ done
 echo ""
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Check 4: Product dir registration (docs 30-products/ vs skill registry)
+# ─────────────────────────────────────────────────────────────────────────────
+# 2026-09-26 复利：docs 侧产品 onboarding（新建 30-products/<pid>/）后，skill 侧
+# product-registry.yaml 必须跟进登记——未登记产品的 ontology 解析会静默回落商管
+# business-ontology（registry 规则 2 禁止项，lnkcrm 实证）。WARN 而非 FAIL：
+# docs 先行 / skill 跟进是合法节奏，但 drift 必须每次审计可见，不靠人工复核发现。
+echo "--- Check 4: Product dir registration ---"
+PRODUCTS_DIR="$LANLNK_BASE/30-products"
+REGISTRY="$REPO_ROOT/skills/business/product-prd-generator/references/product-registry.yaml"
+if [ -d "$PRODUCTS_DIR" ] && [ -f "$REGISTRY" ]; then
+  for product_dir in "$PRODUCTS_DIR"/*/; do
+    [ -d "$product_dir" ] || continue
+    pid=$(basename "$product_dir")
+    if ! grep -qE "^  ${pid}:" "$REGISTRY"; then
+      print_result WARN "Unregistered product dir: 30-products/$pid (product-registry.yaml 无条目；未登记产品的 ontology 解析会静默回落商管，请跟进注册)"
+      WARN=$((WARN+1))
+    else
+      PASS=$((PASS+1))
+    fi
+  done
+  [ $QUIET -eq 0 ] && print_result PASS "Product registration check complete"
+else
+  print_result WARN "Product registration check skipped: missing $PRODUCTS_DIR or registry file"
+  WARN=$((WARN+1))
+fi
+
+echo ""
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Summary
 # ─────────────────────────────────────────────────────────────────────────────
 echo "=== Summary ==="
