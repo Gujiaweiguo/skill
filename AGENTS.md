@@ -25,8 +25,8 @@ Two skill types:
 ## Environment Setup
 
 ```bash
-export LANLNK_BASE=/opt/code/docs/lanlnk           # required for business/ppt/word skills
-export USERGUIDE_BASE=$LANLNK_BASE/materials/03-products/user-guides   # required for doc-generator skill（COMPANIES.md §3：从 COMPANY_BASE 派生）
+export COMPANY_BASE=/opt/code/docs/lanlnk           # 多公司契约（docs 仓 COMPANIES.md §3）；兼容变量 LANLNK_BASE 等价
+export USERGUIDE_BASE=$COMPANY_BASE/materials/03-products/user-guides   # required for doc-generator skill（COMPANIES.md §3：从 COMPANY_BASE 派生）
 ```
 
 Python skills use **uv exclusively** (never pip). Each skill has its own `.venv`:
@@ -39,18 +39,23 @@ PPT skills use Node.js (`pptxgenjs`):
 cd skills/ppt/ppt-master && npm install   # one-time
 ```
 
-## External Data ($LANLNK_BASE)
+## External Data ($LANLNK_BASE / $COMPANY_BASE)
+
+多公司契约见 docs 仓 `COMPANIES.md`（公司发现规则：`docs/<company>/config/company.yaml` 存在即为公司，当前 lanlnk / lianyou；推荐 `COMPANY_BASE`，兼容 `LANLNK_BASE`，无静默默认）。lanlnk 基座结构（5 锚点 + 00-90 编号树，2026-09 docs 三层整理后）：
 
 ```
 /opt/code/docs/lanlnk/
-├── incoming/     # raw source files dropped by user
-├── raw/          # markitdown-converted .md + extracted images (_media/ dirs)
-├── materials/    # structured output (01-company-overview through 07-personnel)
-├── proposals/    # generated proposals + content packages
-└── bidding/      # generated bid docs + content packages
+├── config/       # company.yaml + 词表 + ontology/business-ontology.yaml（机器规则）
+├── incoming/     # 全部原始输入入口（按主题子目录）
+├── raw/          # 中间产物：markitdown 转换件 + _media/ 图片（gitignore，百度盘）
+├── materials/    # 结构化素材 8 大类+（01-company-overview … 16-customers，带 frontmatter）
+├── out/          # 交付物分型层：strategy/ prd/ proposals/ bidding/ …（平铺只放最终文件）
+├── 30-products/  # 产品三层基线入口（lnkcre/lnkchat/lnkreport/lnkchatbi/lnkvision/lnkgateway + INDEX.md）
+└── 00-90 编号树   # 00-governance / 10-strategy / 20-architecture / 25-product-assets /
+                  # 35-domain-packages / 40-delivery / 90-legacy（历史快照，只读）
 ```
 
-Three-tier flow: `incoming/` → `raw/` → `materials/`. Content packages go to `proposals/<client>/content-packages/` or `bidding/<project>/content-packages/`.
+Three-tier flow: `incoming/` → `raw/` → `materials/`. Content packages go to `out/proposals/<client>/content-packages/` or `out/bidding/<project>/content-packages/`. 顶层 `bidding/`（南光/果正）为历史遗留，只读，新产物一律走 `out/bidding/`。
 
 ## Tools & Commands
 
@@ -127,11 +132,12 @@ uv run scripts/ocr_extract.py <input_dir> [<input_dir> ...] \
   --output-dir <output_dir> \
   [--skip-existing]   # resume after interruption (reads slides.jsonl checkpoint)
 
-# Example: extract Haiding contract table structures from PPT images
+# Example: extract Haiding business-logic table structures from PPT images
 uv run scripts/ocr_extract.py \
-  /opt/code/docs/lanlnk/raw/prd-商管系统/02-competitors/海鼎/业务逻辑 \
-  --sql-dir /opt/code/docs/lanlnk/incoming/prd-商管系统/02-competitors/海鼎/数据结构 \
-  --output-dir /opt/code/docs/lanlnk/raw/prd-商管系统/02-competitors/海鼎/业务逻辑/_extracted
+  /opt/code/docs/lanlnk/raw/prd-商管系统/02-competitors/海鼎/04-产品功能/业务逻辑 \
+  --output-dir /opt/code/docs/lanlnk/raw/prd-商管系统/02-competitors/海鼎/04-产品功能/业务逻辑/_extracted \
+  --skip-existing
+# （--sql-dir <sql_ddl_dir> 可选：有 SQL DDL ground-truth 时用于校准形近字，当前海鼎素材无 DDL 文件）
 ```
 
 Outputs: `slides.jsonl` (per-image OCR + bbox), `tables.jsonl` (table names + SQL calibration), `all-ocr.md` (human-readable), `manifest.json`.
@@ -384,7 +390,7 @@ subprocess.run(
 |---|---|
 | `material-importer/references/domain-tags.md` | material-importer (owner), product-prd-generator, compound-learning |
 | `product-prd-generator/references/term-aliases.yaml` | product-prd-generator (owner), competitor-product-analyzer |
-| `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md` | product-prd-generator (商管 project only; 域知识跟着项目走，不放 skill 目录), competitor-product-analyzer |
+| `$LANLNK_BASE/30-products/lnkcre/ontology/domain-knowledge.md` | product-prd-generator (商管 project only; 域知识跟着项目走，不放 skill 目录), competitor-product-analyzer |
 | `$LANLNK_BASE/config/ontology/business-ontology.yaml` | product-prd-generator (runtime dependency), competitor-product-analyzer |
 
 > 此表与 `references/scripts/check_docs_consistency.sh` 的 `SHARED_FILES` 数组是**双 source of truth**——改一边必须同步另一边，跑 `check_docs_consistency.sh` 验证。Aspirational readers（"将来应该读但还没接"）不要写进此表，写到 skill 自身的 roadmap/TODO 里，避免 agent 读了做错误假设。

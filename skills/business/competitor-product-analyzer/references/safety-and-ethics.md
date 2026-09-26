@@ -56,7 +56,7 @@ Agent 在 P0 阶段必须确认：
 
 ### .auth.json 规范
 
-**位置**：`$ANALYSIS_ROOT/.auth.json`（即 `$LANLNK_BASE/30-products/mi-cre/competitor-analysis/<vendor>/.auth.json`）
+**位置**：`$ANALYSIS_ROOT/.auth.json`（即 `$LANLNK_BASE/30-products/lnkcre/evidence/competitors/<vendor>/.auth.json`，canonical 唯一写入位置；mi-cre 旧根已随 2026-09 目录合并删除）
 
 **权限**：mode 0600（仅所有者可读写）
 
@@ -75,9 +75,9 @@ Agent 在 P0 阶段必须确认：
 
 **强制规则**：
 
-- 首次写入时打印：`"请确保 .auth.json 已加入 .gitignore：$LANLNK_BASE/30-products/mi-cre/competitor-analysis/**/.auth.json"`
+- 首次写入时打印：`"请确保 .auth.json 已加入 .gitignore：$LANLNK_BASE/30-products/lnkcre/evidence/competitors/**/.auth.json"`
 - 二次运行复用，不重复询问
-- `.gitignore` 必须覆盖：在 `$LANLNK_BASE/.gitignore` 或仓库根 `.gitignore` 添加 `**/competitor-analysis/**/.auth.json`
+- `.gitignore` 必须覆盖写入路径：在 `$LANLNK_BASE/.gitignore` 或仓库根 `.gitignore` 添加 `**/evidence/competitors/**/.auth.json`（凭据不能进 git；`**/competitor-analysis/**/.auth.json` 历史规则可保留以覆盖 90-legacy 残件）
 - **禁止**：把凭据写入 SKILL.md、references、报告、日志、截图文件名、git commit message
 
 ### 截图脱敏

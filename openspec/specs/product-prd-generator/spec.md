@@ -23,7 +23,7 @@ The skill SHALL support loading product-specific ontology.yaml per `--project` a
 
 - **WHEN** `_load_aliases(skill_root)` or `_load_ontology()` is called without `project` parameter
 - **THEN** ontology is loaded from `$LANLNK_BASE/config/ontology/business-ontology.yaml` (via fallback,
-  since no project-specific ontology exists for 商管 in `30-products/mi-cre/`)
+  since no project-specific ontology.yaml exists for 商管 in `30-products/lnkcre/`)
 - **AND** term-aliases is loaded from `skill_root/references/term-aliases.yaml`
 - **AND** behavior is byte-identical to pre-change
 
@@ -103,7 +103,7 @@ Both MUST:
 #### Scenario: project-specific ontology missing, fallback engaged
 
 - **WHEN** `ontology_path_for_project("商管系统")` is called
-- **AND** no project-specific ontology exists in `30-products/mi-cre/` or `out/prd/商管系统/output/`
+- **AND** no project-specific ontology.yaml exists under `30-products/lnkcre/` or `out/prd/商管系统/output/`
 - **THEN** returns `$LANLNK_BASE/config/ontology/business-ontology.yaml`
 - **AND** does not raise even if the fallback path also does not exist (caller handles missing file)
 

@@ -19,8 +19,8 @@ compatibility: >
   纯提示词 skill，无 Python 依赖。
   文档转换复用 material-importer（markitdown + 图片提取 + OCR）。
   Demo 探测复用 doc-generator 的 Playwright 模式与文本/角色 locator 规范。
-  能力对齐参考 product-prd-generator 输出的功能清单与 ontology（$LANLNK_BASE/config/ontology/business-ontology.yaml）。
-  商管域知识参考 $LANLNK_BASE/30-products/mi-cre/domain-knowledge.md。
+   能力对齐参考目标产品的三层基线（本体层 ontology/aliases，产品注册表见 product-prd-generator 的 `references/product-registry.yaml`）；不得在非 CRE 产品上静默回退到商管 ontology。
+   商管域知识仅在目标产品为 LnkCRE/MI-CRE 时经 lnkcre ontology 入口解析（`30-products/lnkcre/ontology/`，mi-cre 目录已于 2026-09 合并删除）。
 
   Quick start:
   ```bash
@@ -43,7 +43,7 @@ compatibility: >
 
 ## 核心定位
 
-这个 skill 是 **PRD 之前、战略简报之后的产品情报层**。
+这个 skill 是 **PRD 之前、战略简报之后的产品情报层**。它输出可被增量 PRD 消费的证据和稳定能力记录。
 
 它回答的是：
 
@@ -52,6 +52,7 @@ compatibility: >
 - 蓝联当前产品（LnkCRE / CRM / AI）相对竞品是 existing / partial / missing / better？
 - 竞品的哪些设计值得蓝联借鉴？哪些必须补齐？哪些只是观察？
 - 产品改进建议如何排优先级（P0/P1/P2/P3）？
+- 哪些结论仍是未扫描、不可访问或冲突，不能被写成 missing？
 
 它不回答：
 
@@ -126,6 +127,19 @@ strategy-brief-generator（战略定位 / 竞对打法）     ←─ 你的能�
 
 详细规则见 `references/evidence-ledger.md`。
 
+### 能力身份与状态纪律
+
+每条新能力或修订能力必须保留稳定 `trace_id`/`capability_id`、`source_refs`、`target_product` 和 `target_repo`（若已知）。必须区分：
+
+- `evidence_state`: `observed | inferred | not_found | not_scanned | inaccessible | conflicting`
+- `implementation_status`: `existing | partial | missing | explicitly-not-do | unknown`
+
+demo 账号看不到、目标仓代码扫描器未覆盖或资料缺页，只能进入对应证据状态，不得直接判断竞品或蓝联缺少能力。
+
+### 与增量 PRD 的交接
+
+`lanlnk-product-improvement-recommendations.md` 的 P0/P1/P2 项进入 `product-prd-generator` 后，必须携带原始 evidence IDs 和 trace IDs。每个 Gap 应提供目标仓库可复核的反证入口（OpenSpec spec、代码路径、路由、表或符号），避免把 code-map 漏扫写成新需求。实施完成后由目标仓库返回回写包，docs 侧再更新能力基线。
+
 ### 合规与凭据安全（红线）
 
 | 红线 | 说明 |
@@ -149,9 +163,15 @@ strategy-brief-generator（战略定位 / 竞对打法）     ←─ 你的能�
 | 阶段 | 触发 | 产物位置 | 性质 |
 |---|---|---|---|
 | **S0 采集入库** | 用户提供手册路径或 demo 账号 | `incoming/` + `raw/` + `materials/13-competitors/` | 竞品素材沉淀（三层归属）|
-| **S1/S5 能力分析** | 需要做能力矩阵/改进建议/PRD 时 | `30-products/mi-cre/competitor-analysis/<vendor>/` | 蓝联对竞品的分析结论 |
+| **S1/S5 能力分析** | 需要做能力矩阵/改进建议/PRD 时 | `$LANLNK_BASE/30-products/lnkcre/evidence/competitors/<vendor>/`（唯一写入位置） | 蓝联对竞品的分析结论 |
 
 > **为什么分离**：采集入库是"竞品有什么"（事实层，可被多个 skill 复用）；能力分析是"蓝联该怎么改进"（判断层，依赖蓝联功能清单和客户优先级）。混在一起会导致采集产物被分析结论淹没，且 materials 层缺失导致其他 skill 无法复用竞品素材。
+
+### 产品代号与竞品证据隔离（LnkCRE）
+
+- 对照产品代号 **LnkCRE / MI / MI-CRE / lnkcre / 商管系统** 统一解析为 canonical product id **`lnkcre`**（同一产品；MI-* 文档 ID 稳定不变，不代表目录仍叫 mi-cre）。
+- 竞品证据写入根：`$LANLNK_BASE/30-products/lnkcre/evidence/competitors/<vendor>/`（canonical，唯一写入位置；mi-cre 旧根已随 2026-09 目录合并删除，无迁移期读取）。
+- **跨产品隔离**：LnkReport / LnkChat / LnkChatBI 的竞品资料与分析结论不得混入 LnkCRE 的 evidence 树（反之亦然）；目标产品不是 lnkcre 时不读取商管 ontology / LnkCRE feature-baseline。
 
 ### S0 采集入库：三层归属（遵循 lanlnk 统一素材库规范）
 
@@ -194,7 +214,7 @@ $LANLNK_BASE/
 ### S1/S5 能力分析：competitor-analysis 输出
 
 ```text
-$LANLNK_BASE/30-products/mi-cre/competitor-analysis/<vendor>/
+$LANLNK_BASE/30-products/lnkcre/evidence/competitors/<vendor>/   # canonical 写入根（唯一，mi-cre 旧根已删除）
 ├── .auth.json                          ← demo 凭据（mode 0600，gitignored）
 ├── capability-map.json                 ← 竞品能力结构化清单（从 materials 素材抽取）
 ├── competitor-capability-map.md        ← 人类可读版
@@ -285,7 +305,7 @@ S1.5: 证据台账 + 待确认项
 S1.6: 交互确认与交付
 ```
 
-**S1 阶段产物全部在 `30-products/mi-cre/competitor-analysis/<vendor>/`**，不回写 materials（避免分析结论污染素材库）。
+**S1 阶段产物全部写入 canonical `30-products/lnkcre/evidence/competitors/<vendor>/`**，不回写 materials（避免分析结论污染素材库）。
 
 ### S0.1 输入解析
 
@@ -471,7 +491,7 @@ markitdown "<原始文件>" -o "<raw 目录>/<6类>/<同名>.md"
 
 把竞品的原始术语映射到蓝联标准功能名，复用：
 
-- `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md`（商管域术语别名表）
+- LnkCRE 域知识入口（优先 `30-products/lnkcre/ontology/domain-knowledge.md` → `ontology/README.md` → `INDEX.md`；商管域术语别名表）
 - `$LANLNK_BASE/config/ontology/business-ontology.yaml`（8 模块 482 术语）
 - `product-prd-generator/references/term-aliases.yaml`
 
@@ -483,7 +503,7 @@ markitdown "<原始文件>" -o "<raw 目录>/<6类>/<同名>.md"
 
 | 对照产品 | 功能清单路径 |
 |---|---|
-| LnkCRE / 商管系统 | `$LANLNK_BASE/30-products/mi-cre/feature-baseline/feature-baseline.yaml`（CLI 兼容代号：MI） |
+| LnkCRE / MI / MI-CRE / 商管系统（canonical id `lnkcre`） | `$LANLNK_BASE/30-products/lnkcre/prd/baseline/feature-baseline.yaml` |
 | CRM / 会员系统 | `$LANLNK_BASE/materials/03-products/CRM会员系统功能清单.md` |
 | AI Skills | `$LANLNK_BASE/materials/11-cre-ai-skills/02_机会与产品/岗位 AI Skills 增强性与摩擦消除分析矩阵.md` |
 
@@ -590,7 +610,7 @@ Agent:
   [S1.5] 证据台账 142 条（引用 materials/raw 路径）| high 68% / medium 24% / low 8%
          review: 7 项术语未映射 + 2 项 demo 权限未知 + 3 项手册版本过旧
 
-  [S1.6] 交付: competitor-analysis/qimao/
+  [S1.6] 交付: evidence/competitors/qimao/（canonical；历史 run 交付于 competitor-analysis/qimao/，原位保留）
        主交付件: lanlnk-product-improvement-recommendations.md
        后续: 改进建议交给 product-prd-generator 落地 PRD
 ```
@@ -639,8 +659,8 @@ export LANLNK_BASE=/opt/code/docs/lanlnk
 | `$INCOMING_VENDOR_DIR` | `$LANLNK_BASE/incoming/competitor-<vendor>/` | **S0 原始证据入口**（百度盘）|
 | `$RAW_VENDOR_DIR` | `$LANLNK_BASE/raw/prd-商管系统/02-competitors/<vendor>/` | **S0 转换产物**（gitignored，百度盘）|
 | `$MATERIALS_VENDOR_DIR` | `$COMPETITORS_DIR/<vendor>/` | **S0 权威精华**（进 Git）|
-| `$PRD_DIR` | `$LANLNK_BASE/30-products/mi-cre` | PRD 项目根 |
-| `$ANALYSIS_ROOT` | `$PRD_DIR/competitor-analysis/<vendor>` | **S1 能力分析输出根**（不含原始素材）|
+| `$PRD_DIR` | `$LANLNK_BASE/30-products/lnkcre` | LnkCRE canonical 产品根 |
+| `$ANALYSIS_ROOT` | `$LANLNK_BASE/30-products/lnkcre/evidence/competitors/<vendor>` | **S1 能力分析输出根**（不含原始素材）|
 | `$USERGUIDE_BASE` | `$LANLNK_BASE/materials/03-products/user-guides` | doc-generator 的输出根（如需生成竞品操作手册）|
 
 ## 已知限制
@@ -690,12 +710,12 @@ P2 阶段不直接走 doc-generator 的"运行时探测 + Playwright snapshot"�
 
 修改本 skill 时：
 
-1. **判断归属**：通用能力分析方法论 → 留在本文件；商管域专属知识 → 写入 `$PRD_DIR/商管系统/域知识.md`
+1. **判断归属**：通用能力分析方法论 → 留在本文件；商管域专属知识 → 写入 `$LANLNK_BASE/30-products/lnkcre/ontology/domain-knowledge.md`
 2. **更新本文件**的「已知限制」章节
 3. **能力 schema 变更**同步更新 `references/capability-schema.md`
 4. **证据规则变更**同步更新 `references/evidence-ledger.md`
 5. **合规规则变更**同步更新 `references/safety-and-ethics.md`，并检查与 `doc-generator` 的凭据规范一致
-6. **新增竞品**时，在 S0 阶段建立三层目录：`incoming/competitor-<vendor>/`、`raw/prd-商管系统/02-competitors/<vendor>/<6类>/`、`materials/13-competitors/<vendor>/<6类>/`；S1 阶段再建 `competitor-analysis/<vendor>/`
+6. **新增竞品**时，在 S0 阶段建立三层目录：`incoming/competitor-<vendor>/`、`raw/prd-商管系统/02-competitors/<vendor>/<6类>/`、`materials/13-competitors/<vendor>/<6类>/`；S1 阶段再建 `30-products/lnkcre/evidence/competitors/<vendor>/`
 7. **改对比矩阵权重模型**时，同步 `references/comparison-matrix.md` 并检查与 `requirement-evaluator` 的客户需求优先级口径一致
 8. **遇到新菜单加载机制**（如新的 SPA 框架/新的导航模式）时，更新 `references/page-extraction-strategy.md` 的"4 种典型机制"表，并补充实战经验
 

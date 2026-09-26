@@ -9,11 +9,13 @@
 ## 输入
 
 - 默认只需短口令 `回写 PRD`，由 agent 从当前目录、最近对话和项目名默认解析推断目标项目。
-- 可选：项目名或项目路径，例如 `mi` / `langchat` / `/opt/code/lnkcre`。
+- 可选：项目名或项目路径，例如 `mi` / `lnkcre` / `langchat` / `/opt/code/lnkcre`。
 - 可选：时间范围，例如 `今天` / `最近一次` / `本周归档`。
 - 可选：一个或多个 archived change id/path，用于精确指定回写对象。
-- 可选：PRD 输出目录，例如 `$LANLNK_BASE/30-products/mi-cre/`。
+- 可选：PRD 输出目录。LnkCRE 当前 canonical 根为 `$LANLNK_BASE/30-products/lnkcre/prd/`（细分：baseline/increments/requirements/decisions/handoffs，回写件落 `prd/handoffs/`）。
 - 可选：`verification-report.md`、实现摘要、暂缓/合并/误判结论。
+
+> 路径口径：`mi` / `lnkcre` / `LnkCRE` / `MI-CRE` 指同一产品（canonical id `lnkcre`）。`30-products/mi-cre/` 是历史路径和 source_ref 前缀（目录已于 2026-09 合并删除）——回写产物一律写入 `30-products/lnkcre/prd/`。docs 仓的 product registry / INDEX / OpenSpec change 只留在 docs 仓消费，不镜像进目标项目仓。
 
 ## 步骤
 
@@ -39,8 +41,8 @@
 
 ## 输出文件建议
 
-- `output/review/实施回写-<YYYYMMDD>.md`
-- 必要时更新 `功能清单.md`、覆盖度矩阵、`suggested-openspec-changes.yaml`、`mi-consumption-prompt.md`。
+- LnkCRE：`30-products/lnkcre/prd/handoffs/实施回写-<YYYYMMDD>.md`（canonical 写入；历史 run 的 `output/review/实施回写-*.md` 与 `mi-cre/` 旧位置原位保留）
+- 必要时更新 `功能清单.md`、覆盖度矩阵、`suggested-openspec-changes.yaml`、`mi-consumption-prompt.md`（历史文件名保持不变）。
 
 ## 完成标准
 

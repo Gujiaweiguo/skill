@@ -32,6 +32,10 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 | `references/review-template.md` | 写 `review/pending-items.md` 时。待确认事项模板 |
 | `references/rollout-plan-template.md` | S10-A 战略级架构调整 / S5 高复杂度增量 PRD 时产出"建议实施切片"。WP/Gate/跨仓库所有权表/START-RESUME prompt 模板 |
 | `references/term-aliases.yaml` | 跑术语归一（Step 4）时。术语别名表，扩充覆盖率靠加这个文件 |
+| `references/product-semantic-baseline.md` | 配置三层产品基线（本体/PRD/代码）及 Semantic Release 快照边界时 |
+| `references/product-registry.yaml` | 确认目标产品路径、产品适配器和新增产品时 |
+| `references/incremental-prd-handoff.md` | 生成增量 PRD、目标仓消费提示词、实施回写包时 |
+| `references/ui-design-system-handoff.md` | 处理统一前端 UI、设计系统、页面模式和视觉验收时 |
 
 ## 目标
 
@@ -45,6 +49,8 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 - 版本规划
 - PRD
 
+本 Skill 的用户可见结构只有三层：**本体 → PRD → 代码**。本体定义产品世界（对象、术语、规则、能力；业务系统与平台产品内容不同）；PRD 定义产品目标与本轮变更；代码代表当前实现事实。OpenSpec 属于代码层的实施机制，Semantic Release 是本体层的发布快照，UI 规范是 PRD 的内容，竞品分析是 PRD 的输入——它们都不是独立架构层。已注册产品见 `references/product-registry.yaml`：lnkcre、lnkreport、lnkchatbi、lnkchat、lnkvision、lnkgateway 及未来产品。不得因非 CRE 产品没有传统领域模型而静默套用商管 ontology。
+
 ## 适用场景
 
 - 多业务系统产品规划（商管/会员/CRM/供应链等）
@@ -53,9 +59,11 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 - 基于现有产品进行版本规划
 - 需要保留界面截图、流程图、表单图等视觉参考
 
-> **域知识隔离**：本文件只记录**通用 PRD 方法论**。各业务系统的域专属知识（术语/单据流/算法/竞品基线）存放在**各项目目录**下的 `域知识.md`。当前已有：
-> - `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md` — 商管系统域知识
-> - 未来新增会员/CRM 时创建 `$LANLNK_BASE/out/prd/会员系统/域知识.md`
+> **域知识隔离**：本文件只记录**通用 PRD 方法论**。各业务系统的域专属知识（术语/单据流/算法/竞品基线）存放在**各项目目录**。LnkCRE 域知识入口解析优先级（由 `_paths.domain_knowledge_path_for_project` 实现）：
+> a. `$LANLNK_BASE/30-products/lnkcre/ontology/domain-knowledge.md`
+> b. `$LANLNK_BASE/30-products/lnkcre/ontology/README.md`（入口，指向实际 authority）
+> c. `$LANLNK_BASE/30-products/lnkcre/INDEX.md`（声明的 authority/source_ref）
+> 未来新增会员/CRM 时创建 `$LANLNK_BASE/out/prd/会员系统/域知识.md`
 
 ## 不做什么
 
@@ -74,9 +82,8 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 
 ### 2. 原始文档
 
-- `$LANLNK_BASE/incoming/prd-商管系统/00-current-product/`
-- `$LANLNK_BASE/incoming/prd-商管系统/01-customer-requirements/`
-- `$LANLNK_BASE/incoming/prd-商管系统/02-competitors/`
+- `$LANLNK_BASE/incoming/商管客户需求/`（按客户名分目录）
+- `$LANLNK_BASE/incoming/商管系统竞对/`（按竞品名分目录）
 
 ### 3. 转换后的中间资料
 
@@ -84,17 +91,51 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 
 ## 目录规范
 
+LnkCRE 当前 canonical 产品根（docs 侧三层目录统一，2026-09 起）：
+
 ```text
-/opt/code/docs/lanlnk/30-products/mi-cre/
-├── input/
-│   ├── 00-current-product/
-│   ├── 01-customer-requirements/
-│   └── 02-competitors/
-├── raw/
-├── parsed/
-├── review/
-└── output/
+$LANLNK_BASE/30-products/lnkcre/
+├── INDEX.md          # 三层入口与 authority 声明
+├── ontology/         # 本体层入口（README/domain-knowledge）
+├── prd/              # PRD 层（见下方细分）
+├── code/             # 代码层证据
+├── evidence/         # 证据（competitors/<vendor>/ 竞品分析）
+└── reconciliation/   # 三层对账
 ```
+
+PRD 层细分（生成产物按类别落位，`--output-dir` 指向对应子目录）：
+
+```text
+$LANLNK_BASE/30-products/lnkcre/prd/
+├── baseline/       # 产品基线 / 首版全量 PRD（feature-baseline.yaml 也在这里）
+├── increments/     # 增量 PRD
+├── requirements/   # 需求清单 / 需求证据表
+├── decisions/      # 产品决策（ADR / 裁决包）
+└── handoffs/       # 实施交接 / 消费提示词 / 回传件
+```
+
+> **mi-cre 目录已合并删除（2026-09）**：`$LANLNK_BASE/30-products/mi-cre/` 已在 docs 三层整理中并入 `30-products/lnkcre/`，legacy 读取 fallback 已关闭（`legacy_fallback_enabled=False`）。**新生成的 PRD/竞品输出一律写入 lnkcre/**。MI-* / MI-CRE-* 是历史稳定文档 ID，不代表目录仍叫 mi-cre，不要批量改写；`mi-cre` 仍作为路径段别名用于历史文档识别（doc 扫描过滤）。generated / raw / input / parsed / 90-legacy 目录不自动升级为 canonical。
+
+## 产品代号与路径契约（LnkCRE）
+
+CLI `--project` 接受 **MI、MI-CRE、LnkCRE、lnkcre、商管系统**，统一解析为 canonical product id **`lnkcre`**（`_paths.canonical_product_id`，大小写不敏感）。langchat / lnkchat / LnkChat → `lnkchat`。未知产品保持原名，走 `out/prd/<project>/output/` 链路，**不静默映射到其他产品**。
+
+路径解析唯一权威源是 `_paths.resolve_product_paths()`（`ProductPaths`），各脚本/文档不得自行拼 mi-cre 路径：
+
+| 字段 | canonical 路径 |
+|---|---|
+| docs_root | `$LANLNK_BASE/30-products/lnkcre/` |
+| ontology_root | `…/lnkcre/ontology/`（本体权威见 INDEX.md / config/ontology） |
+| prd_root | `…/lnkcre/prd/` |
+| feature_baseline_path | `…/lnkcre/prd/baseline/feature-baseline.yaml` |
+| competitor_evidence_root | `…/lnkcre/evidence/competitors/<vendor>/` |
+
+解析规则（`feature_baseline_path_for_project` / `domain_knowledge_path_for_project` / `competitor_evidence_paths_for_project`）：
+
+1. 只解析 canonical 路径（mi-cre legacy fallback 已随 2026-09 目录合并关闭，`legacy_fallback_enabled=False`）；
+2. 不存在 → `MissingProductDataError`，错误信息含产品 ID 和全部尝试路径；
+3. 绝不静默回退到另一个产品（LnkReport / LnkChat 不会读到 LnkCRE 的 feature baseline 或 ontology）；
+4. 域专属逻辑开关用 `is_lnkre_product(project)`（替代旧的 `{"商管系统", "mi-cre"}` 集合判断）。
 
 ## 材料处理原则
 
@@ -158,12 +199,12 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 - 术语变体多的域（如商管合同条款），只在**精确章节标题**命中时才标记为特殊结构类型，避免噪音扩散。
 - 多来源合并时，选定一个**权威结构模板来源**（如商管的海鼎），其他来源只补证据，不做平均融合。
 
-> **商管域专属补充要求**（条款组识别/海鼎家族合并/家族别名归一）见 `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md`。
+> **商管域专属补充要求**（条款组识别/海鼎家族合并/家族别名归一）见 LnkCRE 域知识入口（解析优先级见上方「域知识隔离」）。
 
 ### Step 4: 术语归一
 把不同材料里的说法统一映射到标准功能名。每个域有自己的术语别名表。
 
-> **商管术语归一实例**（租户服务/资产管理/合同管理等）见 `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md`。
+> **商管术语归一实例**（租户服务/资产管理/合同管理等）见 LnkCRE 域知识入口（`domain_knowledge_path_for_project`，命中 canonical `30-products/lnkcre/ontology/domain-knowledge.md`）。
 
 ### Step 5: 当前产品映射
 对每个功能标记状态：
@@ -177,6 +218,13 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 
 - `confidence`: `high | medium | low`
 - `signals`: 代码与文档的辅助判断信号
+
+同时分离两个维度：
+
+- `evidence_state`: `observed | inferred | not_found | not_scanned | inaccessible | conflicting`
+- `implementation_status`: `existing | partial | missing | explicitly-not-do | unknown`
+
+`not_scanned` 或 `inaccessible` 不得直接输出为 `missing`。
 
 ### Step 6: 合并与对齐
 生成统一能力视图：
@@ -196,6 +244,7 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 - 差距分析
 - 需求证据表
 - PRD
+- 增量 PRD 消费提示词、实施回写要求和 traceability ledger（在增量/交接场景）
 
 ## 中间产物
 
@@ -311,7 +360,7 @@ output/
 上下文：
 - 当前产品代码基线：/opt/code/lnkcre
 - PRD 原始/转换资料根：$LANLNK_BASE/raw/prd-商管系统
-- PRD 输出目录：$LANLNK_BASE/30-products/mi-cre
+- PRD 输出目录：$LANLNK_BASE/30-products/lnkcre/prd/baseline（交接产物落 prd/handoffs/）
 - parsed 目录：$LANLNK_BASE/raw/prd-商管系统/parsed
 
 要求：
@@ -330,7 +379,7 @@ output/
 上下文：
 - 当前产品代码基线：/opt/code/lnkcre
 - PRD 资料根：$LANLNK_BASE/raw/prd-商管系统
-- PRD 输出目录：$LANLNK_BASE/30-products/mi-cre
+- PRD 输出目录：$LANLNK_BASE/30-products/lnkcre/prd/increments
 - parsed 目录：$LANLNK_BASE/raw/prd-商管系统/parsed
 - baseline：$LANLNK_BASE/raw/prd-商管系统/parsed/coverage-baseline.json
 
@@ -372,7 +421,7 @@ uv run product-prd-generator --project 商管系统 \
   --docs-root $LANLNK_BASE/raw/prd-商管系统 \
   --skill-root /opt/code/skill/skills/business/product-prd-generator \
   --parsed-dir $LANLNK_BASE/raw/prd-商管系统/parsed \
-  --output-dir $LANLNK_BASE/30-products/mi-cre \
+  --output-dir $LANLNK_BASE/30-products/lnkcre/prd/increments \
   --mode coverage-validate \
   --baseline $LANLNK_BASE/raw/prd-商管系统/parsed/coverage-baseline.json \
   --update-baseline
@@ -417,7 +466,7 @@ uv run product-prd-generator --project 商管系统 \
 2. **放入正确目录**：
    - 竞品操作手册/蓝图/功能手册 → `$LANLNK_BASE/raw/prd-商管系统/02-competitors/{竞品名}/`
    - 竞品数据结构/PRD 草案 → `$LANLNK_BASE/materials/13-competitors/{竞品名}/`
-   - demo 探测数据 → `$LANLNK_BASE/30-products/mi-cre/competitor-analysis/{竞品名}/`
+   - demo 探测数据 → `$LANLNK_BASE/30-products/lnkcre/evidence/competitors/{竞品名}/`
 3. **跑覆盖度校验**：`--mode coverage-validate` 会自动扫描上述三个目录
 4. **看 gap 报告**：`增量gap报告.md` 的"竞品未匹配能力汇总"会列出新增竞品有多少能力被识别
 5. **扩 ontology**：如果新竞品术语未归一，在 `references/term-aliases.yaml` 中补充别名映射
@@ -568,8 +617,8 @@ uv run pytest tests/ -v
 - **YAML 部分重写致命陷阱**：**永远不要用 `yaml.safe_dump` 部分重写大 YAML 文件中的某个模块**。原因：`safe_dump` 会重新格式化整段内容，且用正则查找下一个模块边界时 `\n[a-zA-Z]` 不匹配中文字符（如 `\n合同管理:` 的 `合` 不是 ASCII 字母），导致 `end` 定位到文件末尾，后续所有模块被截断删除。**正确做法**：用纯文本操作（`str.index("模块名:")` 精确匹配中文字符串），或对整个文件 `safe_load → safe_dump`（全量重写）。已在一次事故中丢失合同管理+财务管理+运营+物业+系统+推广共 6 个模块约 5000 行 YAML。
 - **Ontology sub_functions 必须与 field-specs 全局同步**：ontology 的 `sub_functions` 有旧名称而 field-specs 没有对应实体时，渲染器会产生**空 `####` 标题**（有标题无内容）。这不是报错而是静默问题。每次大改后应做全局同步检查：`ont_subs == spec_keys` for all modules。
 
-> 商管域专属已知限制（资产管理空壳/集团驾驶舱图表库缺失/销售五源模型）见 `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md`。
-- **多产品支持（2026-07-19 起，2026-08-01 三产品真实收官验证）**：CLI 已支持 langchat / LnkChatBI / 未来的 CRM 等非商管产品自动生成 PRD。每个产品通过项目级配置三件套（ontology.yaml + term-aliases.yaml + code-map-rules-<project>.yaml）实现覆盖，缺失时回退到商管默认。配置路径解析为三级 fallback（document-control-plane 迁移后）：`$LANLNK_BASE/30-products/<canonical-dir>/` → `$LANLNK_BASE/out/prd/<project>/output/`（legacy）→ 商管默认。新产品的 onboarding 流程见下方「添加新产品的步骤」章节。**已验证样板**：商管（`30-products/mi-cre/`）/ langchat（`30-products/langchat/`，2026-08-01 真实运行通过：8 模块全覆盖 / 0 商管污染 / 107 capabilities 归类）/ LnkChatBI（`out/prd/LnkChatBI/output/`，legacy 路径）。
+> 商管域专属已知限制（资产管理空壳/集团驾驶舱图表库缺失/销售五源模型）见 LnkCRE 域知识入口（`domain_knowledge_path_for_project`；命中 canonical `30-products/lnkcre/ontology/domain-knowledge.md`）。
+- **多产品支持（2026-07-19 起，2026-08-01 三产品真实收官验证）**：CLI 已支持 langchat / LnkChatBI / 未来的 CRM 等非商管产品自动生成 PRD。每个产品通过项目级配置三件套（ontology.yaml + term-aliases.yaml + code-map-rules-<project>.yaml）实现覆盖，缺失时回退到商管默认。配置路径解析为三级 fallback（document-control-plane 迁移后）：`$LANLNK_BASE/30-products/<canonical-dir>/` → `$LANLNK_BASE/out/prd/<project>/output/`（legacy）→ 商管默认。新产品的 onboarding 流程见下方「添加新产品的步骤」章节。**已验证样板**：商管 LnkCRE（canonical `30-products/lnkcre/`）/ langchat（`30-products/lnkchat/`，2026-08-01 真实运行通过：8 模块全覆盖 / 0 商管污染 / 107 capabilities 归类）/ LnkChatBI（`out/prd/LnkChatBI/output/`，legacy 路径）。
 - **平台型产品素材分层原则（2026-08-01 实证）**：langchat 等「平台型」产品的 PRD 素材必须按**平台层 vs 业务层**分层。平台 PRD 只用平台层素材（产品架构图 / 术语口径 / v2-strategy 目标架构 / 代码 specs）；业务层素材（如商管岗位 AI Skill 解决方案——招商/营运/客服等）是「平台之上的行业应用」，归商管域，**不进平台 PRD 的 docs-root**。混层会导致 doc_map 把业务岗位需求错误归到平台模块，产出语义错乱的 PRD。详见 `/opt/code/docs/opencode/90-复利工程/更新日志.md` 2026-08-01 条目。
 
 ## 设计决策
@@ -672,13 +721,13 @@ PRD 中的实体/单据名称必须满足：
 
 当客户需求文档已有清晰的模块归类时，**遵循客户的结构**，不要自创分类。**原则**：source documents 的结构 IS the requirements。
 
-> 商管模块结构实例（中旅/海鼎/华侨城具体归类）见 `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md`。
+> 商管模块结构实例（中旅/海鼎/华侨城具体归类）见 LnkCRE 域知识入口（`30-products/lnkcre/ontology/domain-knowledge.md`）。
 
 ### 业务单据流：上游导入支持
 
 业务流程中的单据不是孤岛——每个单据应支持从前序单据导入数据。实现模式：下游单据有 `来源` 字段（直接新建/从前序单据转入），选择后联动 `来源单号`。被导入的字段标注"自动带出"，且可修改覆盖。
 
-> 商管单据链实例（招商洽谈→报价→意向→条件报批→合同→应收）见 `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md`。
+> 商管单据链实例（招商洽谈→报价→意向→条件报批→合同→应收）见 LnkCRE 域知识入口（`30-products/lnkcre/ontology/domain-knowledge.md`）。
 
 ### 复杂模块三层架构：实体库 + 配置矩阵 + 操作差异矩阵
 
@@ -690,7 +739,7 @@ PRD 中的实体/单据名称必须满足：
 第三层：操作差异矩阵 — 每种操作类型只列"能改什么/锁定什么/触发什么"（差异表），不列字段定义
 ```
 
-> 商管合同/财务的具体实例见 `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md`。
+> 商管合同/财务的具体实例见 LnkCRE 域知识入口（`30-products/lnkcre/ontology/domain-knowledge.md`）。
 
 ### `markdown` 字段支持矩阵渲染
 
@@ -700,7 +749,7 @@ PRD 中的实体/单据名称必须满足：
 
 做模块 PRD 优化前，先对全部竞品/客户做横向对比分析，提取架构共识和独特概念，按 P0/P1/P2/P3 分层。
 
-> 商管竞品对比基线（12家来源）见 `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md`。
+> 商管竞品对比基线（12家来源）见 LnkCRE 域知识入口（`30-products/lnkcre/ontology/domain-knowledge.md`）。
 
 ### 模块 PRD 优化方法论（可执行清单）
 
@@ -783,7 +832,7 @@ PRD 是中文业务单据与流程，代码 OpenSpec/能力名是英文工程 ID
 
 修改本 skill 时，如发现新的非显而易见行为或踩到新坑：
 
-1. **判断归属**：通用方法论 → 留在本文件；域专属知识 → 写入项目目录下 `域知识.md`（如 `$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md`）
+1. **判断归属**：通用方法论 → 留在本文件；域专属知识 → 写入产品 ontology 目录（LnkCRE：`$LANLNK_BASE/30-products/lnkcre/ontology/domain-knowledge.md`）
 2. **更新本文件**的「已知限制」和「设计决策（通用方法论）」章节
 3. **如是诊断流程**，更新 `references/troubleshooting.md`
 4. **修改 term-aliases.yaml 时**，同时检查 `material-importer/references/domain-tags.md` 是否需要同步

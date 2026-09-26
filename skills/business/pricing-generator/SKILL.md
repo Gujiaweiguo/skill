@@ -69,7 +69,7 @@ compatibility: >
 
 | 产品 | 功能清单路径 | 说明 |
 |---|---|---|
-| LnkCRE / 商管系统 | `$LANLNK_BASE/30-products/mi-cre/feature-baseline/feature-baseline.yaml` | 270 项功能（document-control-plane 迁移后权威位置；CLI 产品代号仍为 MI） |
+| LnkCRE / MI / MI-CRE / 商管系统 | `$LANLNK_BASE/30-products/lnkcre/prd/baseline/feature-baseline.yaml` | 270 项功能。LnkCRE/MI/MI-CRE/lnkcre/商管系统 统一解析为 `lnkcre`（CLI 内部代号 MI，兼容不变）；只读 canonical（mi-cre 旧路径已随 2026-09 目录合并删除），缺失时明确警告并列出尝试路径，绝不读 LnkReport/LnkChat 的基线；新报价只写入 `out/proposals/` |
 | CRM / 会员系统 | `$MATERIALS_DIR/03-products/CRM会员系统功能清单.md` | 会员 CRM 功能 |
 
 > 若功能清单不存在，提示用户先运行 product-prd-generator 生成。

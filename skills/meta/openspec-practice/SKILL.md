@@ -50,7 +50,7 @@ description: OpenSpec 实战工作流 Skill。用于用短口令处理真实项�
 
 项目名默认解析：
 
-- `mi` → `/opt/code/lnkcre`
+- `mi` / `lnkcre` → `/opt/code/lnkcre`（同一产品；LnkCRE canonical id 为 `lnkcre`，MI/MI-CRE 为历史代号，docs 侧资料根为 `$LANLNK_BASE/30-products/lnkcre/`，mi-cre 旧目录已于 2026-09 合并删除）
 - `langchat` → `/opt/code/langchat`
 - `docs` → `/opt/code/docs`
 - `skill` → `/opt/code/skill`

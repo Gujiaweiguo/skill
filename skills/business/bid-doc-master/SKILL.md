@@ -14,7 +14,8 @@ compatibility: >
   Requires Python 3.10+ and uv.
   Provides a `pyproject.toml` for deterministic dependency setup.
 
-  Requires `LANLNK_BASE` env var set to the materials directory (used for bid output paths).
+  Requires `COMPANY_BASE` (or compatible `LANLNK_BASE`) env var set to the company base
+  directory (used for bid output paths under `out/bidding/`).
 
   Quick start:
   ```bash
@@ -48,7 +49,7 @@ compatibility: >
 | `references/case-example.md` | 第一次跑、不确定完整流程时。演示一个投标案例从招标文件到交付的完整路径 |
 | `../../word/word-master/reference/word-content-package-spec.md` | 写 `.word-content.md` 内容包时。word-master 的字段规范（注意路径是单数 `reference/`） |
 
-默认示例素材目录：
+默认示例素材目录（`$BIDDING_DIR = $COMPANY_BASE/out/bidding`；顶层 `bidding/` 为历史遗留，只读，新产物一律走 `out/bidding/`）：
 
 ```text
 $BIDDING_DIR/中旅招投标/
@@ -344,7 +345,7 @@ uv run python -m src.main generate tender_info.json \
 
 ```yaml
 mode: tender
-base_ppt: "/opt/code/docs/lanlnk/incoming/正祥选型方案/蓝联科技CRM商圈会员数智营销方案_202604.pptx"
+base_ppt: "/opt/code/docs/lanlnk/incoming/会员客户需求/正祥选型方案/蓝联科技CRM商圈会员数智营销方案_202604.pptx"
 output: "$BIDDING_DIR/{项目名称}/{项目简称}_述标PPT.pptx"
 cover:
   title: "{项目名称}述标答辩"

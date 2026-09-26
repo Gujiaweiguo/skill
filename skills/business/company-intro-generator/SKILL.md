@@ -682,7 +682,7 @@ based_on:
 
 **PPT生成技术路径**：
 
-以蓝联公司介绍PPT为模板基底（`incoming/正祥选型方案/蓝联科技CRM商圈会员数智营销方案_202604.pptx`），用python-pptx：
+以蓝联公司介绍PPT为模板基底（`incoming/会员客户需求/正祥选型方案/蓝联科技CRM商圈会员数智营销方案_202604.pptx`），用python-pptx：
 
 1. 替换模板封面文字
 2. 用模板layout 2添加定制内容页，标题写进标题占位符（idx=0）
@@ -1485,7 +1485,7 @@ prs.save(target_path)
 
 ```yaml
 mode: intro
-base_ppt: "/opt/code/docs/lanlnk/incoming/正祥选型方案/蓝联科技CRM商圈会员数智营销方案_202604.pptx"
+base_ppt: "/opt/code/docs/lanlnk/incoming/会员客户需求/正祥选型方案/蓝联科技CRM商圈会员数智营销方案_202604.pptx"
 output: "$PROPOSALS_DIR/{项目名称}/蓝联科技公司介绍_{客户简称}_{YYYYMMDD}.pptx"
 
 cover:

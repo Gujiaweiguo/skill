@@ -54,11 +54,17 @@ compatibility: >
 
 ### 产品功能清单定位
 
-评估基准产品的功能清单由 product-prd-generator 生成，位于 `$PRD_DIR/<产品>/output/功能清单.md`。
+评估基准产品的功能清单由 product-prd-generator 生成。
 
-| 产品代号 | 功能清单路径 | 说明 |
+**LnkCRE 功能基线路径契约**（与 product-prd-generator `_paths.resolve_product_paths()` 保持同步，改一边必须改另一边）：
+
+1. 产品代号归一：**MI、MI-CRE、LnkCRE、lnkcre、商管系统 → canonical product id `lnkcre`**（同一产品，大小写不敏感）。
+2. canonical：`$LANLNK_BASE/30-products/lnkcre/prd/baseline/feature-baseline.yaml`（mi-cre 旧路径已随 2026-09 目录合并删除）。
+3. 路径不存在 → **明确报错**（列出产品 ID `lnkcre` 和尝试路径），提示先运行 product-prd-generator；**不得静默改读其他产品（LnkReport / LnkChat / CRM）的功能基线**。
+
+| 产品代号（canonical id） | 功能清单路径 | 说明 |
 |---|---|---|
-| LnkCRE / 商管系统 | `$LANLNK_BASE/30-products/mi-cre/feature-baseline/feature-baseline.yaml` | 270 项功能（208 existing / 60 missing），yaml 格式（document-control-plane 迁移后权威位置；CLI 产品代号仍为 MI） |
+| LnkCRE / MI / MI-CRE / 商管系统（`lnkcre`） | `$LANLNK_BASE/30-products/lnkcre/prd/baseline/feature-baseline.yaml` | 270 项功能（208 existing / 60 missing），yaml 格式。MI/MI-CRE 为历史代号；MI-* 文档 ID 稳定不变，不代表目录仍叫 mi-cre |
 | CRM / 会员系统 | `$MATERIALS_DIR/03-products/CRM会员系统功能清单.md` | 会员 CRM 功能 |
 | AI Skills | `$MATERIALS_DIR/11-cre-ai-skills/02_机会与产品/岗位 AI Skills 增强性与摩擦消除分析矩阵.md` | AI 岗位 Skill 能力 |
 
@@ -93,7 +99,7 @@ P5: 输出评估报告 → 满足度 + 二开清单 + 成本 + 应标建议
 | 参数 | 说明 | 示例 |
 |------|------|------|
 | 需求文档路径 | 客户需求书的文件路径 | `incoming/需求-XX招商管理.docx` |
-| 评估基准产品 | 评估对照哪个产品 | MI（商管系统）/ CRM（会员）/ AI Skills |
+| 评估基准产品 | 评估对照哪个产品 | LnkCRE（商管系统；历史代号 MI / MI-CRE，输入时等价）/ CRM（会员）/ AI Skills |
 | 客户名（可选）| 用于输出目录命名 | XX资产公司 |
 | 单价基准（可选）| 二开人天单价，默认 1500 元/天 | 1500 / 2000 |
 | 客户业态（可选）| 辅助理解需求 | 写字楼出租 / 购物中心 / 产业园区 |
@@ -524,7 +530,7 @@ medium_value_feedback: []
 **示例**：
 ```yaml
 customer: 广州元OPT
-product: MI
+product: lnkcre   # canonical id；用户输入 MI / MI-CRE / LnkCRE / 商管系统 时归一到这里
 high_value_feedback:
   - id: add-enterprise-profile-data-collection
     title: 产业园一企一档数据采集（税收/社保/营收）
@@ -613,18 +619,18 @@ high_value_feedback:
 
 ### 示例 1：标准评估
 
-> 用户："评估一下 incoming/需求-XX招商管理.docx，看 MI 满足多少，二开多少"
+> 用户："评估一下 incoming/需求-XX招商管理.docx，看 MI 满足多少，二开多少"（MI 为 LnkCRE 历史代号，归一为 lnkcre）
 >
 > Agent：
 > ```
 > 我帮你评估。先确认：
-> 1. 评估基准产品是 MI（商管系统）吗？
+> 1. 评估基准产品是 LnkCRE/MI（商管系统，canonical id `lnkcre`）吗？
 > 2. 客户名是什么？（用于输出目录）
 > ```
 >
-> 用户："对，MI。客户是XX资产公司"
+> 用户："对，MI。客户是XX资产公司"（MI → lnkcre）
 >
-> Agent → markitdown 转化需求 → 读 MI 功能清单 → 逐条匹配 → 识别二开 → 算成本 → 输出报告到 `$PROPOSALS_DIR/XX资产公司/需求评估_MI_20260705.md`
+> Agent → markitdown 转化需求 → 读 MI 功能清单 → 逐条匹配 → 识别二开 → 算成本 → 输出报告到 `$PROPOSALS_DIR/XX资产公司/需求评估_LnkCRE_20260705.md`（新文件用 LnkCRE 命名；历史 MI 命名报告不重命名）
 
 ### 示例 2：快速判断
 

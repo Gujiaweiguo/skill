@@ -483,7 +483,7 @@ uv run product-prd-generator \
   --docs-root $LANLNK_BASE/raw/prd-商管系统 \
   --skill-root . \
   --parsed-dir $LANLNK_BASE/raw/prd-商管系统/parsed \
-  --output-dir $LANLNK_BASE/30-products/mi-cre \
+  --output-dir $LANLNK_BASE/30-products/lnkcre/prd/increments \
   --mode coverage-validate \
   --baseline $LANLNK_BASE/raw/prd-商管系统/parsed/coverage-baseline.json \
   --update-baseline
@@ -518,7 +518,7 @@ uv run product-prd-generator \
 
 - **~19% 匹配率瓶颈仍然存在**：coverage-validate 复用 reconcile 的术语匹配，ontology 覆盖率不足时 unmatched 需求会进增量 gap 而非矩阵。继续扩 ontology 术语是唯一提升路径。
 - **机器无法判断域归属**：如明源"账龄"证据来自住宅/售楼还是商管，进 `review/evidence-weak-items.md` 待人工确认。
-- **竞品名提取依赖路径规范**：要求竞品资料在 `02-competitors/{竞品名}/` 下；旗茂 demo 探测数据在 `competitor-analysis/qimao/` 下需特殊处理。
+- **竞品名提取依赖路径规范**：要求竞品资料在 `02-competitors/{竞品名}/` 下；旗茂 demo 探测数据在 canonical `evidence/competitors/qimao/`（`30-products/lnkcre/evidence/competitors/`）下需特殊处理；能力矩阵扫描只读 canonical（mi-cre 旧根已随 2026-09 合并删除）。
 ```
 
 ---
@@ -549,7 +549,7 @@ uv run product-prd-generator --mode coverage-validate --update-baseline ...
 
 ### 11.3 对比验证
 
-将机器输出的 `PRD客户需求覆盖度矩阵.md` 与当前手工维护的 `competitor-analysis/_baseline/PRD客户需求覆盖度矩阵-v1.0.md` 逐单元格对比，差异应 ≤ 5%（允许因 ontology 匹配率导致的 unmatched 差异）。
+将机器输出的 `PRD客户需求覆盖度矩阵.md` 与历史手工基线 `90-legacy/2026-07-31-pre-mi-document-control-plane/out-prd-商管系统/competitor-analysis/_baseline/PRD客户需求覆盖度矩阵-v1.0.md`（历史证据，原位保留）逐单元格对比，差异应 ≤ 5%（允许因 ontology 匹配率导致的 unmatched 差异）。
 
 ---
 

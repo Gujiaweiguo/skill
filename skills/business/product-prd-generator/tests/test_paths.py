@@ -15,7 +15,15 @@ import pytest
 
 from product_prd_generator._paths import (
     _lanlnk_base,
+    canonical_product_id,
+    competitor_evidence_paths_for_project,
+    domain_knowledge_path_for_project,
+    feature_baseline_path_for_project,
+    is_lnkre_product,
+    MissingProductDataError,
     ontology_path_for_project,
+    PRD_OUTPUT_SUBDIRS,
+    resolve_product_paths,
     term_aliases_path_for_project,
 )
 
@@ -140,3 +148,171 @@ def test_term_aliases_path_skill_root_none_returns_fallback():
     p = term_aliases_path_for_project("any_project", SKILL_ROOT)
     # No project-specific yaml for "any_project", so should fall back
     assert p == SKILL_ROOT / "references" / "term-aliases.yaml"
+
+
+# ─── LnkCRE canonical id 别名归一（MI / MI-CRE / LnkCRE / lnkcre / 商管系统）───
+
+
+@pytest.mark.parametrize("raw", ["MI", "mi", "MI-CRE", "mi-cre", "LnkCRE", "lnkcre", "LNKCRE", "商管系统"])
+def test_canonical_product_id_lnkcre_family(raw: str) -> None:
+    assert canonical_product_id(raw) == "lnkcre"
+
+
+@pytest.mark.parametrize("raw", ["langchat", "LnkChat", "lnkchat"])
+def test_canonical_product_id_lnkchat_family(raw: str) -> None:
+    assert canonical_product_id(raw) == "lnkchat"
+
+
+def test_canonical_product_id_unknown_stays_identity() -> None:
+    assert canonical_product_id("LnkChatBI") == "LnkChatBI"
+    assert canonical_product_id("不存在的项目_xyz_123") == "不存在的项目_xyz_123"
+
+
+def test_is_lnkre_product_covers_aliases_and_excludes_others() -> None:
+    for raw in ("MI", "MI-CRE", "LnkCRE", "lnkcre", "商管系统"):
+        assert is_lnkre_product(raw)
+    assert not is_lnkre_product("lnkreport")
+    assert not is_lnkre_product("langchat")
+
+
+# ─── ProductPaths 统一路径契约 ────────────────────────────────────────
+
+
+def test_resolve_product_paths_lnkcre_contract() -> None:
+    paths = resolve_product_paths("LnkCRE")
+    base = DEFAULT_LANLNK_BASE / "30-products"
+    assert paths.canonical_product_id == "lnkcre"
+    assert paths.docs_root == base / "lnkcre"
+    assert paths.ontology_root == base / "lnkcre" / "ontology"
+    assert paths.prd_root == base / "lnkcre" / "prd"
+    assert paths.feature_baseline_path == base / "lnkcre" / "prd" / "baseline" / "feature-baseline.yaml"
+    assert paths.competitor_evidence_root == base / "lnkcre" / "evidence" / "competitors"
+    assert paths.legacy_docs_root == base / "mi-cre"
+    assert paths.legacy_feature_baseline_path == base / "mi-cre" / "feature-baseline" / "feature-baseline.yaml"
+    assert paths.legacy_competitor_root == base / "mi-cre" / "competitor-analysis"
+    assert paths.legacy_fallback_enabled is False
+
+
+def test_resolve_product_paths_alias_inputs_agree() -> None:
+    for raw in ("MI", "MI-CRE", "LnkCRE", "lnkcre", "商管系统"):
+        assert resolve_product_paths(raw) == resolve_product_paths("LnkCRE")
+
+
+def test_prd_output_dir_kinds() -> None:
+    paths = resolve_product_paths("lnkcre")
+    for kind, subdir in PRD_OUTPUT_SUBDIRS.items():
+        assert paths.prd_output_dir(kind) == paths.prd_root / subdir
+    with pytest.raises(ValueError):
+        paths.prd_output_dir("nope")
+
+
+def test_resolve_product_paths_lnkreport_has_no_lnkcre_legacy() -> None:
+    paths = resolve_product_paths("lnkreport")
+    assert paths.canonical_product_id == "lnkreport"
+    assert paths.legacy_docs_root is None
+    assert paths.docs_root.name == "lnkreport"
+
+
+# ─── feature baseline：canonical 优先 → legacy 迁移 fallback → 显式报错 ───
+
+
+def _fake_company_base(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "company.yaml").write_text("company: test\n", encoding="utf-8")
+    monkeypatch.setenv("COMPANY_BASE", str(tmp_path))
+    monkeypatch.delenv("LANLNK_BASE", raising=False)
+    return tmp_path
+
+
+def test_feature_baseline_prefers_canonical_when_both_exist(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    base = _fake_company_base(tmp_path, monkeypatch)
+    canonical = base / "30-products" / "lnkcre" / "prd" / "baseline" / "feature-baseline.yaml"
+    canonical.parent.mkdir(parents=True)
+    canonical.write_text("version: 2\n", encoding="utf-8")
+    legacy = base / "30-products" / "mi-cre" / "feature-baseline" / "feature-baseline.yaml"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text("version: 1\n", encoding="utf-8")
+    assert feature_baseline_path_for_project("LnkCRE") == canonical
+
+
+def test_feature_baseline_no_legacy_fallback_after_merge(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """mi-cre→lnkcre 合并完成后（2026-09），即使残留 legacy 文件也不再回退。"""
+    base = _fake_company_base(tmp_path, monkeypatch)
+    legacy = base / "30-products" / "mi-cre" / "feature-baseline" / "feature-baseline.yaml"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text("version: 1\n", encoding="utf-8")
+    with pytest.raises(MissingProductDataError):
+        feature_baseline_path_for_project("mi-cre")
+    with pytest.raises(MissingProductDataError):
+        feature_baseline_path_for_project("LnkCRE")
+
+
+def test_feature_baseline_missing_raises_actionable_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    base = _fake_company_base(tmp_path, monkeypatch)
+    with pytest.raises(MissingProductDataError) as excinfo:
+        feature_baseline_path_for_project("LnkCRE")
+    msg = str(excinfo.value)
+    assert "lnkcre" in msg
+    assert str(base / "30-products" / "lnkcre" / "prd" / "baseline" / "feature-baseline.yaml") in msg
+
+
+def test_feature_baseline_lnkreport_never_reads_lnkcre(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """LnkReport 解析不得读到 LnkCRE 的 feature baseline（防跨产品静默回退）。"""
+    base = _fake_company_base(tmp_path, monkeypatch)
+    lnkcre_baseline = base / "30-products" / "lnkcre" / "prd" / "baseline" / "feature-baseline.yaml"
+    lnkcre_baseline.parent.mkdir(parents=True)
+    lnkcre_baseline.write_text("version: 2\n", encoding="utf-8")
+    with pytest.raises(MissingProductDataError):
+        feature_baseline_path_for_project("lnkreport")
+
+
+# ─── domain knowledge：a → b → c 优先级链 ────────────────────────
+
+
+def test_domain_knowledge_priority_a_b_c(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    base = _fake_company_base(tmp_path, monkeypatch)
+    # 只有 INDEX.md → c 级
+    index = base / "30-products" / "lnkcre" / "INDEX.md"
+    index.parent.mkdir(parents=True)
+    index.write_text("# index\n", encoding="utf-8")
+    assert domain_knowledge_path_for_project("lnkcre") == index
+    # 出现 ontology/README.md → b 级优先于 c
+    readme = base / "30-products" / "lnkcre" / "ontology" / "README.md"
+    readme.parent.mkdir(parents=True)
+    readme.write_text("# ontology entry\n", encoding="utf-8")
+    assert domain_knowledge_path_for_project("lnkcre") == readme
+    # 出现 canonical domain-knowledge.md → a 级最优先
+    dk = base / "30-products" / "lnkcre" / "ontology" / "domain-knowledge.md"
+    dk.write_text("# dk\n", encoding="utf-8")
+    assert domain_knowledge_path_for_project("LnkCRE") == dk
+
+
+def test_domain_knowledge_missing_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _fake_company_base(tmp_path, monkeypatch)
+    with pytest.raises(MissingProductDataError) as excinfo:
+        domain_knowledge_path_for_project("LnkCRE")
+    assert "lnkcre" in str(excinfo.value)
+
+
+# ─── competitor evidence：canonical 写入根 + legacy 只读根 ─────────────
+
+
+def test_competitor_evidence_roots(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    base = _fake_company_base(tmp_path, monkeypatch)
+    canonical, legacy = competitor_evidence_paths_for_project("LnkCRE")
+    assert canonical == base / "30-products" / "lnkcre" / "evidence" / "competitors"
+    assert legacy is None  # mi-cre 合并完成后无 legacy 读取根
+    canonical2, legacy2 = competitor_evidence_paths_for_project("lnkreport")
+    assert legacy2 is None
+    assert canonical2.name == "competitors"
+
+
+# ─── 真实环境冒烟：canonical feature-baseline 可解析 ────────────────
+
+
+def test_real_env_lnkcre_feature_baseline_resolves() -> None:
+    """真实 docs 仓（合并完成后）：canonical lnkcre 基线必须可解析。"""
+    p = feature_baseline_path_for_project("LnkCRE")
+    assert p.is_file(), f"feature baseline should resolve: {p}"

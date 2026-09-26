@@ -25,14 +25,15 @@ from .reader import read_document
 
 
 def _resolve_output_dir(bidding_path: str, project_name: str) -> Path:
-    """输出目录：$COMPANY_BASE/bidding/<项目>/content-packages（COMPANIES.md §3，无静默默认）。
+    """输出目录：$COMPANY_BASE/out/bidding/<项目>/content-packages（COMPANIES.md §6 out/ 分型层，无静默默认）。
 
     基座未设/非法时报错退出；不再回落「招标文件所在目录」——该兜底曾把
-    内容包写到任意位置（tender 放哪写哪），绕过 docs 仓 bidding/ 约定。
+    内容包写到任意位置（tender 放哪写哪），绕过 docs 仓 out/bidding/ 约定。
+    顶层 bidding/（南光/果正）为历史遗留，只读。
     """
     base = resolve_company_base()
     content_dir = (
-        base / "bidding" / (project_name or Path(bidding_path).stem) / "content-packages"
+        base / "out" / "bidding" / (project_name or Path(bidding_path).stem) / "content-packages"
     )
     content_dir.mkdir(parents=True, exist_ok=True)
     return content_dir

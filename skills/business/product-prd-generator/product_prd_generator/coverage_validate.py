@@ -51,7 +51,14 @@ _AMBIGUOUS_DOMAIN_TERMS = frozenset(
     {"账龄", "成本", "计划", "货值", "售楼", "营销"}
 )
 
-_DEMO_PROBE_PREFIX = "competitor-analysis/qimao/"
+_DEMO_PROBE_PREFIXES = (
+    "evidence/competitors/qimao/",     # canonical（30-products/lnkcre/evidence/competitors）
+    "competitor-analysis/qimao/",      # 历史路径段（mi-cre/90-legacy 时代的 source_ref 字符串识别用，非文件系统 fallback）
+)
+
+
+def _is_demo_probe(source_file: str) -> bool:
+    return any(prefix in source_file for prefix in _DEMO_PROBE_PREFIXES)
 
 _BOLD_ITEM = re.compile(r"^-\s+\*\*(.+?)\*\*\s*(.*)$")
 _SECTION = re.compile(r"^##\s+\d+\.\s*(.+?)（")
@@ -83,6 +90,16 @@ def _normalize_term_simple(heading: str, aliases: dict[str, str]) -> str:
     return cleaned
 
 
+def _competitor_source_prefix(map_dir: Path) -> str:
+    """capability-map 的 source_file 前缀，跟随目录实际位置（canonical 优先判定）。"""
+    parts = map_dir.resolve().parts
+    if "competitors" in parts:
+        idx = parts.index("competitors")
+        if idx > 0 and parts[idx - 1] == "evidence":
+            return "evidence/competitors/"
+    return "competitor-analysis/"
+
+
 def load_capability_map(
     map_dir: Path,
     aliases: dict[str, str],
@@ -100,7 +117,7 @@ def load_capability_map(
 
     map_file = candidates[0]
     competitor_raw = map_dir.name
-    source_file = f"competitor-analysis/{competitor_raw}/{map_file.name}"
+    source_file = f"{_competitor_source_prefix(map_dir)}{competitor_raw}/{map_file.name}"
 
     spec_id_in_parens = re.compile(r"（→\s*(.+?)）")
 
@@ -224,16 +241,17 @@ _COMPETITOR_NAME_ALIASES = {
 def _extract_competitor_name(source_file: str) -> str:
     """Extract competitor name from source_file path.
 
-    Handles four path patterns:
-    - 02-competitors/海鼎/...        (raw scan, Chinese names)
-    - 13-competitors/haiding/...    (materials scan, English names)
-    - competitor-analysis/qimao/...  (demo probe data)
-    - competitor-analysis/haiding/... (structured capability maps)
+    Handles five path patterns:
+    - 02-competitors/海鼎/...                    (raw scan, Chinese names)
+    - 13-competitors/haiding/...                 (materials scan, English names)
+    - evidence/competitors/qimao/...             (canonical demo probe / capability maps)
+    - competitor-analysis/qimao/...              (legacy demo probe, 迁移期只读)
+    - competitor-analysis/haiding/...            (legacy structured capability maps)
     """
     parts = source_file.replace("\\", "/").split("/")
     raw_name = ""
     for i, part in enumerate(parts):
-        if part in ("02-competitors", "13-competitors", "competitor-analysis") and i + 1 < len(parts):
+        if part in ("02-competitors", "13-competitors", "competitor-analysis", "competitors") and i + 1 < len(parts):
             raw_name = parts[i + 1]
             break
         if part == "qimao":
@@ -312,7 +330,7 @@ def _score_competitor_cell(features: list[dict]) -> Cell:
         ".pptx.md" in f.get("source_file", "") or ".xlsx.md" in f.get("source_file", "")
         for f in features
     )
-    has_demo = any(_DEMO_PROBE_PREFIX in f.get("source_file", "") for f in features)
+    has_demo = any(_is_demo_probe(f.get("source_file", "")) for f in features)
 
     if feature_count >= 2 or has_manual:
         strength = "strong"
@@ -369,7 +387,7 @@ def _flag_review(
     qimao_cell = competitor_cells.get("旗茂")
     if qimao_cell and qimao_cell.strength != "absent":
         all_demo = all(
-            _DEMO_PROBE_PREFIX in sf for sf in qimao_cell.source_files
+            _is_demo_probe(sf) for sf in qimao_cell.source_files
         ) if qimao_cell.source_files else False
         if all_demo:
             reasons.append("url_only")

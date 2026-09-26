@@ -81,34 +81,55 @@ def _load_devkit_rate() -> int:
 DEVKIT_RATE = _load_devkit_rate()
 
 
+def _mi_feature_baseline_paths() -> list[Path]:
+    """LnkCRE 功能基线的候选路径（canonical；mi-cre legacy 已随 2026-09 目录合并删除）。
+
+    与 product-prd-generator `_paths.resolve_product_paths()` 的契约保持同步：
+    LnkCRE / MI / MI-CRE / 商管系统 是同一产品（canonical id lnkcre）。
+    """
+    base = get_company_base()
+    return [
+        base / "30-products" / "lnkcre" / "prd" / "baseline" / "feature-baseline.yaml",   # canonical
+    ]
+
+
 def _load_mi_feature_baseline() -> dict[str, Any]:
     """读取 LnkCRE 商管系统功能基线（feature-baseline.yaml）统计信息。
 
-    功能基线权威源：$LANLNK_BASE/30-products/mi-cre/feature-baseline/feature-baseline.yaml
+    功能基线解析（canonical，绝不读取 LnkReport / LnkChat 等其他产品）：
+        $LANLNK_BASE/30-products/lnkcre/prd/baseline/feature-baseline.yaml
 
     返回值：
         { "item_count": int, "status": {existing: n, partial: n, missing: n}, "source": str }
-    读取失败时返回空 dict 并打印警告（功能清单降级为模块级展示，不影响报价生成）。
+    路径不存在时打印明确警告（产品 ID + 尝试路径），功能清单降级为
+    模块级展示，不影响报价生成。
     """
-    path = (get_company_base()
-            / "30-products" / "mi-cre" / "feature-baseline" / "feature-baseline.yaml")
-    try:
-        import yaml
-        with open(path, encoding="utf-8") as f:
-            bl = yaml.safe_load(f) or {}
-        items = bl.get("items", [])
-        status = {}
-        for it in items:
-            s = it.get("status", "unknown")
-            status[s] = status.get(s, 0) + 1
-        return {
-            "item_count": bl.get("item_count", len(items)),
-            "status": status,
-            "source": str(path),
-        }
-    except Exception as e:
-        print(f"[WARN] LnkCRE 功能基线读取失败({e})，功能清单使用内置模块说明", file=sys.stderr)
-        return {}
+    for path in _mi_feature_baseline_paths():
+        try:
+            import yaml
+            with open(path, encoding="utf-8") as f:
+                bl = yaml.safe_load(f) or {}
+            items = bl.get("items", [])
+            status = {}
+            for it in items:
+                s = it.get("status", "unknown")
+                status[s] = status.get(s, 0) + 1
+            return {
+                "item_count": bl.get("item_count", len(items)),
+                "status": status,
+                "source": str(path),
+            }
+        except FileNotFoundError:
+            continue
+        except Exception as e:
+            print(f"[WARN] LnkCRE 功能基线读取失败({path}: {e})，功能清单使用内置模块说明", file=sys.stderr)
+            return {}
+    tried = "\n  ".join(str(p) for p in _mi_feature_baseline_paths())
+    print(f"[WARN] 产品 lnkcre（LnkCRE/MI 商管系统）的功能基线不存在，功能清单使用内置模块说明。"
+          f"尝试路径：\n  {tried}\n"
+          f"请补齐 30-products/lnkcre/prd/baseline/feature-baseline.yaml 或完成 mi-cre → lnkcre 目录迁移。",
+          file=sys.stderr)
+    return {}
 
 # === LnkCRE 商管系统数据（v1 硬编码，用于验证；后续版本改为读模板动态生成）===
 MI_DATA: dict[str, Any] = {
@@ -1061,14 +1082,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="AI Skills 岗位数（仅 --product AI 有效，默认 3，范围 2-6）")
     args = p.parse_args(argv)
     valid_products = {"MI", "CRM", "AI", "LNKCHATBI"}
+    # LnkCRE 家族别名：LnkCRE / MI-CRE / mi_cre / 商管系统 → 内部代号 MI（同一产品）。
+    # 输出文件命名统一用 LnkCRE（新文件用新名；历史 MI 命名报价单不重命名）。
+    lnkcre_aliases = {"LNKCRE", "MI-CRE", "MI_CRE", "商管系统"}
     product_codes = [c.strip().upper() for c in args.product.split(",") if c.strip()]
-    invalid = [c for c in product_codes if c not in valid_products]
-    if not product_codes or invalid:
+    normalized = ["MI" if c in lnkcre_aliases else c for c in product_codes]
+    invalid = [c for c in normalized if c not in valid_products]
+    if not normalized or invalid:
         p.error(
             f"--product 不支持：{','.join(invalid) or args.product}；"
             f"允许值为逗号分隔组合，每个值必须在 {sorted(valid_products)} 中"
+            f"（LnkCRE/MI-CRE/商管系统 等价于 MI）"
         )
-    args.product_codes = product_codes
+    args.product_codes = normalized
     return args
 
 
@@ -1119,10 +1145,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[WARN] 请联系产品负责人确认私有化定价后补充。", file=sys.stderr)
 
     # 输出路径：$LANLNK_BASE/out/proposals/<客户>/报价单_<产品>_<模式>_<客户>_<日期>.xlsx
+    # 新报价单不写回 mi-cre；LnkCRE 家族文件名统一用 LnkCRE（历史 MI 命名报价单不重命名）。
     proposals_dir = get_company_base() / "out" / "proposals"
     out_dir = proposals_dir / args.customer
     out_dir.mkdir(parents=True, exist_ok=True)
-    product_str = "+".join(product_codes)
+    product_str = "+".join("LnkCRE" if c == "MI" else c for c in product_codes)
     out_file = (out_dir
                 / f"报价单_{product_str}_{args.mode}_{args.customer}_{date_str}.xlsx")
 

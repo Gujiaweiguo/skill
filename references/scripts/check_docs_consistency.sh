@@ -65,7 +65,7 @@ print_result() {
 SHARED_FILES=(
   "skills/business/material-importer/references/domain-tags.md|material-importer,product-prd-generator,compound-learning"
   "skills/business/product-prd-generator/references/term-aliases.yaml|product-prd-generator,competitor-product-analyzer"
-  "$LANLNK_BASE/30-products/mi-cre/domain-knowledge.md|product-prd-generator,competitor-product-analyzer"
+  "$LANLNK_BASE/30-products/lnkcre/ontology/domain-knowledge.md|product-prd-generator,competitor-product-analyzer"
   "$LANLNK_BASE/config/ontology/business-ontology.yaml|product-prd-generator,competitor-product-analyzer"
 )
 
@@ -171,7 +171,8 @@ echo ""
 # ─────────────────────────────────────────────────────────────────────────────
 echo "--- Check 3: Critical docs subdirectories ---"
 # Lazy-created dirs (created by skills on first run) are WARN, not FAIL.
-LAZY_DIRS=("${USERGUIDE_BASE:-/opt/code/docs/lanlnk/UserGuide}")
+# COMPANIES.md §3：从 COMPANY_BASE 派生（旧默认 lanlnk/UserGuide 已废弃）。
+LAZY_DIRS=("${USERGUIDE_BASE:-$LANLNK_BASE/materials/03-products/user-guides}")
 CRITICAL_DIRS=(
   "$LANLNK_BASE/incoming"
   "$LANLNK_BASE/raw"
