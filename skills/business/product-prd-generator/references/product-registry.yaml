@@ -35,9 +35,9 @@ products:
     history_note: mi-cre 为历史命名（目录已于 2026-09 合并删除）；MI-* / MI-CRE-* 文档 ID 稳定不变
     code_root: /opt/code/lnkcre
     ontology: /opt/code/docs/lanlnk/config/ontology/business-ontology.yaml
-    ontology_note: docs 侧本体入口见 30-products/lnkcre/ontology/README.md（指向 config/ontology 与 20-architecture/mi-cre/domain-model/）
+    ontology_note: docs 侧本体入口见 30-products/lnkcre/ontology/README.md（指向 ontology/architecture/ 领域模型、ontology/capability-matrix/ 能力矩阵、config/ontology/business-ontology.yaml 机器本体）
     ontology_extra:
-      - /opt/code/docs/lanlnk/20-architecture/mi-cre/domain-model/   # 历史 MI-CRE 文档性领域模型（docs 侧原位保留，不迁移）
+      - /opt/code/docs/lanlnk/30-products/lnkcre/ontology/architecture/domain-model/   # LnkCRE 领域模型（2026-09-26 归位产品本体层，文档层 canonical；运行权威在 /opt/code/lnkcre/openspec/specs/）
     prd_root: /opt/code/docs/lanlnk/30-products/lnkcre/prd
     feature_baseline: /opt/code/docs/lanlnk/30-products/lnkcre/prd/baseline/feature-baseline.yaml
     competitor_evidence_root: /opt/code/docs/lanlnk/30-products/lnkcre/evidence/competitors

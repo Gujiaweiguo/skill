@@ -12,7 +12,7 @@
 
 ## 1. 三层规则
 
-1. 本体层内部可由多个文件组成（如 LnkCRE 的 `business-ontology.yaml` + `20-architecture/mi-cre/domain-model/`），概念上仍是一层。
+1. 本体层内部可由多个文件组成（如 LnkCRE 的 `business-ontology.yaml` + `30-products/lnkcre/ontology/architecture/domain-model/`），概念上仍是一层。
 2. 业务系统（lnkcre/lnkcrm）与平台/AI 产品（lnkreport/lnkchatbi/lnkchat/lnkvision/lnkgateway）的本体**内容不同**，但**层数相同**——平台产品的本体是产品对象（Skill/Workflow/Dataset/Chart/Capability/Execution），不是业务实体。
 3. 三层之间用对账同步，不互相覆盖：代码证据 → PRD 状态回写；实施发现 → 本体变更候选（人工确认后回写）。
 
