@@ -260,6 +260,10 @@ _PRODUCT_CANONICAL_DIR: dict[str, str] = {
     # 新旧项目代号都解析到现行目录。
     "langchat": "lnkchat",
     "lnkchat": "lnkchat",
+    # lnkcrm（商圈会员 CRM）2026-09-26 docs 侧 onboarding：30-products/lnkcrm/ontology/
+    # 已有 draft ontology v0.1（147 功能清单证据锚定）。必须注册——未注册的 CRM 会话
+    # 会静默回落商管 business-ontology（registry 规则 2 明令禁止的跨域回落）。
+    "lnkcrm": "lnkcrm",
 }
 
 

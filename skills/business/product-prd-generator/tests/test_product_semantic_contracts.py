@@ -51,7 +51,7 @@ def test_product_registry_covers_registered_products() -> None:
         (REFERENCES / "product-registry.yaml").read_text(encoding="utf-8")
     )))
     products = _yaml_mapping(registry["products"])
-    expected = {"lnkcre", "lnkreport", "lnkchatbi", "lnkchat", "lnkvision", "lnkgateway"}
+    expected = {"lnkcre", "lnkreport", "lnkchatbi", "lnkchat", "lnkvision", "lnkgateway", "lnkcrm"}
     assert expected <= set(products)
     assert _yaml_mapping(products["lnkcre"])["code_root"] == "/opt/code/lnkcre"
     assert _yaml_mapping(products["lnkchat"])["code_root"] == "/opt/code/lnkchat"

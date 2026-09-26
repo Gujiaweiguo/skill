@@ -88,6 +88,18 @@ def test_ontology_path_langchat_returns_project_specific():
     assert p.is_file(), f"langchat ontology.yaml must exist: {p}"
 
 
+def test_ontology_path_lnkcrm_returns_own_draft_ontology():
+    """lnkcrm 已注册（2026-09-26 docs 侧 onboarding）：命中自有 draft ontology。
+
+    未注册时该调用会静默回落商管 business-ontology（registry 规则 2 禁止项）——
+    本测试是该跨域回落的永久回归闸。
+    """
+    p = ontology_path_for_project("lnkcrm")
+    assert p == DEFAULT_LANLNK_BASE / "30-products" / "lnkcrm" / "ontology" / "ontology.yaml"
+    assert p.is_file(), f"lnkcrm draft ontology must exist: {p}"
+    assert not is_lnkre_product("lnkcrm")
+
+
 def test_ontology_path_LnkChatBI_returns_project_specific():
     """Phase A deliverable: LnkChatBI/output/ontology.yaml exists."""
     p = ontology_path_for_project("LnkChatBI")

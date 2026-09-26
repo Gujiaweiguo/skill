@@ -18,6 +18,7 @@
 products:
   lnkcre:
     display_name: LnkCRE 商管系统
+    kind: business
     aliases: [MI, MI-CRE, 商管系统, lnkcre, LnkCRE]   # canonical product id = lnkcre
     model_kind_hint: operational-domain-model   # legacy 内部提示，非入口概念
     docs_root: /opt/code/docs/lanlnk/30-products/lnkcre
@@ -35,6 +36,7 @@ products:
 
   lnkreport:
     display_name: LnkReport 自助分析平台
+    kind: tool
     model_kind_hint: capability-model
     docs_root: /opt/code/docs/lanlnk/30-products/lnkreport   # confirmed（feedback 2026-09-24，owner 确认 2026-09-26）
     code_root: /opt/code/lnkreport
@@ -45,24 +47,28 @@ products:
 
   lnkchatbi:
     display_name: LnkChatBI（= mysqlbot = SQLBot，同一产品族）
+    kind: tool
     model_kind_hint: capability-model
-    docs_root: /opt/code/docs/lanlnk/30-products/lnkchatbi   # confirmed（feedback 2026-09-24，owner 确认 2026-09-26）
-    code_root: /opt/code/lnkchatbi   # confirmed（owner 确认 2026-09-26；仓库活跃，INDEX.md 的 not found 已过时，docs 侧待同步）
+    docs_root: /opt/code/docs/lanlnk/30-products/lnkchatbi   # confirmed（feedback v2 2026-09-26 闭环）
+    code_root: /opt/code/lnkchatbi   # confirmed（owner 2026-09-26；docs 侧 feedback v2 已同步）
     ontology: /opt/code/docs/lanlnk/out/prd/LnkChatBI/output/ontology.yaml
     term_aliases: /opt/code/docs/lanlnk/out/prd/LnkChatBI/output/term-aliases.yaml
     adapter_status: partial
 
   lnkchat:
     display_name: LnkChat 岗位 AI 工作流平台（langchat 基座）
+    kind: tool
     model_kind_hint: product-runtime-model
     docs_root: /opt/code/docs/lanlnk/30-products/lnkchat
     code_root: /opt/code/lnkchat
     ontology: /opt/code/docs/lanlnk/30-products/lnkchat/ontology.yaml
     term_aliases: /opt/code/docs/lanlnk/30-products/lnkchat/term-aliases.yaml
+    prd_root: /opt/code/docs/lanlnk/30-products/lnkchat/prd   # confirmed（feedback v2 2026-09-26；PRD-LC-* 系列 40+ 文件）
     adapter_status: partial
 
   lnkvision:
     display_name: LnkVision
+    kind: tool
     model_kind_hint: null
     docs_root: /opt/code/docs/lanlnk/30-products/lnkvision   # confirmed（feedback 2026-09-24，owner 确认 2026-09-26）
     code_root: /opt/code/lnkvision
@@ -72,9 +78,20 @@ products:
 
   lnkgateway:
     display_name: LnkGateway
+    kind: tool
     model_kind_hint: null
-    docs_root: /opt/code/docs/lanlnk/30-products/lnkgateway   # confirmed（feedback 2026-09-24，owner 确认 2026-09-26）
+    docs_root: /opt/code/docs/lanlnk/30-products/lnkgateway   # confirmed（feedback v2 2026-09-26）
     code_root: /opt/code/lnkgateway
-    ontology: null        # unresolved（INDEX.md：无已确认 docs ontology 候选）
+    ontology: null        # unresolved（feedback v2：无已确认 docs ontology 候选）
     term_aliases: null
     adapter_status: unsupported
+
+  lnkcrm:
+    display_name: LnkCRM 商圈会员 CRM 系统
+    kind: business
+    docs_root: /opt/code/docs/lanlnk/30-products/lnkcrm   # proposed（feedback v2 2026-09-26，owner 待确认）
+    code_root: null       # unresolved: 无代码仓（planned，即将开发，2026-09-26 owner 定名）
+    ontology: /opt/code/docs/lanlnk/30-products/lnkcrm/ontology/ontology.yaml   # proposed（draft v0.1，147 功能清单证据锚定，confirmed 待 owner 评审）
+    term_aliases: null    # 暂无；缺失时回落 skill references/term-aliases.yaml
+    prd_root: null        # unresolved: planned（prd_ready: false，PRD skill 引导式 onboarding）
+    adapter_status: onboarding
