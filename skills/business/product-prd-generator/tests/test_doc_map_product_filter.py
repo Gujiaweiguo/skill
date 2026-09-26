@@ -83,3 +83,54 @@ def test_project_filter_empty_dir(tmp_path):
     """Empty docs_root returns empty tuple."""
     (tmp_path / "30-products" / "langchat").mkdir(parents=True)
     assert _iter_markdown_files(tmp_path, project="langchat") == ()
+
+
+# ─── LnkCRE 别名归一 / 迁移期 legacy 段识别（2026-09 lnkcre 目录统一）───
+
+
+def test_lnkcre_alias_matches_canonical_and_legacy_segments(multi_product_tree):
+    """LnkCRE / MI / MI-CRE 输入都识别 lnkcre + mi-cre 段（迁移期读取兼容）。"""
+    (multi_product_tree / "30-products" / "lnkcre" / "prd").mkdir(parents=True)
+    (multi_product_tree / "30-products" / "lnkcre" / "prd" / "PRD-LC-CRE.md").write_text("# lnkcre PRD\n")
+
+    for raw in ("LnkCRE", "lnkcre", "MI", "MI-CRE"):
+        files = _iter_markdown_files(multi_product_tree, project=raw)
+        names = sorted(f.name for f in files)
+        assert names == ["PRD-LC-CRE.md", "PRD-MI.md", "domain-model.md"], raw
+
+
+def test_lnkre_filter_excludes_langchat_symmetry(multi_product_tree):
+    """LnkCRE 过滤不得漏进 langchat 文件（跨产品隔离对称性）。"""
+    files = _iter_markdown_files(multi_product_tree, project="lnkcre")
+    for f in files:
+        assert "langchat" not in str(f)
+
+
+def test_case_insensitive_segment_match(multi_product_tree):
+    """段匹配大小写不敏感：LnkCRE 输入能命中 lnkcre 目录段。"""
+    files = _iter_markdown_files(multi_product_tree / "30-products", project="LnkCRE")
+    assert sorted(f.name for f in files) == ["PRD-MI.md"]
+
+
+def test_product_scoped_root_skips_segment_filter(tmp_path):
+    """docs_root 自身即产品专属根（raw/prd-商管系统）：不做段过滤，全量纳入。"""
+    root = tmp_path / "prd-商管系统"
+    (root / "01-customer-requirements" / "万达").mkdir(parents=True)
+    (root / "01-customer-requirements" / "万达" / "req.md").write_text("# 需求\n")
+    (root / "02-competitors" / "海鼎").mkdir(parents=True)
+    (root / "02-competitors" / "海鼎" / "manual.md").write_text("# 手册\n")
+    files = _iter_markdown_files(root, project="商管系统")
+    assert sorted(f.name for f in files) == ["manual.md", "req.md"]
+
+
+def test_shared_root_still_filters(tmp_path):
+    """共享根（名称不含产品别名）保持段过滤，防止跨产品泄漏回归。"""
+    shared = tmp_path / "lanlnk"
+    cre = shared / "30-products" / "lnkcre"
+    chat = shared / "30-products" / "lnkchat"
+    cre.mkdir(parents=True)
+    chat.mkdir(parents=True)
+    (cre / "a.md").write_text("# a\n")
+    (chat / "b.md").write_text("# b\n")
+    files = _iter_markdown_files(shared, project="LnkCRE")
+    assert [f.name for f in files] == ["a.md"]

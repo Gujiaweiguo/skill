@@ -21,6 +21,8 @@
   "schema_version": "1.0",
   "vendor": "qimao",
   "lanlnk_product": "LnkCRE（商管系统）",
+  "target_product": "lnkcre",
+  "target_repo": "/opt/code/lnkcre",
   "generated_at": "2026-07-06T11:30:00+08:00",
   "weight_source": "requirement-evaluator 客户需求频率 + 岗位病药矩阵",
   "dimensions": [
@@ -85,8 +87,18 @@
   "dimension_id": "DIM-core-closed-loop",
   "lanlnk_quality": "Competitive",
   "competitor_quality": "Leading",
-  "quality_gap": +1,
-  "evidence_strength": "high",
+    "quality_gap": +1,
+    "evidence_strength": "high",
+    "evidence_state": "observed",
+    "implementation_status": "partial",
+    "trace_id": "CAP-CRE-CONTRACT-NEW-APPLICATION-001",
+    "recheck_hooks": {
+      "spec_ids": ["lease-contract-management"],
+      "code_paths": [],
+      "routes": [],
+      "symbols": [],
+      "tables": []
+    },
   "recommendation": {
     "type": "增强",
     "priority": "P1",
@@ -139,6 +151,8 @@
 ```
 
 **重要**：加权总分是**诊断信号**，不是竞品胜负判决。
+
+`evidence_state=not_scanned|inaccessible|not_found|conflicting` 的项目只能进入“观察”或“待确认”，不得直接生成 `missing` Gap。
 
 - 竞品加权总分 > 蓝联：说明在客户关心的维度上竞品更强，是改进的优先方向
 - 蓝联加权总分 > 竞品：说明蓝联有可放大的差异化优势，sales 可作为卖点
@@ -196,3 +210,4 @@
 | `ability-comparison-matrix.json` | → `strategy-brief-generator` | 作为"看竞对"的证据 |
 | 蓝联差异化优势章节 | → `company-intro-generator` | 作为方案汇报的卖点素材（仅内部用，不直接抄竞品）|
 | 待确认问题清单 | → 销售/客户沟通 | 作为竞品复核问卷 |
+| `trace_id` + `recheck_hooks` | → `product-prd-generator` | 让目标代码仓验证 Gap，识别 code-map 漏扫和误判 |

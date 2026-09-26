@@ -6,13 +6,33 @@ import sys
 from pathlib import Path
 
 from .word_export import build_content_package, render_docx
-from ._paths import validate_project
+from ._paths import competitor_evidence_paths_for_project, validate_project
 
 
 def _run(module: str, extra_args: list[str]) -> int:
     cmd = [sys.executable, "-m", module, *extra_args]
     completed = subprocess.run(cmd, check=False)
     return completed.returncode
+
+
+def _competitor_capability_dirs(project: str, output_dir: str) -> list[Path]:
+    """竞品能力矩阵目录：canonical evidence/competitors 优先，legacy mi-cre
+    competitor-analysis 迁移期只读兼容，最后兜底 <output_dir>/competitor-analysis。"""
+    canonical_root, legacy_root = competitor_evidence_paths_for_project(project)
+    roots = [canonical_root, legacy_root, Path(output_dir) / "competitor-analysis"]
+    dirs: list[Path] = []
+    seen: set[Path] = set()
+    for root in roots:
+        if root is None or not root.is_dir():
+            continue
+        for comp_dir in sorted(root.iterdir()):
+            resolved = comp_dir.resolve()
+            if resolved in seen or not comp_dir.is_dir():
+                continue
+            seen.add(resolved)
+            if comp_dir.glob("*capability-map.md"):
+                dirs.append(comp_dir)
+    return dirs
 
 
 def _doc_map_args(args: argparse.Namespace, output: str) -> list[str]:
@@ -87,10 +107,8 @@ def main() -> int:
             "--skill-root", args.skill_root,
             "--project", args.project,
         ]
-        analysis_root = Path(args.output_dir) / "competitor-analysis"
-        for comp_dir in sorted(analysis_root.iterdir()) if analysis_root.is_dir() else []:
-            if comp_dir.is_dir() and comp_dir.glob("*capability-map.md"):
-                coverage_args.extend(["--capability-map-dir", str(comp_dir)])
+        for comp_dir in _competitor_capability_dirs(args.project, args.output_dir):
+            coverage_args.extend(["--capability-map-dir", str(comp_dir)])
         if args.baseline:
             coverage_args.extend(["--baseline", args.baseline])
         if args.update_baseline:

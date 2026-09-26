@@ -4,13 +4,16 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from ._paths import is_lnkre_product
 from .data_model import TableMeta
 
 
 # Projects that use the 海鼎-mainline evidence strategy brief.
 # Other products (lnkreport (原 pydataease) / langchat / LnkChatBI / ...) get a neutral,
 # project-parameterized brief without 商管-domain competitor names.
-_MI_PROJECTS = {"商管系统", "mi-cre"}
+# LnkCRE 家族判定走 canonical id：商管系统 / mi-cre / MI / MI-CRE / LnkCRE / lnkcre 同一产品。
+def _is_lnkcre_project(project: str) -> bool:
+    return is_lnkre_product(project)
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,10 +58,10 @@ def _generic_sources_lines() -> list[str]:
 def render_review_brief(data: ReviewBriefInput) -> str:
     total_capabilities = sum(data.status_stats.values())
     mapped_tables = sum(len(tables) for tables in data.tables_by_module.values())
-    strategy = _mi_strategy_lines() if data.project in _MI_PROJECTS else _generic_sources_lines()
+    strategy = _mi_strategy_lines() if _is_lnkcre_project(data.project) else _generic_sources_lines()
     review_step2 = (
         "1. 先看本节：确认海鼎主干 + 证据叠层策略是否接受。"
-        if data.project in _MI_PROJECTS
+        if _is_lnkcre_project(data.project)
         else "1. 先看本节：确认输入来源与状态口径是否接受。"
     )
     lines = [

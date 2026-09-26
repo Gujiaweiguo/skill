@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "prd-handoff.schema.json",
+  "type": "object",
+  "required": ["trace_id", "target_repo", "source_refs", "evidence_state", "implementation_status"],
+  "properties": {
+    "trace_id": {"type": "string", "pattern": "^[A-Z0-9][A-Z0-9._-]+$"},
+    "capability_id": {"type": "string", "minLength": 1},
+    "source_type": {"enum": ["competitor", "customer", "product_decision", "code", "spec", "test"]},
+    "source_refs": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "target_repo": {"type": "string", "minLength": 1},
+    "target_spec_ids": {"type": "array", "items": {"type": "string"}},
+    "suggested_change_ids": {"type": "array", "items": {"type": "string"}},
+    "acceptance_ids": {"type": "array", "items": {"type": "string"}},
+    "evidence_state": {"enum": ["observed", "inferred", "not_found", "not_scanned", "inaccessible", "conflicting"]},
+    "implementation_status": {"enum": ["existing", "partial", "missing", "explicitly-not-do", "unknown"]},
+    "ui_refs": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

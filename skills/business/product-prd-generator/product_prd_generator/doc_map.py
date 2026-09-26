@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 
-from ._paths import ontology_path_for_project, term_aliases_path_for_project
+from ._paths import ontology_path_for_project, product_dir_aliases, term_aliases_path_for_project
 from .models import DocFeature, DocMap, EvidenceKind, EvidenceRef, Requirement
 
 # --- Extraction regexes ---------------------------------------------------
@@ -212,13 +212,30 @@ def _iter_markdown_files(docs_root: Path, project: str | None = None) -> tuple[P
     """Enumerate markdown files under ``docs_root``.
 
     When ``project`` is given, only files whose relative path contains a
-    ``<project>/`` segment are returned. This prevents a multi-product
-    docs root (e.g. lanlnk containing both langchat and mi-cre trees)
-    from leaking other products' requirements into the target product's
-    doc map.
+    product-alias path segment (case-insensitive; e.g. lnkcre / mi-cre /
+    商管系统 for LnkCRE) are returned. This prevents a multi-product
+    docs root (e.g. lanlnk containing both langchat and mi-cre/lnkcre
+    trees) from leaking other products' requirements into the target
+    product's doc map, while still letting legacy mi-cre paths be read
+    during the lnkcre directory migration.
+
+    产品专属根特例：当 docs_root 自身目录名已含产品别名（如
+    ``raw/prd-商管系统`` 或 ``30-products/lnkcre``）时跳过段过滤——
+    该根下所有文件本就属于该产品，逐段匹配反而会过滤掉全部文件。
     """
     if not docs_root.is_dir():
         return ()
+    alias_set: set[str] | None = None
+    root_is_product_scoped = False
+    if project is not None:
+        alias_set = {alias.lower() for alias in product_dir_aliases(project)}
+        root_name = docs_root.name.lower()
+        # 只认 prd-<别名> / <别名> 命名约定的产品专属根（边界对齐），
+        # 避免共享根名字恰好包含别名子串（如 tmp 目录名）被误判。
+        root_is_product_scoped = any(
+            root_name == alias or root_name.endswith("-" + alias) or root_name.endswith("_" + alias)
+            for alias in alias_set
+        )
     result: list[Path] = []
     for p in docs_root.rglob("*.md"):
         if not p.is_file():
@@ -227,8 +244,10 @@ def _iter_markdown_files(docs_root: Path, project: str | None = None) -> tuple[P
         rel_parts = rel.parts
         if any(part.startswith(".") for part in rel_parts):
             continue
-        if project is not None and project not in rel_parts:
-            continue
+        if alias_set is not None and not root_is_product_scoped:
+            part_lower = {part.lower() for part in rel_parts}
+            if not (alias_set & part_lower):
+                continue
         result.append(p)
     return tuple(sorted(result))
 

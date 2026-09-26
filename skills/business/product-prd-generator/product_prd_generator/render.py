@@ -1089,7 +1089,8 @@ def _render_blueprint_modules(
 
 def _load_field_specs(project: str = "商管系统") -> dict[str, Any]:  # noqa: ANY_OK
     import os
-    if project not in {"商管系统", "mi-cre"}:
+    from ._paths import is_lnkre_product
+    if not is_lnkre_product(project):
         # config/field-specs 是商管域专属实体库；其他产品按子功能名匹配会
         # 把商管字段表错误渲染进无关产品（如 lnkreport 的"组织管理"）。
         return {}

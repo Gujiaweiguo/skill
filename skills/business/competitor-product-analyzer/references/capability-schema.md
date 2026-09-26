@@ -13,12 +13,14 @@
 
 ```json
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "vendor": "qimao",
   "product": "旗茂 BS 商管系统",
   "generated_at": "2026-07-06T11:30:00+08:00",
   "input_mode": "manual-plus-demo",
   "account_role_observed": "管理员",
+  "target_product": "lnkcre",
+  "target_repo": "/opt/code/lnkcre",
   "manual_version_date": "2024-08",
   "capabilities": [
     { /* 见下方 Capability 对象 */ }
@@ -31,12 +33,15 @@
 | 字段 | 类型 | 必填 | 说明 |
 |---|---|---|---|
 | `capability_id` | string | 是 | 全局唯一，格式 `CAP-<module>-<capability_slug>`，如 `CAP-合同管理-新合同申请` |
+| `trace_id` | string | 是 | 跨竞品分析、增量 PRD、OpenSpec 和回写的稳定追踪 ID |
 | `vendor` | string | 是 | 竞品代号（kebab-case），如 `qimao` |
 | `product` | string | 是 | 竞品全名，如 `旗茂 BS 商管系统` |
 | `module` | string | 是 | 业务模块名（中文，对齐商管 8 模块：招商/合同/财务/营运/物业/系统/推广/资源）|
 | `capability_name` | string | 是 | 能力名（中文，原词保留）|
 | `original_term` | string | 是 | 竞品原始术语，如 `新合同申请单` |
 | `standard_term` | string | 否 | 归一后的蓝联标准 ID（如 `lease-contract-management`）；未映射时为 null 并进 review |
+| `target_product` | string | 是 | 对照产品 ID，如 `lnkcre`、`lnkcrm`、`lnkreport` |
+| `target_repo` | string | 否 | 对照产品代码仓路径；未知时进 review |
 | `capability_type` | enum | 是 | 见下方取值表 |
 | `scenario` | string | 否 | 业务场景一句话，如 `招商定稿后发起合同审批` |
 | `role` | string[] | 否 | 涉及角色，如 `["招商经理", "法务"]` |
@@ -49,6 +54,8 @@
 | `evidence` | Evidence[] | 是 | 至少 1 条，见 evidence-ledger.md |
 | `confidence` | enum | 是 | `high` / `medium` / `low` |
 | `status_vs_lanlnk` | enum | 是 | `existing` / `partial` / `missing` / `better-than-lanlnk` / `unknown` |
+| `evidence_state` | enum | 是 | `observed` / `inferred` / `not_found` / `not_scanned` / `inaccessible` / `conflicting` |
+| `implementation_status` | enum | 是 | `existing` / `partial` / `missing` / `explicitly-not-do` / `unknown` |
 | `quality_assessment` | enum | 是 | `Leading` / `Competitive` / `Behind` / `Missing` |
 | `notes` | string | 否 | 自由备注（脱敏后的观察）|
 
@@ -100,6 +107,8 @@
 5. `status_vs_lanlnk=unknown` 时必须进 `review/pending-items.md`
 6. `quality_assessment=Missing` 不等于"竞品没有"，仅表示"未观察到"
 7. `standard_term=null` 时必须进 `review/pending-items.md`
+8. `evidence_state=not_scanned|inaccessible|not_found` 时不得把 `implementation_status` 自动设为 `missing`
+9. 新增或修订能力必须有 `trace_id`、`target_product` 和至少一个 `source_ref`
 
 ## 去重规则
 
@@ -112,7 +121,7 @@
 
 ## 与 product-prd-generator 的兼容
 
-`standard_term` 必须对齐 product-prd-generator 的 `term-aliases.yaml` 和 `business-ontology.yaml` 中的英文 spec capability ID，否则 P5 蓝联现状映射会失败。
+`standard_term` 必须对齐目标产品 adapter 的 aliases/ontology；只有 LnkCRE/MI-CRE 才默认参考商管 `business-ontology.yaml`，其他产品不得静默复用商管术语。
 
 找不到映射时：
 

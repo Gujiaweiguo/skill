@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "product-semantic-baseline.schema.json",
+  "title": "Product Baseline (three layers: ontology / prd / codebase)",
+  "description": "User-facing layering is always ontology/prd/code. model_kind is an optional internal hint; legacy values remain accepted for backward compatibility.",
+  "type": "object",
+  "required": ["project", "docs_root", "code_root", "adapter_status"],
+  "properties": {
+    "project": {"type": "string", "minLength": 1},
+    "model_kind": {
+      "description": "internal hint only — not a user-facing layer; legacy values accepted",
+      "enum": ["business-ontology", "capability-model", "operational-domain-model", "product-runtime-model", "semantic-release"]
+    },
+    "docs_root": {"type": ["string", "null"], "minLength": 1},
+    "code_root": {"type": ["string", "null"], "minLength": 1},
+    "source_of_truth": {"type": "array", "items": {"type": "string"}},
+    "ontology": {"type": ["string", "null"]},
+    "term_aliases": {"type": ["string", "null"]},
+    "adapter_status": {"enum": ["implemented", "partial", "unsupported"]},
+    "unsupported_areas": {"type": "array", "items": {"type": "string"}},
+    "verification": {"type": "object", "properties": {"commands": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false}
+  },
+  "additionalProperties": false
+}
