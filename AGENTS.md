@@ -267,7 +267,7 @@ AI agents don't have cross-session memory. All "memory" lives in files that are 
 1. 项目内复利（只影响当前项目）→ 写入目标项目 `AGENTS.md` / docs / OpenSpec。
 2. 公共 OpenCode 使用复利（影响多个项目或人如何操作 OpenCode）→ 写入 `/opt/code/docs/opencode` 对应手册并更新更新日志。
 3. Skill 自身复利（影响某个 skill 或跨 skill 规则）→ 写入本仓库 `AGENTS.md`、对应 `SKILL.md` 或 `references/troubleshooting.md`。
-4. 项目/产品域知识 → 写入 `$LANLNK_BASE/out/prd/<项目>/域知识.md`。
+4. 项目/产品域知识 → 写入 `$LANLNK_BASE/out/prd/<项目>/域知识.md`（skill 工作知识，生成区）；已注册产品的 canonical 本体在 `$LANLNK_BASE/30-products/<产品>/ontology/`（2026-09-26 方案 B 迁移后，经晋升并入，双源不并存）。
 5. 交接模式/跨系统验收 → 写入对应 `交接包/README.md` 或模板文件。
 6. 改了共享文件（如 `domain-tags.md` / `term-aliases.yaml`）→ 检查同步另一边。
 7. 用户要求提交时，建议 commit：`docs: persist lessons via 复利工程`。

@@ -413,7 +413,8 @@ def build_lnkchatbi_data() -> dict[str, Any]:
     定价：默认战略赠送（首年 0 / 次年 0，用于云泰等试水/赠送场景），
     可通过环境变量覆盖：
       LNKCHATBI_PRICE_Y1 / LNKCHATBI_PRICE_Y2  首年/次年费用（整数元）
-    模块源自 out/prd/LnkChatBI/output/功能清单.md 的功能域。
+    模块源自 LnkChatBI 功能清单的功能域（原 out/prd/LnkChatBI/output/功能清单.md；
+    2026-09-26 迁移后 canonical 在 30-products/lnkchatbi/prd/功能清单.md）。
     """
     import os as _os
 

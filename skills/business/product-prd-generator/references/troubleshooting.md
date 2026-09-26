@@ -707,6 +707,6 @@ print('ontology OK')
 |---|---|---|---|---|
 | 商管（基线） | `$LANLNK_BASE/config/ontology/business-ontology.yaml` | 12 | 1572 | materials + 历史 PRD |
 | langchat | `$LANLNK_BASE/30-products/langchat/ontology.yaml` | 8 | ~270 | v2-strategy/02（Frozen 2026-07-19） |
-| LnkChatBI | `$LANLNK_BASE/out/prd/LnkChatBI/output/ontology.yaml` | 8 | ~200 | 域知识.md + AI产品族架构.md |
+| LnkChatBI | `$LANLNK_BASE/30-products/lnkchatbi/ontology/ontology.yaml`（2026-09-26 自 `out/prd/LnkChatBI/output/ontology.yaml` 迁入） | 8 | ~200 | 域知识.md + AI产品族架构.md |
 
 读这些样板时，注意每个的 `source:` 字段标注了权威源，是设计判断的依据。

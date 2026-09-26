@@ -33,6 +33,15 @@ Resolution priority (post lnkcre 目录统一，2026-09):
 MI-* / MI-CRE-* 是历史稳定文档 ID，不代表目录仍叫 mi-cre；不要批量改写
 历史文件名、历史 commit 或历史 source_ref。新生成文件与 registry 记录用
 LnkCRE / lnkcre。
+
+Canonical layout note (2026-09-26 方案 B 家族迁移): lnkreport / lnkchatbi /
+lnkvision 的 canonical PRD 家族与本体已迁入 30-products/<pid>/{prd,ontology}/，
+out/prd/ 降为纯生成区（skill 生成产物仍落 out/，经 owner 审后晋升并入
+canonical，双源不并存）。canonical 布局登记见 references/product-registry.yaml；
+本模块的代码默认输出仍是生成区 out/prd/<project>/output/，不改行为。
+已知缺口：_PRODUCT_CANONICAL_DIR 尚未登记上述三个产品，
+ontology/term-aliases 解析暂不能命中它们的新 canonical 位置
+（见 SKILL.md「已知限制」——补条目属代码行为变更，须另行批准）。
 """
 from __future__ import annotations
 

@@ -35,7 +35,7 @@
 | 只影响一个 skill | 该 skill 的 `SKILL.md` 或 `references/troubleshooting.md` |
 | 影响多个文档类 skill | `/opt/code/skill/references/docspec/` |
 | 影响所有 skill / OpenCode 操作 | `/opt/code/skill/AGENTS.md` |
-| 只影响某个业务项目 | `$LANLNK_BASE/out/prd/<项目>/域知识.md` 或项目 docs |
+| 只影响某个业务项目 | `$LANLNK_BASE/out/prd/<项目>/域知识.md`（skill 工作知识，生成区）或项目 docs；产品 canonical 本体在 `$LANLNK_BASE/30-products/<产品>/ontology/` |
 
 ## 评审清单
 

@@ -59,7 +59,7 @@ items:
 
 ## 依赖：产品功能清单
 
-pricing-generator 依赖 product-prd-generator 产出的功能清单（`$LANLNK_BASE/out/prd/<产品>/output/功能清单.md`）作为定价基线。功能清单缺失时无法生成标准产品报价部分。
+pricing-generator 依赖 product-prd-generator 产出的功能清单作为定价基线（canonical-first：优先 `$LANLNK_BASE/30-products/<产品>/prd/功能清单.md`，回退 `$LANLNK_BASE/out/prd/<项目>/output/功能清单.md` 生成区）。功能清单缺失时无法生成标准产品报价部分。
 
 ## Excel 输出格式约定
 

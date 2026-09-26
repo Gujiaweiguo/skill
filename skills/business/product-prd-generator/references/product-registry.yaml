@@ -10,6 +10,15 @@
 #    与 mi-cre 路径段别名（历史文档识别用）保持不变。
 # 6. 代码侧路径解析唯一权威源是 skill 的 _paths.resolve_product_paths()，
 #    本表与其保持同步（改一边必须改另一边）。
+# 7. 2026-09-26 方案 B 家族迁移（owner 批准）：lnkreport / lnkvision / lnkchatbi 的
+#    canonical PRD 家族与本体自 out/prd/<项目>/output/ 迁入 30-products/<产品>/{prd,ontology}/；
+#    out/prd/ 降为纯生成区（skill 生成产物仍落 out/，经 owner 审后"晋升"并入 canonical，
+#    双源不并存，晋升流程见各产品 30-products/<产品>/prd/README.md）。
+#    docs_root 字段即 canonical root（全部产品均在 30-products/ 下），不另设
+#    canonical_root 重复字段。
+# 8. 已知缺口：_paths._PRODUCT_CANONICAL_DIR 尚未登记 lnkreport/lnkchatbi/lnkvision，
+#    代码侧 ontology 解析暂不能命中这三个产品的新 canonical 位置（详见 SKILL.md 已知限制）；
+#    本表路径为 agent 读取的权威事实，先于代码修复更新。
 #
 # unresolved 字段由 docs 侧整理（docs-reorg-prompt）产出 registry-feedback 后回填
 # （2026-09-24 已回填：30-products/product-registry-feedback.yaml；2026-09-26
@@ -40,9 +49,10 @@ products:
     model_kind_hint: capability-model
     docs_root: /opt/code/docs/lanlnk/30-products/lnkreport   # confirmed（feedback 2026-09-24，owner 确认 2026-09-26）
     code_root: /opt/code/lnkreport
-    ontology: /opt/code/docs/lanlnk/out/prd/lnkreport/output/ontology.yaml
-    ontology_note: generated/supporting（INDEX.md：canonical unresolved，authority 边界待裁决）
-    term_aliases: /opt/code/docs/lanlnk/out/prd/lnkreport/output/term-aliases.yaml
+    prd_root: /opt/code/docs/lanlnk/30-products/lnkreport/prd   # 2026-09-26 方案 B 迁移：功能清单/PRD 家族自 out/prd/lnkreport/output/ 迁入
+    ontology: /opt/code/docs/lanlnk/30-products/lnkreport/ontology/ontology.yaml   # 2026-09-26 迁移（原 out/prd/lnkreport/output/ontology.yaml）
+    ontology_note: canonical 在位（30-products/lnkreport/ontology/，含 README.md 权威指针）
+    term_aliases: /opt/code/docs/lanlnk/30-products/lnkreport/ontology/term-aliases.yaml   # 2026-09-26 迁移
     adapter_status: partial
 
   lnkchatbi:
@@ -51,8 +61,10 @@ products:
     model_kind_hint: capability-model
     docs_root: /opt/code/docs/lanlnk/30-products/lnkchatbi   # confirmed（feedback v2 2026-09-26 闭环）
     code_root: /opt/code/lnkchatbi   # confirmed（owner 2026-09-26；docs 侧 feedback v2 已同步）
-    ontology: /opt/code/docs/lanlnk/out/prd/LnkChatBI/output/ontology.yaml
-    term_aliases: /opt/code/docs/lanlnk/out/prd/LnkChatBI/output/term-aliases.yaml
+    prd_root: /opt/code/docs/lanlnk/30-products/lnkchatbi/prd   # 2026-09-26 方案 B 迁移：PRD 家族自 out/prd/LnkChatBI/output/ 迁入
+    ontology: /opt/code/docs/lanlnk/30-products/lnkchatbi/ontology/ontology.yaml   # 2026-09-26 迁移（原 out/prd/LnkChatBI/output/ontology.yaml）
+    ontology_note: canonical 在位（30-products/lnkchatbi/ontology/，含 README.md 权威指针）；canonical 仍 proposed（owner 2026-09-26）
+    term_aliases: /opt/code/docs/lanlnk/30-products/lnkchatbi/ontology/term-aliases.yaml   # 2026-09-26 迁移
     adapter_status: partial
 
   lnkchat:
@@ -72,7 +84,9 @@ products:
     model_kind_hint: null
     docs_root: /opt/code/docs/lanlnk/30-products/lnkvision   # confirmed（feedback 2026-09-24，owner 确认 2026-09-26）
     code_root: /opt/code/lnkvision
-    ontology: /opt/code/docs/lanlnk/out/prd/LnkVision/域知识.md   # confirmed（owner 2026-09-26）；generated/supporting，canonical authority 待裁决
+    prd_root: /opt/code/docs/lanlnk/30-products/lnkvision/prd   # 2026-09-26 方案 B 迁移：PRD 家族自 out/prd/LnkVision/output/ 迁入
+    ontology: /opt/code/docs/lanlnk/30-products/lnkvision/ontology/域知识.md   # 2026-09-26 升格 canonical 本体（原 out/prd/LnkVision/域知识.md，owner 确认）
+    ontology_note: 域知识.md 已升格为 canonical 本体，位于 30-products/lnkvision/ontology/（含 README.md 权威指针）
     term_aliases: null
     adapter_status: unsupported
 

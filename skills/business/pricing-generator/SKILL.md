@@ -16,7 +16,7 @@ compatibility: >
   Python + openpyxl（uv 管理），生成 .xlsx 报价单（双 sheet：报价单 + 功能清单）。
   依赖素材库 $MATERIALS_DIR（通过 LANLNK_BASE 环境变量配置）。
   依赖报价模板 references/报价模板_<模式>.md。
-  依赖产品功能清单 out/prd/<产品>/output/功能清单.md。
+  依赖产品功能清单（canonical-first 解析：优先 $LANLNK_BASE/30-products/<产品>/prd/功能清单.md，回退 $LANLNK_BASE/out/prd/<项目>/output/功能清单.md 生成区）。
   可选接收 requirement-evaluator 的二开清单。
   Excel 格式参考正祥报价单（深蓝表头 001E5A8A / 浅红汇总 00F9E5DD / 微软雅黑）。
 
@@ -56,7 +56,7 @@ compatibility: >
 | `$MATERIALS_DIR` | `$LANLNK_BASE/materials` | 素材库根 |
 | `$PROPOSALS_DIR` | `$LANLNK_BASE/out/proposals` | 报价单输出位置 |
 | `$REFERENCES_DIR` | `$MATERIALS_DIR/references` | 报价模板存放处 |
-| `$PRD_DIR` | `$LANLNK_BASE/out/prd` | 产品功能清单来源 |
+| `$PRD_DIR` | `$LANLNK_BASE/out/prd` | 产品功能清单生成区（canonical 优先、$PRD_DIR 回退，见下） |
 
 ### 报价模板定位
 
@@ -66,6 +66,18 @@ compatibility: >
 | 私有化模板 | `$REFERENCES_DIR/报价模板_私有化.md` | 终生授权+实施，次年售后可选 |
 
 ### 产品功能清单定位
+
+**canonical-first 解析顺序**（2026-09-26 方案 B 家族迁移后）：优先 `$LANLNK_BASE/30-products/<产品>/prd/功能清单.md`，回退 `$LANLNK_BASE/out/prd/<项目>/output/功能清单.md`（生成区，历史目录名）。
+
+**产品 id 与目录名映射**（canonical 目录一律小写；生成区为历史目录名）：
+
+| 产品 id | canonical 路径（优先） | 生成区回退（历史目录名） |
+|---|---|---|
+| lnkreport | `30-products/lnkreport/prd/功能清单.md` | `out/prd/lnkreport/output/功能清单.md` |
+| lnkvision | `30-products/lnkvision/prd/功能清单.md` | `out/prd/LnkVision/output/功能清单.md` |
+| lnkchatbi | `30-products/lnkchatbi/prd/功能清单.md` | `out/prd/LnkChatBI/output/功能清单.md` |
+
+> lnkvision / lnkchatbi 的生成区历史目录名大写开头（LnkVision / LnkChatBI），仅用于回退；canonical 目录一律小写（lnkvision / lnkchatbi）。禁止把生成区清单当 canonical 引用（双源不并存）。
 
 | 产品 | 功能清单路径 | 说明 |
 |---|---|---|

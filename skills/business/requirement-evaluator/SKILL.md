@@ -16,7 +16,7 @@ description: |-
 compatibility: >
   依赖素材库 $MATERIALS_DIR（通过 LANLNK_BASE 环境变量配置）。
   依赖 markitdown 转化需求文档（docx/pdf → md）。
-  依赖产品功能清单（product-prd-generator 产物，位于 out/prd/<产品>/output/功能清单.md）。
+  依赖产品功能清单（product-prd-generator 产物；canonical-first 解析：优先 $LANLNK_BASE/30-products/<产品>/prd/功能清单.md，回退 $LANLNK_BASE/out/prd/<项目>/output/功能清单.md 生成区）。
   纯提示词 skill，无 Python 依赖。
 
   Quick start:
@@ -50,7 +50,7 @@ compatibility: >
 | `$MATERIALS_DIR` | `$LANLNK_BASE/materials` | 素材库根 |
 | `$PROPOSALS_DIR` | `$LANLNK_BASE/out/proposals` | 评估报告输出位置 |
 | `$INCOMING_DIR` | `$LANLNK_BASE/incoming` | 需求文档暂存区 |
-| `$PRD_DIR` | `$LANLNK_BASE/out/prd` | 产品 PRD 套件根（功能清单来源）|
+| `$PRD_DIR` | `$LANLNK_BASE/out/prd` | 产品 PRD 生成区根（功能清单 canonical 优先、$PRD_DIR 回退，见下）|
 
 ### 产品功能清单定位
 
@@ -61,6 +61,21 @@ compatibility: >
 1. 产品代号归一：**MI、MI-CRE、LnkCRE、lnkcre、商管系统 → canonical product id `lnkcre`**（同一产品，大小写不敏感）。
 2. canonical：`$LANLNK_BASE/30-products/lnkcre/prd/baseline/feature-baseline.yaml`（mi-cre 旧路径已随 2026-09 目录合并删除）。
 3. 路径不存在 → **明确报错**（列出产品 ID `lnkcre` 和尝试路径），提示先运行 product-prd-generator；**不得静默改读其他产品（LnkReport / LnkChat / CRM）的功能基线**。
+
+**功能清单 canonical-first 解析顺序**（2026-09-26 方案 B 家族迁移后）：
+
+1. 优先 `$LANLNK_BASE/30-products/<产品>/prd/功能清单.md`（canonical）
+2. 回退 `$LANLNK_BASE/out/prd/<项目>/output/功能清单.md`（生成区，历史目录名）
+
+**产品 id 与目录名映射**（canonical 目录一律小写；生成区为历史目录名）：
+
+| 产品 id | canonical 路径（优先） | 生成区回退（历史目录名） |
+|---|---|---|
+| lnkreport | `30-products/lnkreport/prd/功能清单.md` | `out/prd/lnkreport/output/功能清单.md` |
+| lnkvision | `30-products/lnkvision/prd/功能清单.md` | `out/prd/LnkVision/output/功能清单.md` |
+| lnkchatbi | `30-products/lnkchatbi/prd/功能清单.md` | `out/prd/LnkChatBI/output/功能清单.md` |
+
+> lnkvision / lnkchatbi 的生成区历史目录名大写开头（LnkVision / LnkChatBI），仅用于回退；canonical 目录一律小写（lnkvision / lnkchatbi）。禁止把生成区清单当 canonical 引用（双源不并存）。
 
 | 产品代号（canonical id） | 功能清单路径 | 说明 |
 |---|---|---|
@@ -116,7 +131,7 @@ markitdown "<需求文档>" -o "<同目录>/<同名>.md"
 
 ### 0.3 定位产品功能清单
 
-根据评估基准产品，定位 `$PRD_DIR/<产品>/output/功能清单.md`。
+按上方「产品功能清单定位」的 canonical-first 顺序定位：优先 `$LANLNK_BASE/30-products/<产品>/prd/功能清单.md`，不存在时回退 `$PRD_DIR/<项目>/output/功能清单.md`（生成区历史目录名，见映射表）。
 
 - 功能清单包含功能名、状态（existing/partial/missing）、置信度
 - `existing` = 产品已有该功能

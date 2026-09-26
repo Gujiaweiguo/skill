@@ -43,7 +43,7 @@
 | 输入 | 类型 | 路径示例 |
 |---|---|---|
 | 战略/架构文集 | stable | `lanlnk/out/prd/<产品>/output/review/v2-strategy/*.md` |
-| 当前 PRD | stable | `lanlnk/out/prd/<产品>/output/产品PRD.md` |
+| 当前 PRD | stable | `lanlnk/30-products/<产品>/prd/产品PRD.md`（canonical；未迁移产品沿用 `lanlnk/out/prd/<项目>/output/产品PRD.md`） |
 | 当前代码基线 | 事实 | `/opt/code/<project>` |
 | ADR 已冻结（可选） | stable | `lanlnk/out/prd/<产品>/output/review/ADR-*.md` |
 | 待起草 ADR 编号清单 | 待定 | 由本计划在 WP 中定义 |
@@ -60,7 +60,7 @@
 | 状态账本 | `<目标代码仓库>/.openspec/state/<主题>-state.md` | 项目侧执行时维护 |
 | ADR 草案 | `<目标代码仓库>/docs/adr/ADR-<NNN>-*.md` | 项目侧 OpenSpec change 驱动 |
 | Gate 证据 | `<目标代码仓库>/docs/handoff/<YYYYMMDD>/gate-G<NN>-<主题>.<ext>` | 项目侧执行时产出 |
-| PRD/战略文集 | `lanlnk/out/prd/<产品>/output/`（docs 仓库） | stable，不漂移 |
+| PRD/战略文集 | PRD canonical 在 `lanlnk/30-products/<产品>/prd/`；战略/评审文集在 `lanlnk/out/prd/<产品>/output/review/`（生成区留守）（docs 仓库） | stable，不漂移 |
 
 **禁止**：把建议实施计划、状态账本、ADR 草案写到 docs 仓库的 `lanlnk/out/prd/` 下——会污染漂移检测、模糊所有权、违反"docs 出 stable，目标代码仓出 living"原则（参考 Kubernetes KEP / Rust RFC / Martin Fowler Strangler Fig 行业惯例）。
 
@@ -152,13 +152,13 @@
 | 产物 | 仓库 | 路径 | 谁维护 |
 |---|---|---|---|
 | 战略/架构文集 | docs | `lanlnk/out/prd/<产品>/output/review/` | 架构师 |
-| PRD / 功能清单 / 差距分析 | docs | `lanlnk/out/prd/<产品>/output/` | 产品 |
+| PRD / 功能清单 / 差距分析 | docs | `lanlnk/30-products/<产品>/prd/`（canonical；未迁移产品 `lanlnk/out/prd/<项目>/output/`） | 产品 |
 | 建议实施计划（本文档） | 目标代码仓 | `docs/handoff/<YYYYMMDD>/` | 工程 |
 | ADR 草案 | 目标代码仓 | `docs/adr/` | 工程 |
 | OpenSpec changes | 目标代码仓 | `.openspec/changes/` | 工程 |
 | 状态账本 | 目标代码仓 | `.openspec/state/` | 工程 |
 | 代码 | 目标代码仓 | — | 工程 |
-| 回写 PRD 状态 | docs | `lanlnk/out/prd/<产品>/output/` | 工程 → 产品 |
+| 回写 PRD 状态 | docs | `lanlnk/30-products/<产品>/prd/`（canonical，经晋升流程；未迁移产品 `lanlnk/out/prd/<项目>/output/`） | 工程 → 产品 |
 
 ## START prompt
 

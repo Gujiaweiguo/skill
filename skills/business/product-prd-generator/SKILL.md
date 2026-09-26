@@ -11,7 +11,7 @@ description: |-
   "商管/会员/CRM/供应链产品规划"、"基于现有产品做版本规划"。
   仅面向内部产品规划与决策，不生成报价/方案/投标文件（那些交给 company-intro-generator / pricing-generator / bid-doc-master），
   不直接修改业务系统代码（业务系统自己基于本 skill 输出的交接文档拆 OpenSpec change）。
-compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to-md conversion and image extraction. Reads code from specified code-root (default /opt/code/lnkcre). Outputs to $LANLNK_BASE/out/prd/<项目>/output/.
+compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to-md conversion and image extraction. Reads code from specified code-root (default /opt/code/lnkcre). Outputs to $LANLNK_BASE/out/prd/<项目>/output/（纯生成区；30-products 在位产品的交付须附晋升清单，见正文「输出目录」）。
 ---
 
 # Product PRD Generator
@@ -64,6 +64,8 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 > b. `$LANLNK_BASE/30-products/lnkcre/ontology/README.md`（入口，指向实际 authority）
 > c. `$LANLNK_BASE/30-products/lnkcre/INDEX.md`（声明的 authority/source_ref）
 > 未来新增会员/CRM 时创建 `$LANLNK_BASE/out/prd/会员系统/域知识.md`
+>
+> **域知识双轨（2026-09-26 方案 B 家族迁移后）**：`out/prd/<项目>/域知识.md` 是 **skill 工作知识**（生成区，留守不变）；产品的 **canonical 本体**在 `30-products/<产品>/ontology/`（lnkvision 的 `域知识.md` 已升格为 canonical 本体，位于 `$LANLNK_BASE/30-products/lnkvision/ontology/域知识.md`）。canonical 位置一律以 `30-products/<产品>/ontology/README.md` 权威指针为准。
 
 ## 不做什么
 
@@ -324,6 +326,14 @@ output/
 └── mi-consumption-prompt.md
 ```
 
+### canonical 在位产品的晋升规则（2026-09-26 方案 B 家族迁移后）
+
+`out/prd/<项目>/output/` 是**纯生成区**。若 `$LANLNK_BASE/30-products/<产品>/` 已有 canonical 内容（当前：**lnkcre / lnkchat / lnkreport / lnkvision / lnkchatbi**）：
+
+1. 生成产物仍落 `out/prd/<项目>/output/` 生成区（路径契约不变，CLI 默认输出不改）；
+2. 但交付说明**必须附晋升清单**——列出本次应覆盖 `30-products/<产品>/{prd,ontology}/` 的对应件（如 `产品PRD.md → 30-products/<产品>/prd/产品PRD.md`、`功能清单.md → 30-products/<产品>/prd/功能清单.md`），并指向该产品 `30-products/<产品>/prd/README.md` 的晋升流程；
+3. **禁止将 out/ 生成件当作 canonical 引用**（双源不并存——生成区件经 owner 审后"晋升"并入 canonical，两处不同时持有同一权威件）。
+
 ## PRD 结构
 
 1. 产品背景
@@ -507,7 +517,9 @@ uv run product-prd-generator --project 商管系统 \
 
 ### Step 1：设计并创建 ontology
 
-**路径**：`$LANLNK_BASE/out/prd/<project>/output/ontology.yaml`
+**路径**：`$LANLNK_BASE/out/prd/<project>/output/ontology.yaml`（生成区默认值，代码默认输出不变）
+
+> **canonical 位置**以 `$LANLNK_BASE/30-products/<产品>/ontology/README.md` 权威指针为准（lnkreport / lnkchatbi / lnkvision 的 ontology 已在位 `30-products/<产品>/ontology/`）；无该目录的产品沿用 out/ 路径。lnkchat 的 ontology 双件在 `30-products/lnkchat/` 产品根目录（非 ontology/ 子目录）是已知家族变体，同样以该产品 ontology README/INDEX 权威指针为准。
 
 设计原则详见 `references/troubleshooting.md` 「如何为新项目设计 ontology」章节。要点：
 
@@ -519,18 +531,18 @@ uv run product-prd-generator --project 商管系统 \
 **样板参考**：
 - 商管（基线）：`$LANLNK_BASE/config/ontology/business-ontology.yaml`（1572 行，12 模块）
 - langchat（v2 战略）：`$LANLNK_BASE/30-products/langchat/ontology.yaml`（8 模块，源自 v2-strategy/02）
-- LnkChatBI（问数）：`$LANLNK_BASE/out/prd/LnkChatBI/output/ontology.yaml`（8 模块）
+- LnkChatBI（问数）：`$LANLNK_BASE/30-products/lnkchatbi/ontology/ontology.yaml`（8 模块；2026-09-26 自 `out/prd/LnkChatBI/output/ontology.yaml` 迁入）
 
 ### Step 2：创建 term-aliases
 
-**路径**：`$LANLNK_BASE/out/prd/<project>/output/term-aliases.yaml`
+**路径**：`$LANLNK_BASE/out/prd/<project>/output/term-aliases.yaml`（生成区默认值；canonical 位置同 Step 1 规则——以 `30-products/<产品>/ontology/README.md` 权威指针为准，lnkreport / lnkchatbi 已在位）
 
 key = capability ID（与 ontology.sub_functions.capabilities 一致），value = 该 capability 的 CN/EN 别名列表。doc_map 加载时会按长度倒序匹配，最长的 alias 优先归一。
 
 **样板参考**：
 - 商管（基线）：`<skill>/references/term-aliases.yaml`
 - langchat：`$LANLNK_BASE/30-products/langchat/term-aliases.yaml`（38 keys，含 v2 对象 + legacy OrchestratorAgent 术语）
-- LnkChatBI：`$LANLNK_BASE/out/prd/LnkChatBI/output/term-aliases.yaml`（14 keys，含 legacy 产品名 mysqlbot/SQLBot）
+- LnkChatBI：`$LANLNK_BASE/30-products/lnkchatbi/ontology/term-aliases.yaml`（14 keys，含 legacy 产品名 mysqlbot/SQLBot；2026-09-26 自 `out/prd/LnkChatBI/output/term-aliases.yaml` 迁入）
 
 ### Step 3：创建 raw 目录（用户素材入口）
 
@@ -618,8 +630,9 @@ uv run pytest tests/ -v
 - **Ontology sub_functions 必须与 field-specs 全局同步**：ontology 的 `sub_functions` 有旧名称而 field-specs 没有对应实体时，渲染器会产生**空 `####` 标题**（有标题无内容）。这不是报错而是静默问题。每次大改后应做全局同步检查：`ont_subs == spec_keys` for all modules。
 
 > 商管域专属已知限制（资产管理空壳/集团驾驶舱图表库缺失/销售五源模型）见 LnkCRE 域知识入口（`domain_knowledge_path_for_project`；命中 canonical `30-products/lnkcre/ontology/domain-knowledge.md`）。
-- **多产品支持（2026-07-19 起，2026-08-01 三产品真实收官验证）**：CLI 已支持 langchat / LnkChatBI / 未来的 CRM 等非商管产品自动生成 PRD。每个产品通过项目级配置三件套（ontology.yaml + term-aliases.yaml + code-map-rules-<project>.yaml）实现覆盖，缺失时回退到商管默认。配置路径解析为三级 fallback（document-control-plane 迁移后）：`$LANLNK_BASE/30-products/<canonical-dir>/` → `$LANLNK_BASE/out/prd/<project>/output/`（legacy）→ 商管默认。新产品的 onboarding 流程见下方「添加新产品的步骤」章节。**已验证样板**：商管 LnkCRE（canonical `30-products/lnkcre/`）/ langchat（`30-products/lnkchat/`，2026-08-01 真实运行通过：8 模块全覆盖 / 0 商管污染 / 107 capabilities 归类）/ LnkChatBI（`out/prd/LnkChatBI/output/`，legacy 路径）。
+- **多产品支持（2026-07-19 起，2026-08-01 三产品真实收官验证）**：CLI 已支持 langchat / LnkChatBI / 未来的 CRM 等非商管产品自动生成 PRD。每个产品通过项目级配置三件套（ontology.yaml + term-aliases.yaml + code-map-rules-<project>.yaml）实现覆盖，缺失时回退到商管默认。配置路径解析为三级 fallback（document-control-plane 迁移后）：`$LANLNK_BASE/30-products/<canonical-dir>/` → `$LANLNK_BASE/out/prd/<project>/output/`（legacy 生成区）→ 商管默认。新产品的 onboarding 流程见下方「添加新产品的步骤」章节。**已验证样板**：商管 LnkCRE（canonical `30-products/lnkcre/`）/ langchat（`30-products/lnkchat/`，2026-08-01 真实运行通过：8 模块全覆盖 / 0 商管污染 / 107 capabilities 归类）/ LnkChatBI（canonical `30-products/lnkchatbi/`，2026-09-26 方案 B 家族迁移后 ontology 双件在 `30-products/lnkchatbi/ontology/`）。
 - **平台型产品素材分层原则（2026-08-01 实证）**：langchat 等「平台型」产品的 PRD 素材必须按**平台层 vs 业务层**分层。平台 PRD 只用平台层素材（产品架构图 / 术语口径 / v2-strategy 目标架构 / 代码 specs）；业务层素材（如商管岗位 AI Skill 解决方案——招商/营运/客服等）是「平台之上的行业应用」，归商管域，**不进平台 PRD 的 docs-root**。混层会导致 doc_map 把业务岗位需求错误归到平台模块，产出语义错乱的 PRD。详见 `/opt/code/docs/opencode/90-复利工程/更新日志.md` 2026-08-01 条目。
+- **canonical 迁移后的 ontology 解析缺口（2026-09-26 登记，待代码修复）**：lnkreport / lnkchatbi / lnkvision 的 ontology 双件已迁入 `30-products/<产品>/ontology/`（out/ 下原文件已删，双源不并存），但 `_paths._PRODUCT_CANONICAL_DIR` 尚无这三个产品的条目——`ontology_path_for_project()` / `term_aliases_path_for_project()` 对它们**解析不到新 canonical 位置**，会兜底到商管 `business-ontology.yaml` / 商管 term-aliases（跨域污染，违反 registry 规则 2 的静默回落禁令）。修复方向：给 `_PRODUCT_CANONICAL_DIR` 补 lnkreport / lnkchatbi / lnkvision 三个条目（属代码行为变更，须另行批准；2026-09-26 本次只改文档与注册表）。
 
 ## 设计决策
 
