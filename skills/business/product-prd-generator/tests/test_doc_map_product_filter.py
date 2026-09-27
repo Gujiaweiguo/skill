@@ -20,16 +20,20 @@ from product_prd_generator.doc_map import _iter_markdown_files
 
 @pytest.fixture()
 def multi_product_tree(tmp_path):
-    """Build a docs root with two product trees + non-product dirs."""
+    """Build a docs root with two product trees + non-product dirs.
+
+    产品段出现在 30-products/ 之外的目录（此处用 90-legacy 历史快照目录模拟，
+    2026-09 三层整理前的 20-architecture/<产品>/ 树同理）也必须被段过滤识别。
+    """
     (tmp_path / "30-products" / "langchat" / "prd").mkdir(parents=True)
     (tmp_path / "30-products" / "langchat" / "prd" / "PRD-LC.md").write_text("# langchat PRD\n")
-    (tmp_path / "20-architecture" / "langchat").mkdir(parents=True)
-    (tmp_path / "20-architecture" / "langchat" / "current-state.md").write_text("# langchat state\n")
+    (tmp_path / "90-legacy" / "langchat").mkdir(parents=True)
+    (tmp_path / "90-legacy" / "langchat" / "current-state.md").write_text("# langchat state\n")
 
     (tmp_path / "30-products" / "mi-cre" / "prd").mkdir(parents=True)
     (tmp_path / "30-products" / "mi-cre" / "prd" / "PRD-MI.md").write_text("# mi-cre PRD\n")
-    (tmp_path / "20-architecture" / "mi-cre").mkdir(parents=True)
-    (tmp_path / "20-architecture" / "mi-cre" / "domain-model.md").write_text("# mi-cre domain\n")
+    (tmp_path / "90-legacy" / "mi-cre").mkdir(parents=True)
+    (tmp_path / "90-legacy" / "mi-cre" / "domain-model.md").write_text("# mi-cre domain\n")
 
     (tmp_path / "00-governance").mkdir()
     (tmp_path / "00-governance" / "README.md").write_text("# governance\n")

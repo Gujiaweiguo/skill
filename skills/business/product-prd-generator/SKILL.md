@@ -128,9 +128,16 @@ CLI `--project` 接受 **MI、MI-CRE、LnkCRE、lnkcre、商管系统**，统一
 |---|---|
 | docs_root | `$LANLNK_BASE/30-products/lnkcre/` |
 | ontology_root | `…/lnkcre/ontology/`（本体权威见 INDEX.md / config/ontology） |
-| prd_root | `…/lnkcre/prd/` |
+| ontology 入口 | `…/lnkcre/ontology/README.md`（docs 侧本体权威指针，指向下述子目录与机器本体） |
+| domain model | `…/lnkcre/ontology/architecture/domain-model/`（文档层 canonical；运行权威在 `/opt/code/lnkcre/openspec/specs/`） |
+| capability matrix | `…/lnkcre/ontology/capability-matrix/` |
+| semantic releases | `…/lnkcre/ontology/releases/`（本体层发布快照；仅 `status=accepted` 可被下游消费） |
+| 机器本体（共享特殊输入） | `$LANLNK_BASE/config/ontology/business-ontology.yaml`（留在 config/ontology/，不迁移；是共享机器本体，**不是第二个 LnkCRE 产品根**） |
+| prd_root | `…/lnkcre/prd/`（canonical PRD） |
 | feature_baseline_path | `…/lnkcre/prd/baseline/feature-baseline.yaml` |
 | competitor_evidence_root | `…/lnkcre/evidence/competitors/<vendor>/` |
+| code_root | `/opt/code/lnkcre`（代码真实权威，含 `openspec/specs/` 与 changes 归档） |
+| 生成区输出 | `$LANLNK_BASE/out/prd/<project>/output/`（纯生成区，**不得直接作为 canonical PRD**；经 owner 审后晋升并入 `30-products/<产品>/prd/`，双源不并存） |
 
 解析规则（`feature_baseline_path_for_project` / `domain_knowledge_path_for_project` / `competitor_evidence_paths_for_project`）：
 

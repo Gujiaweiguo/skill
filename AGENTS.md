@@ -50,9 +50,11 @@ cd skills/ppt/ppt-master && npm install   # one-time
 ├── raw/          # 中间产物：markitdown 转换件 + _media/ 图片（gitignore，百度盘）
 ├── materials/    # 结构化素材 8 大类+（01-company-overview … 16-customers，带 frontmatter）
 ├── out/          # 交付物分型层：strategy/ prd/ proposals/ bidding/ …（平铺只放最终文件）
-├── 30-products/  # 产品三层基线入口（lnkcre/lnkchat/lnkreport/lnkchatbi/lnkvision/lnkgateway + INDEX.md）
-└── 00-90 编号树   # 00-governance / 10-strategy / 20-architecture / 25-product-assets /
-                  # 35-domain-packages / 40-delivery / 90-legacy（历史快照，只读）
+├── 30-products/  # 产品三层基线入口（lnkcre/lnkchat/lnkreport/lnkchatbi/lnkvision/lnkgateway/lnkcrm/lnkwebsite，各产品目录含 INDEX.md）
+└── 00-90 编号树   # 00-governance / 10-strategy / 40-delivery / 90-legacy（历史快照，只读）。
+                  # 20-architecture / 25-product-assets / 35-domain-packages 已于 2026-09
+                  # 三层整理移除：产品本体/PRD 归位 30-products/<产品>/{ontology,prd}/，
+                  # 机器本体 business-ontology.yaml 留守 config/ontology/（不迁移）
 ```
 
 Three-tier flow: `incoming/` → `raw/` → `materials/`. Content packages go to `out/proposals/<client>/content-packages/` or `out/bidding/<project>/content-packages/`. 顶层 `bidding/`（南光/果正）为历史遗留，只读，新产物一律走 `out/bidding/`。

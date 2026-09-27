@@ -27,6 +27,8 @@
 | Semantic Release | 本体层的发布快照（见 §4） |
 | UI 设计系统 / 页面模式 / 视觉验收 | PRD 的内容（见 ui-design-system-handoff.md） |
 | 竞品分析 / 客户需求 / 产品意见 | PRD 的输入（competitor-product-analyzer 产出证据与 trace_id） |
+| `config/ontology/business-ontology.yaml` | 本体层的**共享机器本体特殊输入**（永久留在 `config/ontology/`，不迁移；不是第二个 LnkCRE 产品根） |
+| `out/prd/<项目>/output/` | PRD 的**纯生成区**（不得直接作为 canonical PRD；经 owner 审后晋升并入 `30-products/<产品>/prd/`，双源不并存） |
 
 ## 3. 产品注册表
 

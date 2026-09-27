@@ -127,7 +127,7 @@ def _load_mi_feature_baseline() -> dict[str, Any]:
     tried = "\n  ".join(str(p) for p in _mi_feature_baseline_paths())
     print(f"[WARN] 产品 lnkcre（LnkCRE/MI 商管系统）的功能基线不存在，功能清单使用内置模块说明。"
           f"尝试路径：\n  {tried}\n"
-          f"请补齐 30-products/lnkcre/prd/baseline/feature-baseline.yaml 或完成 mi-cre → lnkcre 目录迁移。",
+          f"请补齐 30-products/lnkcre/prd/baseline/feature-baseline.yaml。",
           file=sys.stderr)
     return {}
 
