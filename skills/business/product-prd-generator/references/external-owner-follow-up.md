@@ -1,3 +1,5 @@
+> Origin: archived change `product-three-layer-governance-sync` (2026-10-02) task 6.5 deliverable; kept tracked because archive/ is gitignored local history.
+
 # External Owner Follow-up
 
 This skill-repository change defines interfaces and review rules only. It does not modify canonical product records or target repositories.
