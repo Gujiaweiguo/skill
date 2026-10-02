@@ -260,7 +260,7 @@ def main():
 
     if os.path.isdir(target):
         for root, dirs, files in os.walk(target):
-            if "/raw" in root or "\\raw" in root:
+            if "raw" in root.split(os.sep):
                 continue
             for f in files:
                 if f.endswith(".md"):
