@@ -80,6 +80,21 @@ COMMON_KEYWORDS = {
 }
 
 
+def _read_text_auto(path: Path) -> str:
+    """UTF-8 → GB18030 → UTF-16 探测解码，兜底 replace。
+
+    与 batch_competitor_import.read_text_auto 同款：避免 GBK 等非 UTF-8
+    案例文件让整个匹配命令崩溃（UnicodeDecodeError）。
+    """
+    raw = path.read_bytes()
+    for enc in ("utf-8", "gb18030", "utf-16", "utf-16-le", "utf-16-be"):
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("utf-8", errors="replace")
+
+
 def load_cases(cases_dir: Path) -> tuple[list[CaseInfo], list[dict[str, str]]]:
     """加载案例库，返回 (案例列表, 跳过清单)。
 
@@ -90,7 +105,7 @@ def load_cases(cases_dir: Path) -> tuple[list[CaseInfo], list[dict[str, str]]]:
     skipped: list[dict[str, str]] = []
     for md_path in sorted(cases_dir.glob("*.md")):
         try:
-            raw = md_path.read_text(encoding="utf-8")
+            raw = _read_text_auto(md_path)
         except OSError as e:
             skipped.append({"path": str(md_path), "reason": f"读取失败: {e.strerror or e}"})
             continue

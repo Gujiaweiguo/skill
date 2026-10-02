@@ -69,6 +69,26 @@ def _load_two_cases() -> tuple[list[case_matcher.CaseInfo], list[dict[str, str]]
 
 
 class LoadCasesTest(unittest.TestCase):
+    def test_gb18030_encoded_case_is_loaded_not_crashed(self) -> None:
+        with TemporaryDirectory() as tmp:
+            cases_dir = Path(tmp) / "04-cases"
+            cases_dir.mkdir()
+            (cases_dir / "plaza.md").write_text(PLAZA_CASE, encoding="utf-8")
+            legacy = PLAZA_CASE.replace("天河城会员小程序", "环贸商城CRM")
+            (cases_dir / "legacy.md").write_bytes(legacy.encode("gb18030"))
+
+            cases, skipped = case_matcher.load_cases(cases_dir)
+
+            results = case_matcher.match_cases(cases, keywords=["环贸商城"])
+
+        self.assertEqual(skipped, [])
+        self.assertEqual(
+            [c.name for c in cases], ["环贸商城CRM", "天河城会员小程序"]
+        )
+        # 默认 min_score=20：环贸商城CRM 关键词 15 + complete 5 = 20 入选；
+        # 天河城 无命中 仅 complete 5 被过滤
+        self.assertEqual([r.case.name for r in results], ["环贸商城CRM"])
+
     def test_reports_skipped_files_instead_of_silent_drop(self) -> None:
         with TemporaryDirectory() as tmp:
             cases_dir = Path(tmp) / "04-cases"
