@@ -297,6 +297,8 @@ source: "raw/原始文件.pptx.md"
   "蓝联科技_投标解决方案.docx.md": {
     "imported_at": "2026-06-18",
     "imported_from": "incoming/蓝联科技_投标解决方案.docx",
+    "source_id": "raw:蓝联科技_投标解决方案.docx.md",
+    "content_sha256": "<SHA-256 of raw file bytes>",
     "consumed_by": [
       "materials/03-products/系统实施与服务体系.md",
       "materials/05-bid/投标模板.md"
@@ -309,6 +311,11 @@ source: "raw/原始文件.pptx.md"
   ...
 }
 ```
+
+`source_id` 与 `content_sha256` 是可选字段。`source_id` 格式为 `raw:<COMPANY_BASE>/raw` 下的相对 POSIX 路径；它标识 raw 路径，不声称识别原始输入文件。`content_sha256` 仅在对 raw 文件实际字节计算 SHA-256 后写入。旧索引缺少这两个字段仍可读取；`imported_from` 是路径推断值，空值不应被解释或提升为原始文件身份。`consumed_by` 等引用继续使用公司基座下的相对路径，不复制 material 内容。
+
+该索引只记录摄取来源路径、文件指纹及 raw/material 路径引用关系，是摄取 provenance；它不是 ontology、证据结论或决策 authority。
+跨 skill 引用 raw/material 来源时，使用共享 `source-reference.schema.json` 表达路径与身份；该 schema 由 product-prd-generator 维护，material-importer 不把它当语义证据或业务决策。
 
 **维护规则**：
 - 新建 material 时 → 在 `consumed_by` 中添加引用路径
