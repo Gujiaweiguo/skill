@@ -1,3 +1,8 @@
+# App Discovery Specification
+
+## Purpose
+Defines how the doc-generator P1 phase probes a running SPA at runtime (Playwright-driven navigation, menu, and router-state discovery) so route and structure facts come from the live application rather than source parsing alone.
+## Requirements
 ### Requirement: Runtime Structure Probing
 
 During P1, the skill SHALL probe the running application via Playwright to discover its actual navigation structure: visible menu items, sidebar entries, top-bar links, and router state. The skill SHALL NOT rely solely on source code parsing to enumerate routes.

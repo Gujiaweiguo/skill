@@ -1,5 +1,8 @@
-## ADDED Requirements
+# Content Operations Skill Specification
 
+## Purpose
+Defines the lnkwebsite content-operations draft-import contracts: case/product payload validation, client authorization gates, and forbidden brand-term checks before CMS draft creation.
+## Requirements
 ### Requirement: Case payloads conform to the draft-import contract
 
 The Skill SHALL validate a Case payload before CMS import. The payload SHALL contain non-empty `slug`, `client_name`, `industry`, `problem`, `solution`, `outcome`; it MAY contain `testimonial` and `image`. The payload SHALL include `client_authorized: true` confirming the client has authorized publication. The Skill SHALL reject payloads with forbidden brand terms (`解决方案`, `数字营销`, `新零售`, `新商业`, `新营销`, `新消费`) in any text field.
