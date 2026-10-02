@@ -1,7 +1,7 @@
 # cross-layer-reconciliation Specification
 
 ## Purpose
-TBD - created by archiving change product-three-layer-governance-sync. Update Purpose after archive.
+Defines the three pairwise reconciliation views (ontology-PRD, PRD-code, ontology-code), their drift/uncertainty/decision outcome vocabulary, evidence and coverage duties, and review-gated resolutions across the product layers.
 ## Requirements
 ### Requirement: The three product layers SHALL be reconciled pairwise
 For each in-scope product, governance SHALL be able to record separate reconciliation results for ontology-to-PRD, PRD-to-code, and ontology-to-code. Each result SHALL identify the compared artifact versions/revisions, timestamp, coverage and known scan limitations, evidence references, outcome, owner/reviewer, and required follow-up. A single aggregate status SHALL NOT replace the three pairwise results.

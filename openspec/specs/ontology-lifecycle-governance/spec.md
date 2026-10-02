@@ -1,7 +1,7 @@
 # ontology-lifecycle-governance Specification
 
 ## Purpose
-TBD - created by archiving change product-three-layer-governance-sync. Update Purpose after archive.
+Defines product ontology profiles (business vs tool), first-version synthesis and incremental deltas with classified provenance, OPC-owned review and release gates, and forward/reverse flow governance for the seven in-scope software products.
 ## Requirements
 ### Requirement: Product ontologies SHALL declare their profile and authority
 For each in-scope product, governance records SHALL identify whether its semantic model is a business ontology or a tool/product ontology, its owner, canonical authority, stable identifier namespace, and relationship to PRD and code authorities. Business ontology profiles MAY model business objects, relationships, lifecycles, rules, and domain terms. Tool ontology profiles MAY model product concepts such as capabilities, workflows, datasets, charts, executions, or integrations and SHALL NOT be forced into a business-entity taxonomy.
