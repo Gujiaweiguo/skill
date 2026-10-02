@@ -388,6 +388,8 @@ def _validate_baseline_scope(item: dict[str, Any], name: str) -> str | None:
     changes = item.get("active_changes")
     if not isinstance(changes, list) or not all(isinstance(entry, str) for entry in changes):
         return f"complete scope {name!r} needs a list of strings 'active_changes'"
+    if len(changes) != len(set(changes)):
+        return f"complete scope {name!r} has duplicate entries in 'active_changes'"
 
     evidence = item.get("active_evidence")
     if not isinstance(evidence, dict):
@@ -414,10 +416,17 @@ def _validate_baseline_scope(item: dict[str, Any], name: str) -> str | None:
                 "needs 'verification_reasons' values from the schema enum"
             )
 
-    if set(evidence) != set(changes):
+    missing = sorted(set(changes) - set(evidence))
+    extra = sorted(set(evidence) - set(changes))
+    if missing or extra:
+        details = []
+        if missing:
+            details.append(f"missing evidence for {missing}")
+        if extra:
+            details.append(f"evidence for unknown changes {extra}")
         return (
-            f"complete scope {name!r} has 'active_evidence' keys "
-            "that do not match 'active_changes'"
+            f"complete scope {name!r}: 'active_evidence' keys do not match 'active_changes' "
+            f"({'; '.join(details)})"
         )
 
     total = item.get("archive_unchecked_task_total")

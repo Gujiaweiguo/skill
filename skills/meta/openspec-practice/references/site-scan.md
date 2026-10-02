@@ -17,7 +17,7 @@ cd /opt/code/skill/skills/meta/openspec-practice
 uv run python scripts/scan_openspec.py <PROJECT_ROOT> --json
 ```
 
-人读报告可去掉 `--json`；契约数据一律以 `--json` 输出为准。趋势对比：把上次扫描 JSON 存档，重跑时加 `--baseline <file>` 得到增量 diff（scope 扫描不完整时该 scope 只进 `uncomparable_scopes`，不产生增删结论）。
+人读报告可去掉 `--json`；契约数据一律以 `--json` 输出为准。趋势对比：把上次扫描 JSON 存档，重跑时加 `--baseline <file>` 得到增量 diff（scope 扫描不完整时该 scope 只进 `uncomparable_scopes`，不产生增删结论）。baseline 严格校验：非对象、`schema_version` 不符、root 不同、scopes 形状非法、evidence 与 `active_changes` 不一致或含重复项、reason 不在枚举内，一律 exit 2 并给字段级错误；过期 baseline 重新生成，不要手改。
 
 4. 如项目有自定义验证命令，读取 `Makefile`、`scripts/*openspec*`、`package.json`、`pyproject.toml` 中的相关命令。未发现时在输出中显式写「未发现（已查 <位置列表>）」，不省略该行——未发现证据不等于项目没有验证。
 5. 必要时在每个 scope 运行：

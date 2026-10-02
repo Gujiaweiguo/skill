@@ -571,6 +571,33 @@ class ScanOpenSpecTest(unittest.TestCase):
                         }
                     ],
                 },
+                "duplicate-change": {
+                    "schema_version": 1,
+                    "root": resolved,
+                    "scopes": [
+                        {
+                            "scope": resolved,
+                            "scan_status": "complete",
+                            "active_changes": ["solo", "solo"],
+                            "active_evidence": {
+                                "solo": {
+                                    "verification_status": "missing",
+                                    "verification_reasons": [],
+                                }
+                            },
+                        }
+                    ],
+                },
+            }
+            fragments = {
+                "missing-evidence": "needs an object 'active_evidence'",
+                "missing-status": "needs a valid 'scan_status'",
+                "malformed-evidence": "needs a valid 'verification_status'",
+                "bad-total": "needs an integer 'archive_unchecked_task_total'",
+                "evidence-missing-change": "missing evidence for ['solo']",
+                "evidence-extra-change": "evidence for unknown changes ['ghost']",
+                "unknown-reason": "schema enum",
+                "duplicate-change": "duplicate entries in 'active_changes'",
             }
             for name, document in cases.items():
                 baseline_path = root.parent / f"{root.name}-{name}.json"
@@ -585,6 +612,7 @@ class ScanOpenSpecTest(unittest.TestCase):
                     baseline_path.unlink()
                 self.assertEqual(result.returncode, 2, f"case {name} should exit 2")
                 self.assertIn("baseline", result.stderr.lower(), f"case {name} should name the baseline")
+                self.assertIn(fragments[name], result.stderr, f"case {name} should name the failing field")
 
     def test_baseline_unreadable_subtree_not_reported_removed(self) -> None:
         if hasattr(os, "geteuid") and os.geteuid() == 0:
