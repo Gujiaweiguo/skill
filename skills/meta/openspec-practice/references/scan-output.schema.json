@@ -1,0 +1,188 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "scan_openspec.py output",
+  "description": "Output contract for scripts/scan_openspec.py. Versioning policy: additive field changes keep schema_version; removing a field or changing its semantics bumps schema_version. The scanner discovers evidence only - it never executes verification commands and never judges change correctness. 'user-provided' command_source and non-'not-run' execution values are reserved for callers that supply or run commands themselves; the scanner always emits command_source in {discovered, none} and execution='not-run'.",
+  "type": "object",
+  "required": ["schema_version", "root", "scope_count", "scopes", "discovery_errors"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "root": { "type": "string" },
+    "scope_count": { "type": "integer", "minimum": 0 },
+    "scopes": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/scope" }
+    },
+    "discovery_errors": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Unreadable subtrees hit during scope discovery (format 'ErrorType: /path'). Scopes under these paths may be absent from this scan; that absence is not evidence of removal and baselines diff such scopes into uncomparable_scopes with reason 'discovery-error'."
+    },
+    "diff": { "$ref": "#/definitions/diff" }
+  },
+  "definitions": {
+    "scope": {
+      "type": "object",
+      "required": [
+        "scope",
+        "scope_source",
+        "scan_status",
+        "has_openspec_yaml",
+        "error",
+        "spec_count",
+        "active_count",
+        "active_changes",
+        "active_evidence",
+        "verification",
+        "archive_count",
+        "archive_unchecked_task_files",
+        "archive_unchecked_task_total",
+        "archive_unchecked_samples",
+        "archive_unreadable_task_files",
+        "archive_unreadable_task_samples"
+      ],
+      "properties": {
+        "scope": { "type": "string" },
+        "scope_source": { "enum": ["openspec-dir", "openspec-yaml"] },
+        "scan_status": {
+          "enum": ["complete", "partial", "inaccessible"],
+          "description": "partial = config-only scope (.openspec.yaml layout not parsed); zero counts are not evidence of absence. inaccessible = scan aborted on OSError, see error."
+        },
+        "has_openspec_yaml": { "type": "boolean" },
+        "error": {
+          "type": ["string", "null"],
+          "description": "Non-null only when scan_status=inaccessible."
+        },
+        "spec_count": { "type": "integer", "minimum": 0 },
+        "active_count": { "type": "integer", "minimum": 0 },
+        "active_changes": { "type": "array", "items": { "type": "string" } },
+        "active_evidence": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/change_evidence" }
+        },
+        "verification": { "$ref": "#/definitions/verification" },
+        "archive_count": { "type": "integer", "minimum": 0 },
+        "archive_unchecked_task_files": { "type": "integer", "minimum": 0 },
+        "archive_unchecked_task_total": { "type": "integer", "minimum": 0 },
+        "archive_unchecked_samples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["change", "path", "unchecked"],
+            "properties": {
+              "change": { "type": "string" },
+              "path": { "type": "string" },
+              "unchecked": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "archive_unreadable_task_files": { "type": "integer", "minimum": 0 },
+        "archive_unreadable_task_samples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["change", "path"],
+            "properties": {
+              "change": { "type": "string" },
+              "path": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "change_evidence": {
+      "type": "object",
+      "description": "Raw evidence for one active change; state derivation lives in references/active-change-triage.md, not in the scanner.",
+      "required": [
+        "tasks_status",
+        "verification_status",
+        "verification_reasons",
+        "artifact_status"
+      ],
+      "properties": {
+        "tasks_status": {
+          "enum": ["missing", "empty", "partial", "complete", "unreadable"]
+        },
+        "verification_status": {
+          "enum": ["present", "missing", "unreadable", "empty", "placeholder"]
+        },
+        "verification_reasons": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "broken-link",
+              "unreadable-encoding",
+              "unreadable-file",
+              "empty",
+              "template-markers",
+              "missing-command",
+              "missing-result",
+              "missing-context"
+            ]
+          }
+        },
+        "artifact_status": {
+          "enum": ["missing", "partial", "complete"],
+          "description": "proposal.md/tasks.md presence: both=complete, one=partial, none=missing."
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "description": "Discovery of candidate verification entrypoints; execution is deliberately not performed by the scanner.",
+      "required": ["command_source", "commands", "execution", "result_ref"],
+      "properties": {
+        "command_source": { "enum": ["discovered", "none", "user-provided"] },
+        "commands": { "type": "array", "items": { "type": "string" } },
+        "execution": { "enum": ["not-run", "passed", "failed", "blocked"] },
+        "result_ref": { "type": ["string", "null"] }
+      }
+    },
+    "diff": {
+      "type": "object",
+      "description": "Present only when --baseline was given. Report-only trend comparison. A verification gap means verification_status != 'present' OR non-empty verification_reasons. Scopes whose current or baseline scan_status is not 'complete' are listed in uncomparable_scopes and never produce added/removed/resolved claims, so failed observations cannot fabricate improvements.",
+      "required": ["scopes_added", "scopes_removed", "scopes_changed", "uncomparable_scopes"],
+      "properties": {
+        "scopes_added": { "type": "array", "items": { "type": "string" } },
+        "scopes_removed": { "type": "array", "items": { "type": "string" } },
+        "uncomparable_scopes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["scope", "current_scan_status", "baseline_scan_status"],
+            "properties": {
+              "scope": { "type": "string" },
+              "current_scan_status": { "type": ["string", "null"] },
+              "baseline_scan_status": { "type": ["string", "null"] },
+              "reason": {
+                "enum": ["discovery-error"],
+                "description": "Optional; present when the scope was undiscoverable due to a traversal error (current_scan_status is null) rather than being in-both-but-incomplete."
+              }
+            }
+          }
+        },
+        "scopes_changed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "scope",
+              "active_added",
+              "active_removed",
+              "verification_gaps_added",
+              "verification_gaps_resolved",
+              "archive_unchecked_delta"
+            ],
+            "properties": {
+              "scope": { "type": "string" },
+              "active_added": { "type": "array", "items": { "type": "string" } },
+              "active_removed": { "type": "array", "items": { "type": "string" } },
+              "verification_gaps_added": { "type": "array", "items": { "type": "string" } },
+              "verification_gaps_resolved": { "type": "array", "items": { "type": "string" } },
+              "archive_unchecked_delta": { "type": "integer" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

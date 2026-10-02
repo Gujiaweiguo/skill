@@ -48,6 +48,7 @@
 cd /opt/code/skill/skills/meta/openspec-practice
 uv run python scripts/scan_openspec.py /opt/code/lnkcre --json
 uv run python scripts/scan_openspec.py /opt/code/langchat --json
+uv run python -m unittest discover -s tests -p "test_*.py"
 ```
 
 并确认：
@@ -55,3 +56,4 @@ uv run python scripts/scan_openspec.py /opt/code/langchat --json
 - `SKILL.md` 仍然短，详细流程在 `references/`。
 - 新增参考文件被 `SKILL.md` 明确路由。
 - Python 脚本只用 stdlib，能通过 `uv run` 执行。
+- 扫描器输出字段与 `references/scan-output.schema.json` 同步（`tests/test_scan_contract.py` 强制）：新增字段属兼容变更，`schema_version` 不变；删除字段或改语义必须升版本并同步 schema、测试与全部 references。
