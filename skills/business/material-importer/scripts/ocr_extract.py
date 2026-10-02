@@ -109,17 +109,22 @@ class TableRef:
 # Phase 1: 图片扫描
 # ---------------------------------------------------------------------------
 
-def scan_images(input_dirs: list[Path]) -> list[ImageRef]:
+def scan_images(input_dirs: list[Path]) -> tuple[list[ImageRef], list[str]]:
     """扫描输入目录下的所有图片文件，自动过滤装饰性图片。
 
     扫描策略：
     - 递归搜索 *_media/ 子目录和直接图片文件
     - 通过 markdown 文件名（.pptx.md / .docx.md）推断来源
     - 跳过 128x120 等典型装饰尺寸的图片
+
+    返回 (图片引用列表, 无法打开的图片路径清单)。无法打开的图片必须
+    显式上报（stderr + manifest skipped_unreadable），否则叠加增量
+    checkpoint 契约时会从 slides.jsonl 无声消失。
     """
     from PIL import Image
 
     results: list[ImageRef] = []
+    skipped_unreadable: list[str] = []
     seen: set[str] = set()
 
     for input_dir in input_dirs:
@@ -148,7 +153,8 @@ def scan_images(input_dirs: list[Path]) -> list[ImageRef]:
                 if w < 50 or h < 50:
                     continue
             except Exception:
-                continue  # 无法打开的图片跳过
+                skipped_unreadable.append(str(img_path))
+                continue
 
             # 推断来源 markdown 文件
             parent = img_path.parent
@@ -165,7 +171,12 @@ def scan_images(input_dirs: list[Path]) -> list[ImageRef]:
             ))
             seen.add(key)
 
-    return results
+    for failed_path in skipped_unreadable:
+        print(f"  ⚠️ 图片无法打开，跳过: {failed_path}", file=sys.stderr)
+    if skipped_unreadable:
+        print(f"  ⚠️ 共 {len(skipped_unreadable)} 张图片无法打开", file=sys.stderr)
+
+    return results, skipped_unreadable
 
 
 # ---------------------------------------------------------------------------
@@ -449,7 +460,8 @@ def write_markdown_summary(results: list[OCRResult],
 
 def write_manifest(results: list[OCRResult], table_refs: list[TableRef],
                    image_refs: list[ImageRef], sql_table_count: int,
-                   model_name: str, output_dir: Path) -> Path:
+                   model_name: str, output_dir: Path,
+                   skipped_unreadable: list[str] | None = None) -> Path:
     """写入 manifest.json — 元数据。"""
     path = output_dir / "manifest.json"
     total_time = sum(r.duration_sec for r in results)
@@ -460,6 +472,8 @@ def write_manifest(results: list[OCRResult], table_refs: list[TableRef],
         "image_count": len(image_refs),
         "ocr_success_count": sum(1 for r in results if not r.error),
         "ocr_error_count": sum(1 for r in results if r.error),
+        "skipped_unreadable_count": len(skipped_unreadable or []),
+        "skipped_unreadable": skipped_unreadable or [],
         "table_ref_count": len(table_refs),
         "sql_table_count": sql_table_count,
         "total_ocr_time_sec": round(total_time, 1),
@@ -541,7 +555,7 @@ def main():
 
     # Phase 1: 扫描图片
     print(f"\n📂 Phase 1: 扫描图片...")
-    image_refs = scan_images(args.input_dirs)
+    image_refs, skipped_unreadable = scan_images(args.input_dirs)
     print(f"  发现 {len(image_refs)} 张待识别图片")
 
     if not image_refs:
@@ -630,7 +644,8 @@ def main():
     print(f"  ✅ {md_path.name}")
 
     manifest_path = write_manifest(
-        results, all_table_refs, image_refs, len(sql_index), args.model, output_dir
+        results, all_table_refs, image_refs, len(sql_index), args.model, output_dir,
+        skipped_unreadable=skipped_unreadable,
     )
     print(f"  ✅ {manifest_path.name}")
 
