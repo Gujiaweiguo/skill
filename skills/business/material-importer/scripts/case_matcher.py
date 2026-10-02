@@ -80,20 +80,33 @@ COMMON_KEYWORDS = {
 }
 
 
-def load_cases(cases_dir: Path) -> list[CaseInfo]:
+def load_cases(cases_dir: Path) -> tuple[list[CaseInfo], list[dict[str, str]]]:
+    """加载案例库，返回 (案例列表, 跳过清单)。
+
+    frontmatter 缺失/解析失败/非映射的文件不参与匹配，但必须进入跳过清单
+    显式上报——否则「解析不了」会被下游当成「案例不存在」。
+    """
     cases = []
+    skipped: list[dict[str, str]] = []
     for md_path in sorted(cases_dir.glob("*.md")):
-        raw = md_path.read_text(encoding="utf-8")
+        try:
+            raw = md_path.read_text(encoding="utf-8")
+        except OSError as e:
+            skipped.append({"path": str(md_path), "reason": f"读取失败: {e.strerror or e}"})
+            continue
         fm_match = re.match(r"^---\n(.*?)\n---", raw, re.DOTALL)
         if not fm_match:
+            skipped.append({"path": str(md_path), "reason": "缺少 frontmatter"})
             continue
 
         try:
             fm = yaml.safe_load(fm_match.group(1))
-        except yaml.YAMLError:
+        except yaml.YAMLError as e:
+            skipped.append({"path": str(md_path), "reason": f"frontmatter YAML 解析失败: {e}"})
             continue
 
         if not fm or not isinstance(fm, dict):
+            skipped.append({"path": str(md_path), "reason": "frontmatter 不是键值映射"})
             continue
 
         body = raw[fm_match.end():].strip()
@@ -114,7 +127,7 @@ def load_cases(cases_dir: Path) -> list[CaseInfo]:
         )
         cases.append(case)
 
-    return cases
+    return cases, skipped
 
 
 def _as_list(val: Any) -> list[str]:
@@ -284,7 +297,9 @@ def main():
         print(f"错误: 案例目录不存在: {cases_dir}", file=sys.stderr)
         sys.exit(1)
 
-    cases = load_cases(cases_dir)
+    cases, skipped = load_cases(cases_dir)
+    for item in skipped:
+        print(f"[WARN] 案例文件跳过（不参与匹配）: {item['path']} — {item['reason']}", file=sys.stderr)
 
     if args.list_tags:
         tags = list_tags(cases)
@@ -319,6 +334,7 @@ def main():
     if args.json:
         output = {
             "total_cases": len(cases),
+            "skipped_files": skipped,
             "matched": len(results),
             "results": [
                 {
