@@ -65,6 +65,11 @@ print_result() {
 SHARED_FILES=(
   "skills/business/material-importer/references/domain-tags.md|material-importer,product-prd-generator,compound-learning"
   "skills/business/product-prd-generator/references/term-aliases.yaml|product-prd-generator,competitor-product-analyzer"
+  "skills/business/product-prd-generator/references/product-governance/source-reference.schema.json|product-prd-generator,material-importer,competitor-product-analyzer"
+  "skills/business/product-prd-generator/references/product-governance/layer-reference.schema.json|product-prd-generator,openspec-practice"
+  "skills/business/product-prd-generator/references/product-governance/ontology-change-set.schema.json|product-prd-generator,competitor-product-analyzer,openspec-practice"
+  "skills/business/product-prd-generator/references/product-governance/reconciliation-record.schema.json|product-prd-generator,openspec-practice"
+  "skills/business/product-prd-generator/references/product-governance/implementation-return.schema.json|product-prd-generator,openspec-practice"
   "$LANLNK_BASE/30-products/lnkcre/ontology/domain-knowledge.md|product-prd-generator,competitor-product-analyzer"
   "$LANLNK_BASE/config/ontology/business-ontology.yaml|product-prd-generator,competitor-product-analyzer"
 )

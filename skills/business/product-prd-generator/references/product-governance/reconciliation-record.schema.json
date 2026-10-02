@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "reconciliation-record.schema.json",
+  "title": "Pairwise product layer reconciliation",
+  "type": "object",
+  "required": ["schema_version", "reconciliation_id", "product_id", "pair", "left", "right", "coverage", "outcome", "findings"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "reconciliation_id": {"type": "string", "minLength": 1},
+    "product_id": {"enum": ["lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat"]},
+    "pair": {"enum": ["ontology-prd", "prd-code", "ontology-code"]},
+    "left": {"$ref": "layer-reference.schema.json"},
+    "right": {"$ref": "layer-reference.schema.json"},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "coverage": {"$ref": "scan-coverage.schema.json"},
+    "outcome": {"enum": ["aligned", "drifted", "conflicting", "missing", "not-scanned", "inaccessible", "deferred", "unsupported", "false-positive-corrected"]},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["finding_id", "summary", "source_ids", "disposition"],
+        "properties": {
+          "finding_id": {"type": "string", "minLength": 1},
+          "trace_ids": {"type": "array", "items": {"type": "string"}},
+          "summary": {"type": "string", "minLength": 1},
+          "source_ids": {"type": "array", "items": {"type": "string"}},
+          "disposition": {"enum": ["ontology-review", "product-decision", "implementation", "scanner-coverage", "no-action", "pending"]},
+          "owner": {"type": "string", "minLength": 1},
+          "decision_ref": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"pair": {"const": "ontology-prd"}}, "required": ["pair"]},
+      "then": {
+        "properties": {
+          "left": {"properties": {"layer": {"const": "ontology"}}},
+          "right": {"properties": {"layer": {"const": "prd"}}}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"pair": {"const": "prd-code"}}, "required": ["pair"]},
+      "then": {
+        "properties": {
+          "left": {"properties": {"layer": {"const": "prd"}}},
+          "right": {"properties": {"layer": {"const": "code"}}}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"pair": {"const": "ontology-code"}}, "required": ["pair"]},
+      "then": {
+        "properties": {
+          "left": {"properties": {"layer": {"const": "ontology"}}},
+          "right": {"properties": {"layer": {"const": "code"}}}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"coverage": {"properties": {"status": {"enum": ["not-scanned", "inaccessible"]}}}}, "required": ["coverage"]},
+      "then": {"properties": {"outcome": {"not": {"const": "missing"}}}}
+    },
+    {
+      "if": {"properties": {"findings": {"contains": {"properties": {"disposition": {"enum": ["ontology-review", "product-decision"]}}}}}, "required": ["findings"]},
+      "then": {
+        "properties": {
+          "findings": {
+            "items": {
+              "if": {
+                "properties": {"disposition": {"enum": ["ontology-review", "product-decision"]}},
+                "required": ["disposition"]
+              },
+              "then": {"required": ["owner"], "properties": {"owner": {"const": "OPC"}}}
+            }
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

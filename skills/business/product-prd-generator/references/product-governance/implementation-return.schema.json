@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "implementation-return.schema.json",
+  "title": "Reviewed implementation return proposal",
+  "type": "object",
+  "required": ["schema_version", "return_id", "product_id", "trace_ids", "target_repo", "review_status", "proposed_updates"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "return_id": {"type": "string", "minLength": 1},
+    "product_id": {"enum": ["lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat"]},
+    "origin_flow": {"description": "Direction for this return only; reverse-origin findings remain proposals.", "enum": ["forward-governance", "code-evidence-reverse"]},
+    "trace_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "target_repo": {"type": "string", "minLength": 1},
+    "open_spec_change_id": {"type": "string", "minLength": 1},
+    "source_revision": {"type": "string", "minLength": 1},
+    "scan_coverage": {"$ref": "scan-coverage.schema.json"},
+    "verification_refs": {"type": "array", "items": {"type": "string"}},
+    "reconciliation_ids": {"type": "array", "items": {"type": "string"}},
+    "findings": {"type": "array", "items": {"type": "string"}},
+    "review_status": {"enum": ["incomplete", "pending", "accepted", "rejected"]},
+    "review_owner": {"type": "string", "minLength": 1},
+    "proposed_updates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["destination_layer", "summary", "status"],
+        "properties": {
+          "destination_layer": {"enum": ["ontology", "prd", "code", "reconciliation"]},
+          "summary": {"type": "string", "minLength": 1},
+          "status": {"enum": ["proposed", "accepted", "rejected", "deferred"]},
+          "decision_ref": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "allOf": [
+    {"if": {"properties": {"review_status": {"const": "accepted"}}, "required": ["review_status"]}, "then": {"required": ["open_spec_change_id", "source_revision", "verification_refs", "review_owner"], "properties": {"review_owner": {"const": "OPC"}}}},
+    {
+      "if": {"properties": {"origin_flow": {"const": "code-evidence-reverse"}}, "required": ["origin_flow"]},
+      "then": {
+        "required": ["source_revision", "scan_coverage"],
+        "properties": {
+          "proposed_updates": {
+            "items": {
+              "properties": {
+                "destination_layer": {"enum": ["ontology", "prd", "reconciliation"]},
+                "status": {"const": "proposed"}
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "layer-reference.schema.json",
+  "title": "Product layer authority reference",
+  "type": "object",
+  "required": ["product_id", "product_class", "layer", "status"],
+  "properties": {
+    "product_id": {"enum": ["lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat"]},
+    "product_class": {"enum": ["business", "tool"]},
+    "ontology_profile": {"enum": ["business-ontology", "tool-ontology"]},
+    "layer": {"enum": ["ontology", "prd", "code"]},
+    "status": {"enum": ["resolved", "unresolved", "unsupported", "inaccessible"]},
+    "authority_ref": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "minLength": 1},
+    "revision": {"type": "string", "minLength": 1},
+    "release_id": {"type": "string", "minLength": 1},
+    "owner": {"type": "string", "minLength": 1},
+    "reason": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {"if": {"properties": {"product_class": {"const": "business"}}, "required": ["product_class"]}, "then": {"properties": {"ontology_profile": {"const": "business-ontology"}}}},
+    {"if": {"properties": {"product_class": {"const": "tool"}}, "required": ["product_class"]}, "then": {"properties": {"ontology_profile": {"const": "tool-ontology"}}}},
+    {"if": {"properties": {"status": {"const": "resolved"}}, "required": ["status"]}, "then": {"required": ["authority_ref"]}},
+    {"if": {"properties": {"status": {"enum": ["unresolved", "unsupported", "inaccessible"]}}, "required": ["status"]}, "then": {"required": ["reason"]}}
+  ],
+  "additionalProperties": false
+}

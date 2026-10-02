@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ontology-change-set.schema.json",
+  "title": "Ontology baseline draft or incremental change set",
+  "type": "object",
+  "required": ["schema_version", "change_set_id", "product_id", "ontology_profile", "change_mode", "origin_flow", "baseline", "inputs", "changes", "review"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "change_set_id": {"type": "string", "minLength": 1},
+    "product_id": {"enum": ["lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat"]},
+    "ontology_profile": {"enum": ["business-ontology", "tool-ontology"]},
+    "change_mode": {"enum": ["initial-baseline", "incremental"]},
+    "origin_flow": {"description": "Direction for this change only; never a product-level workflow classification.", "enum": ["forward-governance", "code-evidence-reverse"]},
+    "ontology_impact": {
+      "type": "object",
+      "required": ["result", "rationale", "baseline_ref"],
+      "properties": {
+        "result": {"enum": ["changed", "no-change"]},
+        "rationale": {"type": "string", "minLength": 1},
+        "baseline_ref": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "scan_coverage": {"$ref": "scan-coverage.schema.json"},
+    "baseline": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {"enum": ["absent", "identified"]},
+        "version": {"type": "string", "minLength": 1},
+        "revision": {"type": "string", "minLength": 1},
+        "authority_ref": {"type": "string", "minLength": 1}
+      },
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "identified"}}, "required": ["status"]}, "then": {"required": ["version", "authority_ref"]}},
+        {"if": {"properties": {"status": {"const": "absent"}}, "required": ["status"]}, "then": {"properties": {"version": false, "revision": false, "authority_ref": false}}}
+      ],
+      "additionalProperties": false
+    },
+    "inputs": {"type": "array", "items": {"$ref": "source-reference.schema.json"}},
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["change_id", "operation", "concept_ref", "proposed_content", "rationale", "source_ids"],
+        "properties": {
+          "change_id": {"type": "string", "minLength": 1},
+          "operation": {"enum": ["add", "modify", "deprecate", "relate"]},
+          "concept_ref": {"type": "string", "minLength": 1},
+          "proposed_content": {"type": "object", "minProperties": 1},
+          "rationale": {"type": "string", "minLength": 1},
+          "source_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+          "impact_refs": {"type": "array", "items": {"type": "string"}},
+          "compatibility_notes": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "review": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {"enum": ["draft", "under-review", "accepted", "rejected", "deferred", "superseded"]},
+        "owner": {"type": "string", "minLength": 1},
+        "decision_ref": {"type": "string", "minLength": 1},
+        "rationale": {"type": "string"},
+        "reviewed_at": {"type": "string", "format": "date-time"}
+      },
+      "allOf": [
+      {"if": {"properties": {"status": {"const": "accepted"}}, "required": ["status"]}, "then": {"required": ["owner", "decision_ref", "reviewed_at"], "properties": {"owner": {"const": "OPC"}}}}
+      ],
+      "additionalProperties": false
+    },
+    "proposed_release": {
+      "type": "object",
+      "required": ["version", "source_revision"],
+      "properties": {
+        "version": {"type": "string", "minLength": 1},
+        "source_revision": {"type": "string", "minLength": 1},
+        "release_id": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "origin_flow": {"const": "forward-governance"},
+          "change_mode": {"const": "incremental"}
+        },
+        "required": ["origin_flow", "change_mode"]
+      },
+      "then": {"required": ["ontology_impact"]}
+    },
+    {
+      "if": {"properties": {"origin_flow": {"const": "code-evidence-reverse"}}, "required": ["origin_flow"]},
+      "then": {
+        "required": ["scan_coverage"],
+        "properties": {
+          "inputs": {
+            "contains": {
+              "properties": {"source_type": {"enum": ["code_fact", "spec_fact", "test_fact"]}},
+              "required": ["source_type", "revision"]
+            },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"ontology_impact": {"properties": {"result": {"const": "no-change"}}}}, "required": ["ontology_impact"]},
+      "then": {"properties": {"changes": {"maxItems": 0}}}
+    },
+    {
+      "if": {"properties": {"ontology_impact": {"properties": {"result": {"const": "changed"}}}}, "required": ["ontology_impact"]},
+      "then": {"properties": {"changes": {"minItems": 1}}}
+    },
+    {
+      "if": {"properties": {"origin_flow": {"const": "code-evidence-reverse"}}, "required": ["origin_flow"]},
+      "then": {"required": ["scan_coverage"]}
+    },
+    {
+      "if": {"properties": {"change_mode": {"const": "initial-baseline"}}, "required": ["change_mode"]},
+      "then": {
+        "properties": {
+          "baseline": {
+            "properties": {
+              "status": {"const": "absent"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"change_mode": {"const": "incremental"}}, "required": ["change_mode"]},
+      "then": {
+        "properties": {
+          "baseline": {
+            "properties": {
+              "status": {"const": "identified"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"review": {"properties": {"status": {"const": "accepted"}}}}, "required": ["review"]},
+      "then": {"required": ["proposed_release"]}
+    }
+  ],
+  "additionalProperties": false
+}
