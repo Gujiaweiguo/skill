@@ -236,6 +236,47 @@ fi
 echo ""
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Check 5: Shared files must be git-tracked (fresh-clone view)
+# 2026-10-02 复利：磁盘上存在 ≠ fresh clone 后存在。Check 1 只看磁盘视角；
+# 本检查按 git 索引（git ls-files）校验，堵「引用已推送、被引用物未提交」
+# 的悬空类事故（实证：6c5c5b3 前夜 product-governance 目录 untracked 悬空）。
+# 仓内相对路径查 skill 仓索引；$LANLNK_BASE 绝对路径查 docs 仓自身索引。
+# ─────────────────────────────────────────────────────────────────────────────
+echo "--- Check 5: Shared files tracked (git view) ---"
+if git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  for entry in "${SHARED_FILES[@]}"; do
+    path="${entry%%|*}"
+    if [[ "$path" == /* ]]; then
+      if git -C "$LANLNK_BASE" rev-parse --git-dir >/dev/null 2>&1; then
+        rel_docs="${path#"$LANLNK_BASE"/}"
+        if [ -z "$(git -C "$LANLNK_BASE" ls-files -- "$rel_docs")" ]; then
+          print_result FAIL "Shared file exists on disk but NOT tracked in docs repo (fresh clone would lose it): $rel_docs"
+          FAIL=$((FAIL+1))
+        else
+          PASS=$((PASS+1))
+        fi
+      else
+        print_result WARN "docs base not inside a git repo — skipping tracked-view: ${path/#$LANLNK_BASE/\$LANLNK_BASE}"
+        WARN=$((WARN+1))
+      fi
+    else
+      if [ -z "$(git -C "$REPO_ROOT" ls-files -- "$path")" ]; then
+        print_result FAIL "Shared file exists on disk but NOT git-tracked (fresh clone would lose it): $path"
+        FAIL=$((FAIL+1))
+      else
+        PASS=$((PASS+1))
+      fi
+    fi
+  done
+  [ $QUIET -eq 0 ] && print_result PASS "Tracked-view check complete"
+else
+  print_result WARN "Not a git repo — skipping tracked-view check"
+  WARN=$((WARN+1))
+fi
+
+echo ""
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Summary
 # ─────────────────────────────────────────────────────────────────────────────
 echo "=== Summary ==="

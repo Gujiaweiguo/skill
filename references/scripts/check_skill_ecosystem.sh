@@ -194,6 +194,36 @@ else
   P1_FAIL=$((P1_FAIL+1))
 fi
 
+# ─────────────────────────────────────────────────────────────────────────────
+# P1-7 (引用完整性 git 视角): 被 tracked 内容引用的治理文件必须在 git 索引里
+# 2026-10-02 复利：磁盘存在 ≠ fresh clone 存在（6c5c5b3 前夜悬空实证）。
+# (a) 复杂 skill 的 troubleshooting.md 必须 tracked（P1-1 只看磁盘视角）
+# (b) AGENTS.md 提及的 references/scripts/*.sh 必须存在且 tracked
+# ─────────────────────────────────────────────────────────────────────────────
+if git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  for cs in "${COMPLEX_SKILLS[@]}"; do
+    ts="$cs/references/troubleshooting.md"
+    if [ -f "$REPO_ROOT/$ts" ] && [ -z "$(git -C "$REPO_ROOT" ls-files -- "$ts")" ]; then
+      print_check P1 FAIL "troubleshooting.md on disk but NOT git-tracked (fresh clone would lose it): $ts"
+      P1_FAIL=$((P1_FAIL+1))
+    fi
+  done
+  while IFS= read -r ref_script; do
+    [ -n "$ref_script" ] || continue
+    if [ ! -f "$REPO_ROOT/$ref_script" ]; then
+      print_check P1 FAIL "AGENTS.md references missing script: $ref_script"
+      P1_FAIL=$((P1_FAIL+1))
+    elif [ -z "$(git -C "$REPO_ROOT" ls-files -- "$ref_script")" ]; then
+      print_check P1 FAIL "AGENTS.md-referenced script NOT git-tracked (fresh clone would lose it): $ref_script"
+      P1_FAIL=$((P1_FAIL+1))
+    else
+      P1_PASS=$((P1_PASS+1))
+    fi
+  done < <(grep -oE 'references/scripts/[A-Za-z0-9._-]+\.sh' "$REPO_ROOT/AGENTS.md" | sort -u)
+else
+  print_check WARN n-a "Not a git repo — skipping tracked-view checks (P1-7)"
+fi
+
 if [ $P1_FAIL -eq 0 ]; then
   print_check PASS PASS "All P1 checks passed"
 fi
