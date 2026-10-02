@@ -312,7 +312,7 @@ source: "raw/原始文件.pptx.md"
 }
 ```
 
-`source_id` 与 `content_sha256` 是可选字段。`source_id` 格式为 `raw:<COMPANY_BASE>/raw` 下的相对 POSIX 路径；它标识 raw 路径，不声称识别原始输入文件。`content_sha256` 仅在对 raw 文件实际字节计算 SHA-256 后写入。旧索引缺少这两个字段仍可读取；`imported_from` 是路径推断值，空值不应被解释或提升为原始文件身份。`consumed_by` 等引用继续使用公司基座下的相对路径，不复制 material 内容。
+`source_id` 与 `content_sha256` 是可选字段。`source_id` 格式为 `raw:<COMPANY_BASE>/raw` 下的相对 POSIX 路径；它标识 raw 路径，不声称识别原始输入文件。`content_sha256` 仅在对 raw 文件实际字节计算 SHA-256 后写入。`scan_incomplete` 同为可选字段：仅当索引重建时 raw/ 或 materials/ 存在无法访问的路径（权限等）才出现且为 `true`——表示该条目的 `consumed_by`/`needs_review` 基于不完整观察，**人工清理对应 raw 文件前必须先消除访问失败并重扫**；stderr 会同步列出失败位置。旧索引缺少这些字段仍可读取；`imported_from` 是路径推断值，空值不应被解释或提升为原始文件身份。`consumed_by` 等引用继续使用公司基座下的相对路径，不复制 material 内容。
 
 该索引只记录摄取来源路径、文件指纹及 raw/material 路径引用关系，是摄取 provenance；它不是 ontology、证据结论或决策 authority。
 跨 skill 引用 raw/material 来源时，使用共享 `source-reference.schema.json` 表达路径与身份；该 schema 由 product-prd-generator 维护，material-importer 不把它当语义证据或业务决策。

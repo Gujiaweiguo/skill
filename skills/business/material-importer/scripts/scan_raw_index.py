@@ -23,6 +23,7 @@ import sys
 from datetime import datetime
 from fnmatch import fnmatchcase
 from pathlib import Path
+from typing import NamedTuple
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _company_base import resolve_company_base  # noqa: E402
@@ -30,33 +31,76 @@ from _company_base import resolve_company_base  # noqa: E402
 RAW_EXTENSIONS = (".md", ".csv")
 
 
-def find_raw_files(raw_dir: Path) -> list[Path]:
-    """遍历 raw/ 目录，收集所有 .md 与 .csv 文件（排除 _media/ 与隐藏目录）。"""
+class ScanFailure(NamedTuple):
+    """一次扫描中无法访问的位置（目录不可进入 / 文件不可读）。"""
+
+    location: str
+    message: str
+
+    def __str__(self) -> str:  # pragma: no cover - 展示格式
+        return f"{self.location}: {self.message}"
+
+
+def find_raw_files(raw_dir: Path) -> tuple[list[Path], list[ScanFailure]]:
+    """遍历 raw/ 目录，收集所有 .md 与 .csv 文件（排除 _media/ 与隐藏目录）。
+
+    返回 (文件列表, 无法访问的位置清单)。os.walk 对不可读目录默认静默跳过，
+    这里通过 onerror 显式收集——绝不把「没扫到」当「不存在」。
+    """
     results: list[Path] = []
-    for root, dirs, files in os.walk(raw_dir):
+    failures: list[ScanFailure] = []
+
+    def record_error(err: OSError) -> None:
+        failures.append(
+            ScanFailure(
+                location=getattr(err, "filename", None) or str(raw_dir),
+                message=err.strerror or str(err),
+            )
+        )
+
+    for root, dirs, files in os.walk(raw_dir, onerror=record_error):
         dirs[:] = [d for d in dirs if d != "_media" and not d.startswith(".")]
         for f in files:
             if f.endswith(RAW_EXTENSIONS) and f != "_index.json":
                 results.append(Path(root) / f)
-    return sorted(results)
+    return sorted(results), failures
 
 
-def load_materials_content(materials_dir: Path) -> dict[str, str]:
-    """加载 materials/ 下所有 .md 文件内容，返回 {relative_path: content}。"""
+def load_materials_content(
+    materials_dir: Path,
+) -> tuple[dict[str, str], list[ScanFailure]]:
+    """加载 materials/ 下所有 .md 文件内容，返回 ({relative_path: content}, 读取失败清单)。
+
+    读取失败的文件不参与 consumed_by 检测，必须显式上报；
+    否则「读不到」会被下游当成「没有引用」，进而误判 needs_review。
+    """
     contents: dict[str, str] = {}
+    failures: list[ScanFailure] = []
     if not materials_dir.is_dir():
-        return contents
-    for root, _, files in os.walk(materials_dir):
+        return contents, failures
+
+    def record_error(err: OSError) -> None:
+        failures.append(
+            ScanFailure(
+                location=getattr(err, "filename", None) or str(materials_dir),
+                message=err.strerror or str(err),
+            )
+        )
+
+    for root, _, files in os.walk(materials_dir, onerror=record_error):
         for f in files:
             if f.endswith(".md"):
                 p = Path(root) / f
                 try:
                     text = p.read_text(encoding="utf-8", errors="replace")
-                    rel = str(p.relative_to(materials_dir.parent))
-                    contents[rel] = text
-                except Exception:
-                    pass
-    return contents
+                except OSError as e:
+                    failures.append(
+                        ScanFailure(location=str(p), message=e.strerror or str(e))
+                    )
+                    continue
+                rel = str(p.relative_to(materials_dir.parent))
+                contents[rel] = text
+    return contents, failures
 
 
 def find_consumers(raw_filename: str, materials_content: dict[str, str]) -> list[str]:
@@ -132,6 +176,18 @@ def build_entry(
     }
 
 
+def _under_inaccessible(rel_name: str, raw_dir: Path, failures: list[ScanFailure]) -> bool:
+    """判断 raw 相对路径是否位于本次扫描无法访问的位置之下。"""
+    target = raw_dir / rel_name
+    for failure in failures:
+        try:
+            target.relative_to(Path(failure.location))
+            return True
+        except ValueError:
+            continue
+    return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="扫描 raw/ 重建 _index.json")
     parser.add_argument("--raw-dir", default=None, help="raw/ 目录路径（默认 $COMPANY_BASE/raw）")
@@ -159,12 +215,27 @@ def main() -> int:
             print(f"[WARN] 现有 _index.json 解析失败，将完全重建", file=sys.stderr)
 
     print(f"[INFO] 扫描 raw/ 目录: {raw_dir}", file=sys.stderr)
-    raw_files = find_raw_files(raw_dir)
+    raw_files, raw_failures = find_raw_files(raw_dir)
+    for failure in raw_failures:
+        print(f"[WARN] raw/ 无法访问（该子树未纳入索引）: {failure}", file=sys.stderr)
+    if raw_failures:
+        print(f"[WARN] raw/ 共 {len(raw_failures)} 处无法访问", file=sys.stderr)
     print(f"[INFO] 发现 {len(raw_files)} 个 .md 文件", file=sys.stderr)
 
     print(f"[INFO] 加载 materials/ 内容: {materials_dir}", file=sys.stderr)
-    materials_content = load_materials_content(materials_dir)
+    materials_content, material_failures = load_materials_content(materials_dir)
+    for failure in material_failures:
+        print(f"[WARN] materials 无法读取（consumed_by 检测未覆盖该文件）: {failure}", file=sys.stderr)
+    if material_failures:
+        print(
+            f"[WARN] materials 共 {len(material_failures)} 处读取失败",
+            file=sys.stderr,
+        )
     print(f"[INFO] 加载 {len(materials_content)} 个 materials 文件", file=sys.stderr)
+
+    # materials 不完整 → 所有条目的 consumed_by/needs_review 都基于部分证据，必须标记；
+    # 仅 raw 子树失败 → 已发现条目自身证据完整，不标记（缺失条目在下方合并保留时单独标记）。
+    materials_complete = not material_failures
 
     new_index: dict[str, dict] = {}
     consumed_count = 0
@@ -188,10 +259,32 @@ def main() -> int:
             if "needs_review" in old:
                 entry["needs_review"] = old["needs_review"] or generated_entry["needs_review"]
 
+        if materials_complete:
+            entry.pop("scan_incomplete", None)
+        else:
+            entry["scan_incomplete"] = True
+
         new_index[rel_name] = entry
 
         if (i + 1) % 200 == 0:
             print(f"[INFO] 进度: {i + 1}/{len(raw_files)}", file=sys.stderr)
+
+    # 合并模式下，未能重新发现、且位于本次无法访问子树之下的旧条目：
+    # 保留并标记 scan_incomplete——不能因为「扫不到」而丢弃仍有效的索引记录。
+    preserved_count = 0
+    if args.merge:
+        for rel_name, old in existing.items():
+            if rel_name in new_index:
+                continue
+            if _under_inaccessible(rel_name, raw_dir, raw_failures):
+                preserved = dict(old)
+                preserved["scan_incomplete"] = True
+                new_index[rel_name] = preserved
+                preserved_count += 1
+                print(
+                    f"[WARN] 旧条目位于无法访问的子树，保留并标记 scan_incomplete: {rel_name}",
+                    file=sys.stderr,
+                )
 
     index_path.write_text(
         json.dumps(new_index, ensure_ascii=False, indent=2) + "\n",
@@ -203,6 +296,16 @@ def main() -> int:
     print(f"     总条目: {len(new_index)}", file=sys.stderr)
     print(f"     已消费: {consumed_count} ({consumed_count / len(new_index) * 100:.1f}%)" if new_index else "", file=sys.stderr)
     print(f"     待确认: {unconsumed}", file=sys.stderr)
+    if preserved_count:
+        print(f"     保留(不可访问子树): {preserved_count}", file=sys.stderr)
+    if not materials_complete or raw_failures:
+        flagged = sum(1 for e in new_index.values() if e.get("scan_incomplete"))
+        print(
+            f"     ⚠️ 扫描不完整: raw {len(raw_failures)} 处 / materials "
+            f"{len(material_failures)} 处失败，{flagged} 个条目标记 scan_incomplete；"
+            "人工清理 raw 前必须先消除访问失败并重扫",
+            file=sys.stderr,
+        )
     return 0
 
 

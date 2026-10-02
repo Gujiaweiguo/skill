@@ -1,14 +1,24 @@
 from hashlib import sha256
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
+import json
+import os
 import sys
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 import scan_raw_index  # noqa: E402
+
+
+def _skip_if_root(test: unittest.TestCase) -> None:
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        test.skipTest("permission checks do not apply when running as root")
 
 
 class BuildEntryTest(unittest.TestCase):
@@ -99,12 +109,157 @@ class FindRawFilesTest(unittest.TestCase):
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text("x", encoding="utf-8")
 
-            found = scan_raw_index.find_raw_files(raw_dir)
+            found, failures = scan_raw_index.find_raw_files(raw_dir)
 
         self.assertEqual(
             [str(p.relative_to(raw_dir)) for p in found],
             ["topic/a.docx.md", "topic/csv/清单.csv"],
         )
+        self.assertEqual(failures, [])
+
+    def test_walk_failure_is_reported_not_swallowed(self) -> None:
+        _skip_if_root(self)
+        with TemporaryDirectory() as tmp:
+            raw_dir = Path(tmp) / "raw"
+            (raw_dir / "topic").mkdir(parents=True)
+            (raw_dir / "topic" / "a.md").write_text("x", encoding="utf-8")
+            locked = raw_dir / "locked"
+            locked.mkdir()
+            (locked / "b.md").write_text("x", encoding="utf-8")
+            os.chmod(locked, 0o000)
+            try:
+                found, failures = scan_raw_index.find_raw_files(raw_dir)
+            finally:
+                os.chmod(locked, 0o755)
+
+        self.assertEqual([p.name for p in found], ["a.md"])
+        self.assertEqual(len(failures), 1)
+        self.assertIn(str(locked), failures[0].location)
+        self.assertTrue(failures[0].message)
+
+
+class LoadMaterialsContentTest(unittest.TestCase):
+    def test_unreadable_material_file_is_reported_not_swallowed(self) -> None:
+        _skip_if_root(self)
+        with TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            materials_dir = base / "materials"
+            materials_dir.mkdir()
+            good = materials_dir / "good.md"
+            good.write_text("内容", encoding="utf-8")
+            locked = materials_dir / "locked.md"
+            locked.write_text("内容", encoding="utf-8")
+            os.chmod(locked, 0o000)
+            try:
+                contents, failures = scan_raw_index.load_materials_content(materials_dir)
+            finally:
+                os.chmod(locked, 0o755)
+
+        self.assertEqual(list(contents.keys()), ["materials/good.md"])
+        self.assertEqual(len(failures), 1)
+        self.assertIn(str(locked), failures[0].location)
+
+
+class ScanMainIncompleteTest(unittest.TestCase):
+    """main() 的失败可见性行为：不可读输入必须落 WARN 与 scan_incomplete 标记。"""
+
+    @staticmethod
+    def _make_base(tmp: str) -> Path:
+        base = Path(tmp)
+        (base / "config").mkdir(parents=True, exist_ok=True)
+        (base / "config" / "company.yaml").write_text("brand: test\n", encoding="utf-8")
+        return base
+
+    def _run_main(self, raw_dir: Path, materials_dir: Path) -> tuple[int, str]:
+        stderr = StringIO()
+        argv = [
+            "scan_raw_index.py",
+            "--raw-dir", str(raw_dir),
+            "--materials-dir", str(materials_dir),
+        ]
+        with patch.dict(os.environ, {"COMPANY_BASE": str(raw_dir.parents[0])}, clear=False):
+            with patch.object(sys, "argv", argv):
+                with redirect_stderr(stderr):
+                    rc = scan_raw_index.main()
+        return rc, stderr.getvalue()
+
+    def test_unreadable_material_flags_entries_and_warns(self) -> None:
+        _skip_if_root(self)
+        with TemporaryDirectory() as tmp:
+            base = self._make_base(tmp)
+            raw_dir = base / "raw"
+            raw_dir.mkdir()
+            (raw_dir / "报告.docx.md").write_text("内容", encoding="utf-8")
+            materials_dir = base / "materials"
+            materials_dir.mkdir()
+            consumer = materials_dir / "案例.md"
+            consumer.write_text(
+                '---\nsource: "raw/报告.docx.md"\n---\n正文', encoding="utf-8"
+            )
+            os.chmod(consumer, 0o000)
+            try:
+                rc, stderr = self._run_main(raw_dir, materials_dir)
+            finally:
+                os.chmod(consumer, 0o755)
+
+            index = json.loads((raw_dir / "_index.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(rc, 0)
+        self.assertIn("[WARN]", stderr)
+        self.assertIn("consumed_by 检测未覆盖", stderr)
+        entry = index["报告.docx.md"]
+        self.assertEqual(entry["consumed_by"], [])
+        self.assertTrue(entry["needs_review"])
+        self.assertTrue(entry["scan_incomplete"])
+
+    def test_clean_scan_has_no_scan_incomplete_flag(self) -> None:
+        with TemporaryDirectory() as tmp:
+            base = self._make_base(tmp)
+            raw_dir = base / "raw"
+            raw_dir.mkdir()
+            (raw_dir / "报告.docx.md").write_text("内容", encoding="utf-8")
+            materials_dir = base / "materials"
+            materials_dir.mkdir()
+
+            rc, stderr = self._run_main(raw_dir, materials_dir)
+
+            index = json.loads((raw_dir / "_index.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(rc, 0)
+        self.assertNotIn("scan_incomplete", index["报告.docx.md"])
+        self.assertNotIn("[WARN]", stderr)
+
+    def test_merge_preserves_entries_under_inaccessible_subtree(self) -> None:
+        _skip_if_root(self)
+        with TemporaryDirectory() as tmp:
+            base = self._make_base(tmp)
+            raw_dir = base / "raw"
+            (raw_dir / "topic").mkdir(parents=True)
+            (raw_dir / "topic" / "a.md").write_text("内容", encoding="utf-8")
+            locked = raw_dir / "locked"
+            locked.mkdir()
+            (locked / "b.md").write_text("内容", encoding="utf-8")
+            materials_dir = base / "materials"
+            materials_dir.mkdir()
+
+            rc1, _ = self._run_main(raw_dir, materials_dir)
+            self.assertEqual(rc1, 0)
+            first = json.loads((raw_dir / "_index.json").read_text(encoding="utf-8"))
+            self.assertIn("locked/b.md", first)
+
+            os.chmod(locked, 0o000)
+            try:
+                rc2, stderr = self._run_main(raw_dir, materials_dir)
+            finally:
+                os.chmod(locked, 0o755)
+
+            second = json.loads((raw_dir / "_index.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(rc2, 0)
+        self.assertIn("locked/b.md", second)
+        self.assertTrue(second["locked/b.md"]["scan_incomplete"])
+        self.assertNotIn("scan_incomplete", second["topic/a.md"])
+        self.assertIn("保留并标记 scan_incomplete", stderr)
 
 
 class FindConsumersTest(unittest.TestCase):
