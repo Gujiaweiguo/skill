@@ -31,6 +31,16 @@
 4. 输出漂移类型和证据路径。
 5. 建议：无需处理 / 更新 PRD 判断 / 创建新 change / 做 archive reconciliation。
 
+## 执行回执
+
+每次审计必须记录可复现证据；正式结构化记录沿用共享治理契约 `reconciliation-record.schema.json` 的字段语义，此处不复制 schema：
+
+- `target_repo` 与 revision / commit
+- 扫描范围（比对了哪些模块 / 路径；未扫描区域如实记 not-scanned，不推断为缺失）
+- 实际执行的测试 / 验证命令及结果
+- `coverage.status`（complete / partial / not-scanned / inaccessible）
+- 证实误判的历史 finding 是否按 `false-positive-corrected` 修正留痕（不静默删除）
+
 ## 输出
 
 ```text
@@ -43,6 +53,12 @@ Archive 漂移审计：
 - code:
 - test:
 - docs:
+
+执行回执：
+- target_repo / revision:
+- 扫描范围:
+- 命令与结果:
+- coverage:
 
 建议动作：
 - ...

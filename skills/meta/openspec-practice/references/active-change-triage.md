@@ -26,6 +26,20 @@ openspec validate --changes --strict --json --no-interactive
 4. 标出冲突点：数据库迁移、权限、路由、共享组件、测试门禁。
 5. 推荐一次只推进一个 change。
 
+## 状态决策表
+
+按证据组合判断，证据冲突时按表格从上到下取第一个命中行。证据字段来自 `scan_openspec.py` 的 `active_evidence`（`tasks_status` / `verification_status` + `verification_reasons` / `artifact_status`），validate 结果来自 `openspec validate` CLI，不由扫描器推断：
+
+| 证据组合 | 状态 |
+|---|---|
+| `openspec validate` 失败 | 阻塞：先修 artifacts，不进入实施判断 |
+| tasks 未开始且无代码证据 | 未开始 |
+| tasks 部分勾选，或代码已部分落地 | 部分实现 |
+| tasks 全勾选但 verification report 非 present（missing / unreadable / empty / placeholder） | 待验证 |
+| tasks 全勾选且 verification report 为 present、验证通过 | 可归档 |
+| 需求与当前 PRD / canonical spec 已冲突 | 应废弃重开（不直接删，保留提案记录） |
+| 与其他 active change 改同一边界（数据库迁移 / 权限 / 路由 / 共享组件） | 应拆分或排序，不并行 apply |
+
 ## 并行判断
 
 | 类型 | 建议 |
