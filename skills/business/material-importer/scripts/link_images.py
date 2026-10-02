@@ -93,15 +93,17 @@ def main():
     copied = 0
 
     for root, _, files in os.walk(mat_dir):
-        if "/media" in root or root.endswith("media"):
+        if "media" in root.split(os.sep):
             continue
         for f in files:
             if not f.endswith(".md"):
                 continue
             p = os.path.join(root, f)
             try:
-                content = open(p, encoding="utf-8").read()
-            except Exception:
+                with open(p, encoding="utf-8") as fobj:
+                    content = fobj.read()
+            except (OSError, UnicodeDecodeError) as e:
+                print(f"[WARN] 无法读取，跳过: {p}: {e}", file=sys.stderr)
                 continue
             # 只处理断引用（路径不以 media/ 开头）
             if not re.search(r"!\[[^\]]*\]\((?!media/)[^)]+\)", content):
