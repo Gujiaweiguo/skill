@@ -4,7 +4,19 @@
 
 ## 目标
 
-目标项目 change 归档后，用 archived change 的证据刷新 PRD 侧状态、覆盖矩阵和下一轮 suggested changes。
+目标项目 change 归档后，用 archived change 的证据刷新 PRD 侧状态、覆盖矩阵和下一轮 suggested changes。回写证据按共享治理契约组织成 proposal；canonical 更新必须经 destination owner 审核后执行。
+
+## 共享治理契约
+
+回写证据的结构和语义以 product-prd-generator 拥有的共享契约为准，本 skill 只引用不复制：
+
+- 契约目录：`/opt/code/skill/skills/business/product-prd-generator/references/product-governance/`（owner：product-prd-generator）。
+- `implementation-return.schema.json`：回写证据本体。`trace_ids`、`target_repo`、`open_spec_change_id`、`verification_refs` 描述证据来源；`proposed_updates[].destination_layer` 指向 ontology/prd/code/reconciliation，状态从 `proposed` 起。
+- `layer-reference.schema.json`：标识被回写目标层的 authority 与版本；解析不到时显式记 `unresolved` / `unsupported` / `inaccessible` 及原因，不用其他产品的 authority 顶替。
+- `reconciliation-record.schema.json`：单次 pairwise 对账记录（见下文「晋升后 pairwise 对账」）。
+- 涉及 ontology 变更时，另按 `ontology-change-set.schema.json` 记 draft/delta 提案。
+
+契约是 skill 间接口，不是产品数据存储，也不是任何产品 canonical ontology/PRD/code 的权威；适用产品范围以该目录 README 为准（7 个软件产品，lnkwebsite 站点运营不在此契约内）。本 skill 所在的 skill 仓库不拥有任何外部 canonical 层产物。
 
 ## 输入
 
@@ -14,6 +26,7 @@
 - 可选：一个或多个 archived change id/path，用于精确指定回写对象。
 - 可选：PRD 输出目录。LnkCRE 当前 canonical 根为 `$LANLNK_BASE/30-products/lnkcre/prd/`（细分：baseline/increments/requirements/decisions/handoffs，回写件落 `prd/handoffs/`）。
 - 可选：`verification-report.md`、实现摘要、暂缓/合并/误判结论。
+- 可选：已有 implementation-return / reconciliation-record 记录；存在时做增量更新，不重写、不静默删除既有 finding。
 
 > 路径口径：`mi` / `lnkcre` / `LnkCRE` / `MI-CRE` 指同一产品（canonical id `lnkcre`）。`30-products/mi-cre/` 是历史路径和 source_ref 前缀（目录已于 2026-09 合并删除）——回写产物一律写入 `30-products/lnkcre/prd/`。docs 仓的 product registry / INDEX / OpenSpec change 只留在 docs 仓消费，不镜像进目标项目仓。
 
@@ -36,8 +49,32 @@
    - 暂缓
    - code_map 漏判
    - 仍未处理
-7. 更新前先列出候选 changes、目标 PRD、将修改的 PRD 文件和范围，等用户确认。
-8. 确认后再更新 PRD 资料库，不改目标项目代码，不创建目标项目 change。
+7. 更新前先列出候选 changes、目标 PRD、将修改的 PRD 文件和范围，以及按 `implementation-return.schema.json` 组织的 `proposed_updates` 清单，等用户确认。
+8. 用户确认后再进入回写；canonical 更新仍须由 destination owner 审核接受。用户确认仅在其身份为 destination owner 或获授权代理时才满足该审核门。不改目标项目代码，不创建目标项目 change。
+
+## 回写规则
+
+- 目标治理顺序：未来增量先做 ontology impact check（记录变更或有依据的无变更），再形成 PRD delta，最后交目标代码仓实施。已存在的代码领先场景可反向形成带 revision/coverage 的实现事实与 reconciliation/candidate，但不得将实现现状自动升级为产品意图。
+- OPC 为产品及 ontology 决策审核 owner。OPC 批准语义候选后才可晋升 ontology/PRD canonical；代码实现事实仍须记录目标仓、revision、扫描范围与验证证据，OPC 决策本身不构成技术验证。
+- origin flow 是单次 change/return 的字段，不是产品属性。产品完整状态、ontology/PRD 内容覆盖成熟度、adapter_status 分开记录。
+- 回写证据是 proposal：`proposed_updates[].status` 起始为 `proposed`；canonical 更新（PRD 资料库文件、ontology 基线）须经 destination owner 审核接受后执行。`review_status: accepted` 必须有 `verification_refs` 和 `review_owner`；证据不齐时保留 `incomplete`，不凑数接受。
+- ontology draft/delta 保持 review-gated：涉及 ontology 变更只产出 `ontology-change-set` 提案（draft / under-review），canonical 晋升前必须获得 approval；回写流程不得直接改写 ontology 权威文件。
+- 所有权边界：目标仓库拥有自己的 OpenSpec changes 和验证；回写只消费 archived change 证据，不替目标仓库 apply、verify，不写产品代码仓库。
+- 无强制顺序管道：回写与对账按短口令独立触发，不要求「消费 → 实施 → 回写」全链齐备才能执行。
+
+## 晋升后 pairwise 对账
+
+canonical 晋升（ontology 或 PRD 任一侧更新落地）之后，三对关系各自独立对账，每对一条 `reconciliation-record`：
+
+- `ontology-prd`：ontology ↔ PRD
+- `prd-code`：PRD ↔ code
+- `ontology-code`：ontology ↔ code
+
+规则：
+
+- 三对独立检查，不得用一对的结论推断另一对。
+- `coverage.status` 如实保留 `complete` / `partial` / `not-scanned` / `inaccessible`；未扫描或不可访问区域不得推断为缺失（对应 outcome 不得记 `missing`）。
+- 证实为误判的历史 drift finding，用 outcome `false-positive-corrected` 修正并留痕，不静默删除。
 
 ## 输出文件建议
 
@@ -47,5 +84,6 @@
 ## 完成标准
 
 - 状态变化都有 archived change / spec / code / test 证据。
+- 回写证据与对账记录符合共享契约；canonical 变更只出现在 destination owner 接受之后。
 - 下一轮 suggested changes 不再包含已完成或误判项。
-- code_map / ontology / term-aliases 问题进入单独修复清单。
+- code_map / ontology / term-aliases 问题进入单独修复清单（ontology 侧走 review-gated 提案，不直接改权威文件）。

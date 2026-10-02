@@ -95,6 +95,8 @@ uv run python scripts/scan_openspec.py <PROJECT_ROOT>
 - 不把历史 archive 当成可随意重写的当前事实。
 - 不把 PRD 过时或 code_map 漏判转成代码 change。
 - 不因目标项目仓库内找不到 PRD 就判定 PRD 不存在；先核对用户给出的 docs 绝对路径。
+- PRD 消费与回写遵循 product-prd-generator 的共享 product-governance 契约（`skills/business/product-prd-generator/references/product-governance/`）；proposal 起始状态、destination owner 审核、review-gated ontology 提案、晋升后 pairwise 对账等细则以 `references/prd-writeback.md` 为本 skill 内唯一权威描述，入口不复制。
+- skill 仓库不拥有任何产品的 canonical ontology/PRD/code，不写产品代码仓库；目标仓库始终拥有自己的 OpenSpec changes 与验证，消费/实施/回写按短口令独立触发。
 - 多 active changes 时，一次只推进一个 apply。
 - 多 scope 项目必须列出每个 scope 的验证命令。
 - 新流程优先要求 `verification-report.md`；历史项目缺报告时按 proposal/tasks/specs/code/tests 做证据审计。
