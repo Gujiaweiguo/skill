@@ -46,12 +46,18 @@ def find_vendor(path: str, root: str) -> str:
     return "unknown"
 
 
-def has_frontmatter(path: str) -> bool:
+def has_frontmatter(path: str) -> bool | None:
+    """检测文件是否已有 frontmatter；读取失败返回 None（无法判定）。
+
+    读失败绝不能返回 False——那会把「读不了」当成「没有」，
+    把不可读文件排进补写队列（失败观察不得变成修改决策）。
+    """
     try:
         with open(path, "r", encoding="utf-8") as f:
             return f.read(4).startswith("---")
-    except Exception:
-        return False
+    except (OSError, UnicodeDecodeError) as e:
+        print(f"[WARN] 无法读取，跳过: {path}: {e}", file=sys.stderr)
+        return None
 
 
 def process_dir(target: str, root: str, created: str, dry_run: bool):
@@ -63,7 +69,10 @@ def process_dir(target: str, root: str, created: str, dry_run: bool):
         for fn in sorted(fnames):
             if fn.endswith(".md"):
                 p = os.path.join(dirpath, fn)
-                if not has_frontmatter(p):
+                hf = has_frontmatter(p)
+                if hf is None:
+                    continue
+                if not hf:
                     files.append(p)
     files.sort()
 
