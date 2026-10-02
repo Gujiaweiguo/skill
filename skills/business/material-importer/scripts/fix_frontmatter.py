@@ -95,7 +95,7 @@ def process(target: str, root: str, dry_run: bool):
     counters = {}
     log = []
     for dirpath, _, fnames in os.walk(target):
-        if os.sep + "raw" in dirpath or "/raw" in dirpath:
+        if "raw" in dirpath.split(os.sep):
             continue
         for fn in sorted(fnames):
             if not fn.endswith(".md"):
@@ -107,8 +107,10 @@ def process(target: str, root: str, dry_run: bool):
                 continue
             ins_type, ins_dom, patch_dom, id_prefix = cfg
             try:
-                content = open(p, encoding="utf-8").read()
-            except Exception:
+                with open(p, encoding="utf-8") as f:
+                    content = f.read()
+            except (OSError, UnicodeDecodeError) as e:
+                print(f"[WARN] 无法读取，跳过: {p}: {e}", file=sys.stderr)
                 continue
             data, before, fm_text, after = parse_fm(content)
             name = extract_name(content, fn)
