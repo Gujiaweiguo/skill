@@ -11,9 +11,7 @@
 > 项目级配置的权威路径变为 `$LANLNK_BASE/30-products/<canonical-dir>/ontology.yaml`。
 > 路径解析 helper 实现了三级 fallback（30-products → out/prd legacy → config 默认），
 > 本 spec 的 scenarios 反映当前权威路径。
-
 ## Requirements
-
 ### Requirement: Multi-project ontology loading
 
 The skill SHALL support loading product-specific ontology.yaml per `--project` argument, falling back to
@@ -307,3 +305,35 @@ The docs repo 复利工程 更新日志 SHALL include an entry summarizing the 4
   - path 硬编码 → 配置化 fallback 模式
   - skeptical re-scan 发现 Risks 误判（coverage_validate.py + word_export.py）
   - future_scanners 占位 schema 模式
+
+### Requirement: Full and incremental PRDs SHALL preserve distinct inputs and semantic provenance
+The skill SHALL support a first/full PRD as a versioned product-planning baseline and an incremental PRD as a delta against an identified prior PRD baseline. Both modes SHALL preserve customer requirements, competitor evidence, current code facts, ontology references, and owner/OPC product judgments as distinct input classes with source references, timestamps or revisions where available, confidence/review state, and stable trace identifiers for actionable items. The skill SHALL accept a subset of input classes when that matches the task and SHALL NOT force every upstream skill to run for every request.
+
+#### Scenario: First/full PRD combines available inputs
+- **WHEN** an owner requests a first/full PRD for an in-scope product
+- **THEN** the output SHALL identify the ontology basis, code baseline, available customer requirements, available competitor evidence, and owner/OPC decisions, and SHALL disclose absent or unreviewed input classes
+
+#### Scenario: Incremental PRD compares against a prior baseline
+- **WHEN** an owner requests an incremental PRD after new evidence, decisions, or implementation changes
+- **THEN** the output SHALL identify the prior PRD baseline and ontology release/model version, classify new or changed inputs, and retain trace links to their sources
+
+#### Scenario: Owner/OPC business judgment is provided
+- **WHEN** a product owner provides a business interpretation, decision, or priority
+- **THEN** the skill SHALL record it as a product decision with owner, rationale, status, and supporting evidence when available, separate from observed customer or competitor evidence
+
+#### Scenario: Competitor evidence is used in a PRD
+- **WHEN** competitor analysis contributes to an actionable PRD item
+- **THEN** the PRD item SHALL retain the competitor capability/evidence identifiers and SHALL NOT treat competitor observation alone as an approved product decision
+
+#### Scenario: Ontology concept is missing during PRD analysis
+- **WHEN** a requirement or decision uses a semantic concept absent from the current ontology
+- **THEN** the skill SHALL be able to synthesize a proposed ontology delta from the classified source and link it to the PRD item, while keeping the PRD decision and ontology authority separately reviewable
+
+#### Scenario: Owner approves an ontology delta
+- **WHEN** an ontology delta synthesized from customer, competitor, code, or owner input is approved and promoted
+- **THEN** the PRD workflow SHALL compare affected PRD items against the new ontology version and record whether a PRD update is needed, without silently rewriting the PRD baseline
+
+#### Scenario: Inputs are incomplete or not requested
+- **WHEN** one or more input classes are unavailable or the task does not require them
+- **THEN** the skill SHALL mark them unavailable, not scanned, or not applicable as appropriate and SHALL continue only within the declared scope without implying a complete three-layer reconciliation
+
