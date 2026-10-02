@@ -4,9 +4,9 @@
   uv run scripts/scan_raw_index.py [--raw-dir <path>] [--materials-dir <path>] [--merge]
 
 功能:
-  - 遍历 raw/ 下所有 .md 文件（排除 _media/ 目录）
+  - 遍历 raw/ 下所有 .md 与 .csv 文件（排除 _media/ 目录）
   - 对每个 raw 文件，扫描 materials/ 检测是否被引用（consumed_by）
-  - 推断 imported_from（从目录结构反推 incoming/ 源路径）
+  - 推断 imported_from（从目录结构反推 incoming/ 源路径；csv 推断为无扩展名）
   - 默认与现有 _index.json 合并（保留手动维护的字段）
   - --no-merge 时完全覆盖
 
@@ -15,23 +15,28 @@
 """
 
 import argparse
+import hashlib
 import json
 import os
+import re
 import sys
 from datetime import datetime
+from fnmatch import fnmatchcase
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _company_base import resolve_company_base  # noqa: E402
 
+RAW_EXTENSIONS = (".md", ".csv")
 
-def find_raw_md_files(raw_dir: Path) -> list[Path]:
-    """遍历 raw/ 目录，收集所有 .md 文件（排除 _media/）。"""
+
+def find_raw_files(raw_dir: Path) -> list[Path]:
+    """遍历 raw/ 目录，收集所有 .md 与 .csv 文件（排除 _media/ 与隐藏目录）。"""
     results: list[Path] = []
     for root, dirs, files in os.walk(raw_dir):
         dirs[:] = [d for d in dirs if d != "_media" and not d.startswith(".")]
         for f in files:
-            if f.endswith(".md") and f != "_index.json":
+            if f.endswith(RAW_EXTENSIONS) and f != "_index.json":
                 results.append(Path(root) / f)
     return sorted(results)
 
@@ -57,28 +62,38 @@ def load_materials_content(materials_dir: Path) -> dict[str, str]:
 def find_consumers(raw_filename: str, materials_content: dict[str, str]) -> list[str]:
     """检测哪些 materials 文件引用了该 raw 文件。
 
-    匹配策略（从精确到宽松）：
-    1. 完整文件名（含扩展名，如 report.xlsx.md）
-    2. 去掉 .md 后缀的文件名（如 report.xlsx）
-    3. 去掉所有扩展名的文件名（如 report）
+    来源字段匹配完整 raw 文件名、原始文件名或来源字段中的通配引用；正文只匹配明确的 raw media 目录。
     """
     consumers: list[str] = []
+    original_filename = raw_filename.removesuffix(".md")
+    filename_pattern = re.compile(
+        rf"(?<![\w.-])(?:{re.escape(raw_filename)}|{re.escape(original_filename)})(?![\w.-])"
+    )
+    glob_token_pattern = re.compile(r"[^\s;；\"'()（）]*\*[^\s;；\"'()（）]*")
+    media_stem = original_filename.rsplit(".", 1)[0] if "." in original_filename else original_filename
+    media_pattern = re.compile(
+        rf"(?:^|/)raw/(?:[^/\s)\"']*/)*{re.escape(media_stem)}_media/"
+    )
 
-    stems = set()
-    stems.add(raw_filename)
-    name_no_md = raw_filename.removesuffix(".md")
-    stems.add(name_no_md)
-    name_no_ext = name_no_md
-    while "." in name_no_ext:
-        name_no_ext = name_no_ext.rsplit(".", 1)[0]
-    if name_no_ext and len(name_no_ext) >= 4:
-        stems.add(name_no_ext)
+    def references(source_text: str, content: str) -> bool:
+        if filename_pattern.search(source_text):
+            return True
+        for token in glob_token_pattern.findall(source_text):
+            if "*" in token and fnmatchcase(raw_filename, token.rsplit("/", 1)[-1]):
+                return True
+        return bool(media_pattern.search(content))
 
     for mat_path, content in materials_content.items():
-        for stem in stems:
-            if stem in content:
-                consumers.append(mat_path)
-                break
+        frontmatter = re.match(r"\A---\s*\n(.*?)\n---(?:\s*\n|\Z)", content, re.DOTALL)
+        source_text = ""
+        if frontmatter:
+            source_lines = re.findall(
+                r"(?m)^\s*(?:source|source_file)\s*:\s*(.*?)\s*$",
+                frontmatter.group(1),
+            )
+            source_text = "\n".join(source_lines)
+        if references(source_text, content):
+            consumers.append(mat_path)
 
     return sorted(set(consumers))
 
@@ -91,6 +106,8 @@ def infer_imported_from(raw_path: Path, raw_dir: Path) -> str:
         source_dir = parts[0]
         filename = raw_path.name
         orig_name = filename.removesuffix(".md")
+        # csv 是 convert_excel 的产物，原始扩展名（.xls/.xlsx）无法从文件名推断，输出无扩展名形式
+        orig_name = orig_name.removesuffix(".csv")
         return f"incoming/{source_dir}/{orig_name}"
     return ""
 
@@ -103,12 +120,15 @@ def build_entry(
     """为单个 raw 文件构建索引条目。"""
     consumers = find_consumers(raw_path.name, materials_content)
     mtime = datetime.fromtimestamp(raw_path.stat().st_mtime)
+    raw_identity = raw_path.relative_to(raw_dir).as_posix()
     return {
         "imported_at": mtime.strftime("%Y-%m-%d"),
         "imported_from": infer_imported_from(raw_path, raw_dir),
         "consumed_by": consumers,
         "unconsumed_sections": [] if consumers else ["未检测到 materials 引用，需人工确认是否可清理"],
         "needs_review": len(consumers) == 0,
+        "source_id": f"raw:{raw_identity}",
+        "content_sha256": hashlib.sha256(raw_path.read_bytes()).hexdigest(),
     }
 
 
@@ -139,7 +159,7 @@ def main() -> int:
             print(f"[WARN] 现有 _index.json 解析失败，将完全重建", file=sys.stderr)
 
     print(f"[INFO] 扫描 raw/ 目录: {raw_dir}", file=sys.stderr)
-    raw_files = find_raw_md_files(raw_dir)
+    raw_files = find_raw_files(raw_dir)
     print(f"[INFO] 发现 {len(raw_files)} 个 .md 文件", file=sys.stderr)
 
     print(f"[INFO] 加载 materials/ 内容: {materials_dir}", file=sys.stderr)
@@ -156,11 +176,17 @@ def main() -> int:
 
         if args.merge and rel_name in existing:
             old = existing[rel_name]
+            generated_entry = entry.copy()
+            entry.update(old)
             entry["imported_from"] = old.get("imported_from") or entry["imported_from"]
-            if old.get("unconsumed_sections") and not entry["unconsumed_sections"]:
+            entry["consumed_by"] = find_consumers(raw_path.name, materials_content)
+            entry["source_id"] = f"raw:{Path(rel_name).as_posix()}"
+            entry["content_sha256"] = hashlib.sha256(raw_path.read_bytes()).hexdigest()
+            entry["unconsumed_sections"] = generated_entry["unconsumed_sections"]
+            if old.get("unconsumed_sections") and not generated_entry["unconsumed_sections"]:
                 entry["unconsumed_sections"] = old["unconsumed_sections"]
             if "needs_review" in old:
-                entry["needs_review"] = old["needs_review"] or entry["needs_review"]
+                entry["needs_review"] = old["needs_review"] or generated_entry["needs_review"]
 
         new_index[rel_name] = entry
 
