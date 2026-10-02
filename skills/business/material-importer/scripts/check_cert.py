@@ -81,7 +81,7 @@ def scan_materials(materials_dir: str) -> list[dict]:
     today = date.today()
 
     for root, dirs, files in os.walk(materials_dir):
-        if "raw" in root:
+        if "raw" in root.split(os.sep):
             continue
         for f in files:
             if not f.endswith(".md"):
