@@ -46,11 +46,11 @@ def discover_scopes(root: Path) -> list[Path]:
     return sorted(scopes, key=lambda p: (len(p.relative_to(root).parts), str(p)))
 
 
-def count_unchecked_tasks(tasks_file: Path) -> int:
+def count_unchecked_tasks(tasks_file: Path) -> int | None:
     try:
         return sum(1 for line in tasks_file.read_text(encoding="utf-8").splitlines() if line.lstrip().startswith("- [ ]"))
     except UnicodeDecodeError:
-        return 0
+        return None
 
 
 def scan_scope(scope: Path) -> dict[str, Any]:
@@ -61,7 +61,11 @@ def scan_scope(scope: Path) -> dict[str, Any]:
 
     specs = sorted(p for p in specs_dir.glob("*/spec.md") if p.is_file()) if specs_dir.exists() else []
     active_changes = (
-        sorted(p for p in changes_dir.iterdir() if p.is_dir() and p.name != "archive")
+        sorted(
+            p
+            for p in changes_dir.iterdir()
+            if p.is_dir() and p.name != "archive" and not p.name.startswith(".")
+        )
         if changes_dir.exists()
         else []
     )
@@ -72,9 +76,18 @@ def scan_scope(scope: Path) -> dict[str, Any]:
     )
 
     stale_files: list[dict[str, Any]] = []
+    unreadable_files: list[dict[str, str]] = []
     stale_total = 0
     for tasks_file in archive_dir.glob("*/tasks.md") if archive_dir.exists() else []:
         count = count_unchecked_tasks(tasks_file)
+        if count is None:
+            unreadable_files.append(
+                {
+                    "change": tasks_file.parent.name,
+                    "path": str(tasks_file),
+                }
+            )
+            continue
         if count:
             stale_total += count
             stale_files.append(
@@ -95,6 +108,8 @@ def scan_scope(scope: Path) -> dict[str, Any]:
         "archive_unchecked_task_files": len(stale_files),
         "archive_unchecked_task_total": stale_total,
         "archive_unchecked_samples": stale_files[:20],
+        "archive_unreadable_task_files": len(unreadable_files),
+        "archive_unreadable_task_samples": unreadable_files[:20],
     }
 
 
@@ -107,6 +122,7 @@ def render_markdown(root: Path, scopes: list[dict[str, Any]]) -> str:
         f"- active changes: {sum(s['active_count'] for s in scopes)}",
         f"- archived changes: {sum(s['archive_count'] for s in scopes)}",
         f"- archived task files with unchecked items: {sum(s['archive_unchecked_task_files'] for s in scopes)}",
+        f"- archived task files unreadable: {sum(s['archive_unreadable_task_files'] for s in scopes)}",
         "",
         "| Scope | Specs | Active | Archive | Stale task files |",
         "|---|---:|---:|---:|---:|",
@@ -128,6 +144,13 @@ def render_markdown(root: Path, scopes: list[dict[str, Any]]) -> str:
             lines.extend(["", f"## Archive unchecked samples: {scope['scope']}"])
             for item in scope["archive_unchecked_samples"]:
                 lines.append(f"- {item['change']}: {item['unchecked']} unchecked tasks")
+
+        if scope["archive_unreadable_task_samples"]:
+            lines.extend(["", f"## Archive unreadable task files: {scope['scope']}"])
+            lines.extend(
+                f"- {item['change']}: unreadable tasks file ({item['path']})"
+                for item in scope["archive_unreadable_task_samples"]
+            )
 
     return "\n".join(lines) + "\n"
 
