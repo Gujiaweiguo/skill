@@ -229,10 +229,15 @@ def _to_dict(code_map: CodeMap) -> dict[str, object]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Extract code-side capability map from OpenSpec specs + alignment matrix.")
-    parser.add_argument("--code-root", default="/opt/code/lnkcre")
+    parser.add_argument("--code-root", default="")
     parser.add_argument("--project", default="商管系统")
     parser.add_argument("--output", default="-", help="output JSON path; '-' for stdout")
     args = parser.parse_args()
+
+    if not args.code_root:
+        from product_prd_generator._paths import resolve_code_root
+
+        args.code_root = str(resolve_code_root(args.project))
 
     code_map = extract(Path(args.code_root), args.project)
     payload = json.dumps(_to_dict(code_map), ensure_ascii=False, indent=2)

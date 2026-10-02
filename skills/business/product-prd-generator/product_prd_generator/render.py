@@ -284,7 +284,7 @@ def _git_revision(code_root: str) -> tuple[str | None, str | None]:
 def _render_feature_list(
     capabilities: list[dict[str, Any]],  # noqa: ANY_OK
     project: str = "商管系统",
-    code_root: str = "/opt/code/lnkcre",
+    code_root: str = "",
 ) -> str:
     commit, commit_date = _git_revision(code_root)
     status_counts = Counter(
@@ -712,6 +712,8 @@ def _render_requirement_list_file(requirements: list[dict[str, Any]]) -> str:  #
 def _load_ontology(project: str = "商管系统") -> dict[str, Any]:  # noqa: ANY_OK
     ontology_path = ontology_path_for_project(project)
     if not ontology_path.is_file():
+        return {}
+    if ontology_path.suffix.lower() != ".yaml":
         return {}
     return yaml.safe_load(ontology_path.read_text(encoding="utf-8")) or {}
 
@@ -1250,7 +1252,7 @@ def _render_engineering_notes(
     )
 
 
-def render_prd(inputs: RenderInputs, code_root: str = "/opt/code/lnkcre") -> str:
+def render_prd(inputs: RenderInputs, code_root: str = "") -> str:
     project = inputs.reconcile.get("project", "商管系统")
     capabilities = inputs.reconcile.get("capabilities", [])
     requirements = inputs.reconcile.get("requirements", [])
@@ -1300,10 +1302,18 @@ def main() -> int:
     parser.add_argument("--reconcile", required=True)
     parser.add_argument("--doc-map", default="")
     parser.add_argument("--docs-root", default="")
-    parser.add_argument("--output-dir", default="output")
+    parser.add_argument("--output-dir", default="")
     parser.add_argument("--project", default="商管系统")
-    parser.add_argument("--code-root", default="/opt/code/lnkcre")
+    parser.add_argument("--code-root", default="")
     args = parser.parse_args()
+
+    if not args.output_dir or not args.docs_root or not args.code_root:
+        from ._paths import default_output_paths, resolve_code_root
+
+        defaults = default_output_paths(args.project)
+        args.output_dir = args.output_dir or str(defaults[0])
+        args.docs_root = args.docs_root or str(defaults[2])
+        args.code_root = args.code_root or str(resolve_code_root(args.project))
 
     doc_map_path = args.doc_map if args.doc_map else None
     inputs = _load_inputs(args.reconcile, doc_map_path, args.docs_root)

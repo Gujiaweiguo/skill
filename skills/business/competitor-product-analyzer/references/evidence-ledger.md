@@ -91,6 +91,27 @@ Evidence 对象：
 | `判断` | 基于证据的推理 | 必须列出依据的 evidence_id |
 | `假设` | 未证实的假设 | 必须说明如何验证 |
 
+## 治理交接：导出为共享 source-reference
+
+跨 skill 交接（PRD / ontology 工作流）挂接共享契约 `/opt/code/skill/skills/business/product-prd-generator/references/product-governance/`（owner 为 product-prd-generator；本 skill 只消费不修改，字段与枚举以共享 schema 为准，此处不重复定义），包括 `source-reference.schema.json` 与 `ontology-change-set.schema.json`。导出映射：
+
+| 台账字段 | 共享 source-reference 字段 | 说明 |
+|---|---|---|
+| `evidence_id` | `evidence_id` | 原值透传；台账仍是唯一权威记录 |
+| `capability_id` | `capability_id` | 原值透传 |
+| `source_ref` | `source_ref` | 公司根（`$COMPANY_BASE` ∥ `$LANLNK_BASE`）相对路径；外部 URL 与代码仓引用保持原样 |
+| `probed_at`（缺失时用 `source_date`） | `observed_at` | 运行时探测时间优先 |
+| `confidence` | `confidence` | 按台账原值 |
+
+`source_ref` 路径规范：materials/raw 内证据写公司根相对路径（如 `materials/13-competitors/qimao/05-实施与服务/合同模块操作手册.pdf`），demo-runtime 另填 `url`。不得改写为其他产品或其他公司的权威路径，也不得把未核实的绝对路径伪装成相对路径。
+
+**决策不是证据（来源边界）**：
+
+- `claim_type=证据` 导出为 `observed` 的竞品观察；`claim_type=判断` 导出为 `inferred`，且必须能回溯到依据的 `evidence_id`
+- OPC/产品 owner 的 roadmap、优先级或 ontology 方向决策，在共享契约里是独立的 `product_decision`（decision 对象按共享 schema），由决策 owner 单独记录。这类决策不进本台账，也不抬高任何竞品观察的 `confidence`
+- 只有单独记录的 owner decision 能批准路线图或 ontology 方向；本台账的【判断】条目最多作为决策的 supporting source
+- 竞品观察可以支撑共享 `ontology-change-set` 的 `draft` 提案，但永不自动写入 canonical ontology，也不强制任何 PRD feature
+
 ## 禁止行为
 
 - 禁止无 source_ref 的 evidence

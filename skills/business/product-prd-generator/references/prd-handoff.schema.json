@@ -2,12 +2,30 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "prd-handoff.schema.json",
   "type": "object",
-  "required": ["trace_id", "target_repo", "source_refs", "evidence_state", "implementation_status"],
+  "required": ["trace_id", "target_repo", "source_refs", "evidence_state", "implementation_status", "product_id", "product_class", "ontology_profile", "ontology_baseline", "prd_baseline"],
   "properties": {
+    "product_id": {"enum": ["lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat"]},
+    "product_class": {"enum": ["business", "tool"]},
+    "ontology_profile": {"enum": ["business-ontology", "tool-ontology"]},
+    "ontology_baseline": {"$ref": "layer-reference.schema.json"},
+    "prd_baseline": {"$ref": "layer-reference.schema.json"},
     "trace_id": {"type": "string", "pattern": "^[A-Z0-9][A-Z0-9._-]+$"},
     "capability_id": {"type": "string", "minLength": 1},
     "source_type": {"enum": ["competitor", "customer", "product_decision", "code", "spec", "test"]},
     "source_refs": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "sources": {"type": "array", "items": {"$ref": "source-reference.schema.json"}},
+    "decision": {
+      "type": "object",
+      "required": ["decision_id", "owner", "status", "rationale"],
+      "properties": {
+        "decision_id": {"type": "string", "minLength": 1},
+        "owner": {"const": "OPC"},
+        "status": {"enum": ["proposed", "accepted", "rejected", "deferred", "superseded"]},
+        "rationale": {"type": "string", "minLength": 1},
+        "supporting_source_ids": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
     "target_repo": {"type": "string", "minLength": 1},
     "target_spec_ids": {"type": "array", "items": {"type": "string"}},
     "suggested_change_ids": {"type": "array", "items": {"type": "string"}},
@@ -16,5 +34,12 @@
     "implementation_status": {"enum": ["existing", "partial", "missing", "explicitly-not-do", "unknown"]},
     "ui_refs": {"type": "array", "items": {"type": "string"}}
   },
+  "allOf": [
+    {"if": {"properties": {"product_class": {"const": "business"}}, "required": ["product_class"]}, "then": {"properties": {"ontology_profile": {"const": "business-ontology"}}}},
+    {"if": {"properties": {"product_class": {"const": "tool"}}, "required": ["product_class"]}, "then": {"properties": {"ontology_profile": {"const": "tool-ontology"}}}},
+    {"properties": {"ontology_baseline": {"properties": {"layer": {"const": "ontology"}}}}, "required": ["ontology_baseline"]},
+    {"properties": {"prd_baseline": {"properties": {"layer": {"const": "prd"}}}}, "required": ["prd_baseline"]},
+    {"if": {"properties": {"source_type": {"const": "product_decision"}}, "required": ["source_type"]}, "then": {"required": ["decision"]}}
+  ],
   "additionalProperties": false
 }

@@ -104,11 +104,13 @@ def test_e2e_商管_coverage_validate(tmp_path: Path):
     coverage_result = _run_cli(
         ["--project", "商管系统", "--code-root", str(SHANGGUAN_CODE_ROOT),
          "--docs-root", str(SHANGGUAN_DOCS_ROOT)],
-        output_dir=tmp_path / "out",
+        output_dir=tmp_path / "coverage-out",
         parsed_dir=tmp_path / "parsed",
         mode="coverage-validate",
     )
     assert coverage_result.returncode == 0, f"Coverage-validate failed:\n{coverage_result.stderr}"
+    assert (tmp_path / "coverage-out" / "PRD客户需求覆盖度矩阵.md").is_file()
+    assert not (tmp_path / "coverage-out" / "产品PRD.md").exists()
 
 
 # ─── 3. langchat generate ──────────────────────────────────────────────

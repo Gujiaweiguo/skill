@@ -128,3 +128,13 @@
 1. 在 `review/pending-items.md` 记录"术语未映射：`<original_term>` 拟映射到 `<候选>`，待确认"
 2. `standard_term` 暂填 null
 3. 不强行编一个新 ID
+
+## 与共享产品治理契约的映射
+
+跨 skill 交接使用共享契约 `/opt/code/skill/skills/business/product-prd-generator/references/product-governance/`（owner 为 product-prd-generator；本 skill 只消费不修改，字段与枚举以共享 schema 为准，此处不重复定义），包括 `source-reference.schema.json` 与 `ontology-change-set.schema.json`。映射关系：
+
+- `capability_id`、`trace_id`、`target_product` 原值透传到共享 source-reference 的同名字段；`capability-map.json` 仍是这些 ID 的唯一权威记录，共享 schema 只链接不取代
+- `evidence[].source_ref` 透传为共享 `source_ref`（公司根相对路径，如 `materials/13-competitors/<vendor>/…`；外部 URL 与代码仓引用除外），并由消费方回链 `evidence_id` 指向 `evidence-ledger.json` 的台账条目
+- 竞品能力观察导出为 `competitor_observation` 类型的 source reference；`evidence_state`、`confidence` 按本 schema 记录的原值填写
+
+`standard_term=null` 的术语要进 ontology 治理流程，只能作为共享 `ontology-change-set` 的 `draft` 提案输入（`changes[].source_ids` 指向上述 source reference）。提案不会自动晋升 canonical ontology，也不构成 PRD 必须实现的 feature；采纳与否由单独记录的 owner decision 决定（来源边界详见 `evidence-ledger.md`）。

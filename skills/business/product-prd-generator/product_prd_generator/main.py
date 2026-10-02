@@ -6,7 +6,14 @@ import sys
 from pathlib import Path
 
 from .word_export import build_content_package, render_docx
-from ._paths import competitor_evidence_paths_for_project, validate_project
+from ._paths import (
+    MissingProductDataError,
+    competitor_evidence_paths_for_project,
+    default_output_paths,
+    output_dir_for_project,
+    resolve_code_root,
+    validate_project,
+)
 
 
 def _run(module: str, extra_args: list[str]) -> int:
@@ -56,11 +63,13 @@ def _doc_map_args(args: argparse.Namespace, output: str) -> list[str]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="product-prd-generator")
     parser.add_argument("--project", default="商管系统", type=validate_project)
-    parser.add_argument("--code-root", default="/opt/code/lnkcre")
-    parser.add_argument("--docs-root", default=str(Path.cwd()))
+    parser.add_argument("--code-root", default="")
+    parser.add_argument("--docs-root", default="")
     parser.add_argument("--skill-root", default=str(Path(__file__).resolve().parents[1]))
-    parser.add_argument("--parsed-dir", default="parsed")
-    parser.add_argument("--output-dir", default="output")
+    parser.add_argument("--parsed-dir", default="")
+    parser.add_argument("--output-dir", default="")
+    parser.add_argument("--canonical-target", action="store_true")
+    parser.add_argument("--output-kind", choices=["baseline", "increments", "requirements", "decisions", "handoffs"], default="baseline")
     parser.add_argument("--word-master-root", default=str(Path(__file__).resolve().parents[3] / "word" / "word-master"))
     parser.add_argument("--docx-output", default="")
     parser.add_argument("--mode", choices=["generate", "coverage-validate"], default="generate")
@@ -82,6 +91,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
+    try:
+        _, default_parsed, default_docs, default_review = default_output_paths(args.project)
+        code_root = resolve_code_root(args.project, args.code_root)
+    except MissingProductDataError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    requested_output_dir = args.output_dir
+    args.output_dir = str(output_dir_for_project(args.project, requested_output_dir, args.canonical_target, args.output_kind))
+    args.parsed_dir = args.parsed_dir or str(default_parsed)
+    args.docs_root = args.docs_root or str(default_docs)
+    args.code_root = str(code_root)
     parsed_dir = Path(args.parsed_dir)
     parsed_dir.mkdir(parents=True, exist_ok=True)
 
@@ -97,6 +117,8 @@ def main() -> int:
         return 1
 
     review_dir = Path(args.output_dir).parent / "review"
+    if not requested_output_dir and not args.canonical_target:
+        review_dir = default_review
 
     if args.mode == "coverage-validate":
         coverage_args = [
@@ -119,6 +141,7 @@ def main() -> int:
             coverage_args.extend(["--competitors", args.competitors])
         if _run("product_prd_generator.coverage_validate", coverage_args) != 0:
             return 1
+        return 0
 
     if _run(
         "product_prd_generator.render",

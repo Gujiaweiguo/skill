@@ -16,12 +16,14 @@ from product_prd_generator.archive_evidence import (
     load_archive_evidence,
 )
 from product_prd_generator.models import (
+    CapabilityId,
     CapabilityStatus,
     Confidence,
     EvidenceKind,
     EvidenceRef,
     ReconciledCapability,
 )
+from product_prd_generator.review import build_report
 
 
 def _write_archive(
@@ -147,7 +149,7 @@ def test_load_treats_none_modified_as_empty(tmp_path: Path) -> None:
     assert only.modified_capabilities == ()
 
 
-def test_apply_promotes_existing_capability_to_existing_high(tmp_path: Path) -> None:
+def test_apply_keeps_archive_only_capability_unverified_and_reviewable(tmp_path: Path) -> None:
     archive_evidence = (
         ArchiveEvidence(
             change_id="w01-005-workbench-g2-view",
@@ -162,7 +164,7 @@ def test_apply_promotes_existing_capability_to_existing_high(tmp_path: Path) -> 
     )
     by_id: dict[str, ReconciledCapability] = {
         "workbench-g2-view": ReconciledCapability(
-            id="workbench-g2-view",
+            id=CapabilityId("workbench-g2-view"),
             name="workbench-g2-view",
             code_status=CapabilityStatus.MISSING,
             doc_status=CapabilityStatus.EXISTING,
@@ -175,15 +177,30 @@ def test_apply_promotes_existing_capability_to_existing_high(tmp_path: Path) -> 
     apply_archive_evidence(by_id, archive_evidence)
 
     promoted = by_id["workbench-g2-view"]
-    assert promoted.reconciled_status == CapabilityStatus.EXISTING
-    assert promoted.confidence == Confidence.HIGH
-    assert promoted.gaps == ()
+    assert promoted.reconciled_status == CapabilityStatus.MISSING
+    assert promoted.confidence == Confidence.LOW
+    assert promoted.evidence_provenance == "archive-only"
+    assert any("archive evidence does not directly verify" in gap for gap in promoted.gaps)
     archive_refs = [e for e in promoted.evidence if e.kind == EvidenceKind.OPENSPEC_ARCHIVE]
     assert len(archive_refs) == 1
     assert archive_refs[0].ref == "w01-005-workbench-g2-view@2026-08-06"
+    report = build_report({
+        "project": "langchat",
+        "capabilities": [{
+            "id": promoted.id,
+            "name": promoted.name,
+            "reconciled_status": str(promoted.reconciled_status),
+            "confidence": str(promoted.confidence),
+            "evidence_provenance": promoted.evidence_provenance,
+            "gaps": list(promoted.gaps),
+            "evidence": [{"kind": str(ref.kind), "ref": ref.ref} for ref in promoted.evidence],
+        }],
+    })
+    assert len(report.items) == 1
+    assert "runtime or tests" in report.items[0].problem
 
 
-def test_apply_creates_new_capability_when_id_not_in_by_id(tmp_path: Path) -> None:
+def test_apply_creates_unverified_capability_when_id_not_in_by_id(tmp_path: Path) -> None:
     archive_evidence = (
         ArchiveEvidence(
             change_id="w01-003-evidence-manifest",
@@ -201,10 +218,12 @@ def test_apply_creates_new_capability_when_id_not_in_by_id(tmp_path: Path) -> No
     apply_archive_evidence(by_id, archive_evidence)
 
     created = by_id["evidence-manifest-projection"]
-    assert created.reconciled_status == CapabilityStatus.EXISTING
-    assert created.confidence == Confidence.HIGH
-    assert created.code_status == CapabilityStatus.EXISTING
-    assert created.doc_status == CapabilityStatus.EXISTING
+    assert created.reconciled_status == CapabilityStatus.MISSING
+    assert created.confidence == Confidence.LOW
+    assert created.evidence_provenance == "archive-only"
+    assert created.code_status == CapabilityStatus.MISSING
+    assert created.doc_status == CapabilityStatus.MISSING
+    assert any("archive evidence does not directly verify" in gap for gap in created.gaps)
     archive_refs = [e for e in created.evidence if e.kind == EvidenceKind.OPENSPEC_ARCHIVE]
     assert len(archive_refs) == 1
 
@@ -212,7 +231,7 @@ def test_apply_creates_new_capability_when_id_not_in_by_id(tmp_path: Path) -> No
 def test_apply_handles_empty_evidence_gracefully(tmp_path: Path) -> None:
     by_id: dict[str, ReconciledCapability] = {
         "x": ReconciledCapability(
-            id="x",
+            id=CapabilityId("x"),
             name="x",
             code_status=CapabilityStatus.EXISTING,
             doc_status=CapabilityStatus.EXISTING,
@@ -224,3 +243,39 @@ def test_apply_handles_empty_evidence_gracefully(tmp_path: Path) -> None:
     apply_archive_evidence(by_id, ())
 
     assert by_id["x"].confidence == Confidence.MEDIUM
+
+
+def test_apply_preserves_direct_code_and_test_evidence(tmp_path: Path) -> None:
+    archive_evidence = (
+        ArchiveEvidence(
+            change_id="verified-change",
+            archive_date="2026-08-06",
+            new_capabilities=("verified-capability",),
+            modified_capabilities=(),
+            tasks_completed=2,
+            tasks_total=2,
+            short_description="Verified capability",
+            archive_path="archive/verified-change",
+        ),
+    )
+    by_id = {
+        "verified-capability": ReconciledCapability(
+            id=CapabilityId("verified-capability"),
+            name="verified capability",
+            code_status=CapabilityStatus.EXISTING,
+            doc_status=CapabilityStatus.EXISTING,
+            reconciled_status=CapabilityStatus.EXISTING,
+            confidence=Confidence.HIGH,
+            evidence=(
+                EvidenceRef(kind=EvidenceKind.CODE, ref="src/capability.py"),
+                EvidenceRef(kind=EvidenceKind.TEST, ref="tests/test_capability.py"),
+            ),
+        ),
+    }
+
+    apply_archive_evidence(by_id, archive_evidence)
+
+    verified = by_id["verified-capability"]
+    assert verified.code_status == CapabilityStatus.EXISTING
+    assert verified.reconciled_status == CapabilityStatus.EXISTING
+    assert verified.evidence_provenance == "archive-and-code-and-test"

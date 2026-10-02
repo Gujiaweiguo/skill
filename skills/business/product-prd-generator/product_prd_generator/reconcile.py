@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
 from enum import Enum, unique
 from pathlib import Path
 from typing import Any
@@ -12,7 +11,7 @@ import yaml
 
 from ._paths import codebase_features_path_for_project, ontology_path_for_project, overrides_path_for_project
 from .archive_evidence import apply_archive_evidence, load_archive_evidence
-from .models import RequirementRecord
+from .models import EvidenceKind, EvidenceRef, ReconcileResult, ReconciledCapability, RequirementRecord
 
 
 @unique
@@ -28,32 +27,6 @@ class Confidence(str, Enum):
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
-
-
-@dataclass(frozen=True, slots=True)
-class EvidenceRef:
-    kind: str
-    ref: str
-
-
-@dataclass(frozen=True, slots=True)
-class ReconciledCapability:
-    id: str
-    name: str
-    code_status: str
-    doc_status: str
-    reconciled_status: str
-    confidence: str
-    gaps: tuple[str, ...]
-    evidence: tuple[EvidenceRef, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ReconcileResult:
-    project: str
-    capabilities: tuple[ReconciledCapability, ...]
-    requirements: tuple[RequirementRecord, ...] = ()
-    source_path: str = ""
 
 
 def _coerce_status(value: str) -> CapabilityStatus:
@@ -89,6 +62,9 @@ def _reconcile_pair(code_status: CapabilityStatus, doc_status: CapabilityStatus)
 
 def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> ReconcileResult:
     project = str(code_map.get("project", doc_map.get("project", "商管系统")))
+    source_revision = str(code_map.get("commit_sha", ""))
+    raw_scan_coverage = code_map.get("scan_coverage", {})
+    scan_coverage = dict(raw_scan_coverage) if isinstance(raw_scan_coverage, Mapping) else {}
     by_id: dict[str, ReconciledCapability] = {}
 
     spec_capabilities = code_map.get("spec_capabilities", [])
@@ -199,9 +175,65 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
         if archive_evidence:
             apply_archive_evidence(by_id, archive_evidence)
 
+    direct_evidence = code_map.get("direct_evidence", {})
+    direct_matches = direct_evidence.get("matches", []) if isinstance(direct_evidence, Mapping) else []
+    if isinstance(direct_matches, list):
+        for match in direct_matches:
+            if not isinstance(match, Mapping):
+                continue
+            cap_id = str(match.get("capability_id", ""))
+            existing = by_id.get(cap_id)
+            if existing is None:
+                continue
+            kind = str(match.get("kind", ""))
+            ref = str(match.get("ref", ""))
+            evidence_id = str(match.get("evidence_id", ""))
+            term = str(match.get("term", ""))
+            anchor_id = str(match.get("spec_capability_id", ""))
+            role = str(match.get("role", "other"))
+            note = (
+                "static source match; runtime not verified"
+                if kind == EvidenceKind.CODE.value
+                else "test-file match; test execution not verified"
+            )
+            by_id[cap_id] = ReconciledCapability(
+                id=existing.id,
+                name=existing.name,
+                code_status=existing.code_status,
+                doc_status=existing.doc_status,
+                reconciled_status=existing.reconciled_status,
+                confidence=existing.confidence,
+                gaps=existing.gaps,
+                evidence=existing.evidence
+                + (
+                    EvidenceRef(
+                        kind=kind,
+                        ref=ref,
+                        note=(
+                            f"{note}; capability_id={cap_id}; spec_anchor={anchor_id}; "
+                            f"term={term}; role={role}; evidence_id={evidence_id}"
+                        ),
+                    ),
+                ),
+            )
+
     _apply_capability_overrides(by_id, project)
 
     _spec_doc_status_sweep(by_id)
+    for cap_id, capability in by_id.items():
+        if capability.evidence_provenance in {"spec-only", "archive-only", "archive-and-spec-only"}:
+            review_gap = "spec/archive evidence does not directly verify current runtime or tests"
+            if review_gap not in capability.gaps:
+                by_id[cap_id] = ReconciledCapability(
+                    id=capability.id,
+                    name=capability.name,
+                    code_status=capability.code_status,
+                    doc_status=capability.doc_status,
+                    reconciled_status=capability.reconciled_status,
+                    confidence=capability.confidence,
+                    gaps=capability.gaps + (review_gap,),
+                    evidence=capability.evidence,
+                )
 
     requirements = _build_requirement_records(doc_map, by_id)
 
@@ -210,6 +242,8 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
         capabilities=tuple(by_id.values()),
         requirements=requirements,
         source_path=code_root_str,
+        source_revision=source_revision,
+        scan_coverage=scan_coverage,
     )
 
 
@@ -576,6 +610,8 @@ def to_json(result: ReconcileResult) -> dict[str, object]:
     return {
         "project": result.project,
         "source_path": result.source_path,
+        "source_revision": result.source_revision,
+        "scan_coverage": result.scan_coverage,
         "capabilities": [
             {
                 "id": cap.id,
@@ -584,6 +620,7 @@ def to_json(result: ReconcileResult) -> dict[str, object]:
                 "doc_status": cap.doc_status,
                 "reconciled_status": cap.reconciled_status,
                 "confidence": cap.confidence,
+                "evidence_provenance": cap.evidence_provenance,
                 "gaps": list(cap.gaps),
                 "evidence": [{"kind": e.kind, "ref": e.ref} for e in cap.evidence],
             }

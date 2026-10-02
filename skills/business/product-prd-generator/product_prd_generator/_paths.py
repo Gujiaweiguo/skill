@@ -69,6 +69,11 @@ _PRODUCT_ALIASES: dict[str, str] = {
     # LnkChat 岗位 AI 家族（目录已统一 30-products/lnkchat/）
     "lnkchat": "lnkchat",
     "langchat": "lnkchat",
+    "lnkchatbi": "lnkchatbi",
+    "lnkreport": "lnkreport",
+    "lnkvision": "lnkvision",
+    "lnkgateway": "lnkgateway",
+    "lnkcrm": "lnkcrm",
 }
 
 # 每个产品的"目录段别名"——doc_map 产品过滤用它识别属于该产品的路径段。
@@ -76,6 +81,22 @@ _PRODUCT_ALIASES: dict[str, str] = {
 _PRODUCT_DIR_SEGMENTS: dict[str, tuple[str, ...]] = {
     "lnkcre": (LNKCRE_CANONICAL_DIR, LNKCRE_LEGACY_DIR, "商管系统"),
     "lnkchat": ("lnkchat", "langchat"),
+    "lnkchatbi": ("lnkchatbi",),
+    "lnkreport": ("lnkreport",),
+    "lnkvision": ("lnkvision",),
+    "lnkgateway": ("lnkgateway",),
+    "lnkcrm": ("lnkcrm",),
+}
+
+_REGISTERED_PRODUCTS = frozenset(_PRODUCT_DIR_SEGMENTS)
+_PRODUCT_CODE_ROOTS: dict[str, str | None] = {
+    "lnkcre": "/opt/code/lnkcre",
+    "lnkreport": "/opt/code/lnkreport",
+    "lnkchatbi": "/opt/code/lnkchatbi",
+    "lnkchat": "/opt/code/lnkchat",
+    "lnkvision": "/opt/code/lnkvision",
+    "lnkgateway": "/opt/code/lnkgateway",
+    "lnkcrm": None,
 }
 
 # PRD 产物细分目录（requirement：基线/增量/需求/决策/交接 各归其位）。
@@ -177,18 +198,6 @@ def resolve_product_paths(project: str) -> ProductPaths:
             legacy_fallback_enabled=_legacy_fallback_enabled(),
         )
 
-    if cid == "lnkchat":
-        docs_root = products_dir / "lnkchat"
-        return ProductPaths(
-            canonical_product_id=cid,
-            docs_root=docs_root,
-            ontology_root=docs_root,
-            prd_root=docs_root / "prd",
-            feature_baseline_path=docs_root / "prd" / "baseline" / "feature-baseline.yaml",
-            competitor_evidence_root=docs_root / "evidence" / "competitors",
-        )
-
-    # 未知/未注册三层目录的产品：canonical 目录按产品 id 推导，不编造 legacy。
     docs_root = products_dir / cid
     return ProductPaths(
         canonical_product_id=cid,
@@ -295,7 +304,7 @@ def _canonical_dirs_for(project: str) -> list[str]:
         if _legacy_fallback_enabled():
             dirs.append(LNKCRE_LEGACY_DIR)
         return dirs
-    canonical = _PRODUCT_CANONICAL_DIR.get(project, _PRODUCT_CANONICAL_DIR.get(project.lower()))
+    canonical = _PRODUCT_CANONICAL_DIR.get(cid)
     return [canonical] if canonical else []
 
 
@@ -364,6 +373,7 @@ def _guard_unregistered_fallback(project: str, base: Path, fallback: Path) -> No
 def ontology_path_for_project(project: str) -> Path:
     base = _lanlnk_base()
 
+    cid = canonical_product_id(project)
     for subdir in _canonical_dirs_for(project):
         nested = base / "30-products" / subdir / "ontology" / "ontology.yaml"
         if nested.is_file():
@@ -372,10 +382,24 @@ def ontology_path_for_project(project: str) -> Path:
         if flat.is_file():
             return flat
 
-    legacy = base / "out" / "prd" / project / "output" / "ontology.yaml"
+    if cid == "lnkvision":
+        authority = base / "30-products" / "lnkvision" / "ontology" / "域知识.md"
+        if authority.is_file():
+            return authority
+
+    if cid == "lnkgateway":
+        raise MissingProductDataError(
+            "产品 'lnkgateway' 的 ontology authority 未解析，拒绝回落商管 business-ontology。"
+        )
+
+    legacy = base / "out" / "prd" / cid / "output" / "ontology.yaml"
     if legacy.is_file():
         return legacy
 
+    if cid in _REGISTERED_PRODUCTS and cid != "lnkcre":
+        raise MissingProductDataError(
+            f"产品 {cid!r} 的 ontology authority 不存在，拒绝回落商管 business-ontology。"
+        )
     fallback = base / "config" / "ontology" / "business-ontology.yaml"
     _guard_unregistered_fallback(project, base, fallback)
     return fallback
@@ -383,6 +407,7 @@ def ontology_path_for_project(project: str) -> Path:
 
 def term_aliases_path_for_project(project: str, skill_root: Path) -> Path:
     base = _lanlnk_base()
+    cid = canonical_product_id(project)
 
     for subdir in _canonical_dirs_for(project):
         nested = base / "30-products" / subdir / "ontology" / "term-aliases.yaml"
@@ -392,10 +417,14 @@ def term_aliases_path_for_project(project: str, skill_root: Path) -> Path:
         if flat.is_file():
             return flat
 
-    legacy = base / "out" / "prd" / project / "output" / "term-aliases.yaml"
+    legacy = base / "out" / "prd" / cid / "output" / "term-aliases.yaml"
     if legacy.is_file():
         return legacy
 
+    if cid in _REGISTERED_PRODUCTS and cid != "lnkcre":
+        raise MissingProductDataError(
+            f"产品 {cid!r} 的 term-aliases authority 不存在，拒绝回落商管词表。"
+        )
     fallback = skill_root / "references" / "term-aliases.yaml"
     _guard_unregistered_fallback(project, base, fallback)
     return fallback
@@ -404,7 +433,8 @@ def term_aliases_path_for_project(project: str, skill_root: Path) -> Path:
 def codebase_features_path_for_project(project: str) -> Path:
     """Return the optional curated code-feature map for a project."""
     base = _lanlnk_base()
-    return base / "raw" / f"prd-{project}" / "parsed" / "codebase-features.json"
+    cid = canonical_product_id(project)
+    return base / "raw" / f"prd-{cid}" / "parsed" / "codebase-features.json"
 
 
 def overrides_path_for_project(project: str) -> Path:
@@ -415,7 +445,8 @@ def overrides_path_for_project(project: str) -> Path:
     away by the archive-to-existing promotion.
     """
     base = _lanlnk_base()
-    return base / "raw" / f"prd-{project}" / "parsed" / "capability-overrides.yaml"
+    cid = canonical_product_id(project)
+    return base / "raw" / f"prd-{cid}" / "parsed" / "capability-overrides.yaml"
 
 
 class InvalidProjectError(ValueError):
@@ -443,3 +474,39 @@ def validate_project(raw: str) -> str:
                 f"--project contains control character: {raw!r}",
             )
     return cleaned
+
+
+def default_output_paths(project: str) -> tuple[Path, Path, Path, Path]:
+    base = _lanlnk_base()
+    cid = canonical_product_id(project)
+    output = base / "out" / "prd" / cid / "output"
+    docs = base / "raw" / f"prd-{cid}"
+    parsed = docs / "parsed"
+    review = output.parent / "review"
+    return output, parsed, docs, review
+
+
+def output_dir_for_project(project: str, explicit: str = "", canonical: bool = False, kind: str = "baseline") -> Path:
+    if explicit:
+        return Path(explicit)
+    if canonical:
+        return resolve_product_paths(project).prd_output_dir(kind)
+    return default_output_paths(project)[0]
+
+
+def resolve_code_root(project: str, explicit: str = "") -> Path:
+    if explicit:
+        return Path(explicit)
+    cid = canonical_product_id(project)
+    if cid == "lnkcre":
+        configured = _PRODUCT_CODE_ROOTS[cid]
+        if configured is not None:
+            return Path(configured)
+    configured = _PRODUCT_CODE_ROOTS.get(cid)
+    if configured is None:
+        raise MissingProductDataError(
+            f"产品 {cid!r} 没有可安全推断的 code_root，请显式传入 --code-root。"
+        )
+    raise MissingProductDataError(
+        f"产品 {cid!r} 的 code_root 是公司/环境相关路径，请显式传入 --code-root。"
+    )

@@ -21,6 +21,7 @@ compatibility: >
   Demo 探测复用 doc-generator 的 Playwright 模式与文本/角色 locator 规范。
    能力对齐参考目标产品的三层基线（本体层 ontology/aliases，产品注册表见 product-prd-generator 的 `references/product-registry.yaml`）；不得在非 CRE 产品上静默回退到商管 ontology。
    商管域知识仅在目标产品为 LnkCRE/MI-CRE 时经 lnkcre ontology 入口解析（`30-products/lnkcre/ontology/`，mi-cre 目录已于 2026-09 合并删除）。
+   跨 skill 交接契约：product-prd-generator 的 `references/product-governance/`（共享 source-reference / ontology-change-set；本 skill 只消费不修改）。
 
   Quick start:
   ```bash
@@ -84,6 +85,7 @@ strategy-brief-generator（战略定位 / 竞对打法）     ←─ 你的能�
 - 不直接修改业务系统代码（/opt/code/lnkcre）
 - 不绕过登录/验证码/权限/反爬，不做漏洞测试或压力测试
 - 不把竞品截图/UI 文字直接用于客户材料
+- 不把 OPC/产品 owner 的决策当竞品证据；不自动写 canonical ontology（只允许 draft 提案）
 
 ## 三种输入模式
 
@@ -136,9 +138,41 @@ strategy-brief-generator（战略定位 / 竞对打法）     ←─ 你的能�
 
 demo 账号看不到、目标仓代码扫描器未覆盖或资料缺页，只能进入对应证据状态，不得直接判断竞品或蓝联缺少能力。
 
+### 共享产品治理契约集成（handoff contract）
+
+竞品证据流向 PRD 与 ontology 工作流时，统一挂接共享契约目录：
+`/opt/code/skill/skills/business/product-prd-generator/references/product-governance/`（owner 为 product-prd-generator；本 skill 只消费、不修改，也不向该目录写入任何文件）。契约的字段与枚举以该目录下各 schema 为准，本 skill 文档不复制定义；本文件出现的取值表仅约束本 skill 自身产物。
+
+**ID 映射（本 skill 保留所有权，共享 schema 只链接不取代）**：
+
+| 本 skill 字段 | 共享 source-reference 字段 | 说明 |
+|---|---|---|
+| `evidence_id`（`EV-NNN`） | `evidence_id` | 原值透传；`evidence-ledger.json` 仍是唯一权威记录 |
+| `capability_id`（`CAP-<module>-<slug>`） | `capability_id` | 原值透传；`capability-map.json` 仍是唯一权威记录 |
+| `trace_id` | `trace_id` | 竞品分析、增量 PRD、OpenSpec change、实施回写全程复用同一 ID |
+| `source_ref` | `source_ref` | 公司根相对路径（如 `materials/13-competitors/<vendor>/05-实施与服务/…`）；外部 URL 与代码仓引用除外 |
+
+导出时每条竞品观察对应一条 `competitor_observation` 类型的共享 source reference，`evidence_id`/`capability_id`/`trace_id` 按上表透传，`evidence_state` 与 `confidence` 按本 skill 台账原值填写。
+
+**来源边界（provenance boundary）**：
+
+| 层 | 本 skill 标记 | 共享契约对应 | 记录者 |
+|---|---|---|---|
+| 竞品事实/观察 | `claim_type=证据` | `competitor_observation` + `evidence_state=observed` | 本 skill，必须挂 `evidence_id` |
+| 基于证据的推理 | `claim_type=判断` | `evidence_state=inferred` | 本 skill，必须列出依据的 `evidence_id` |
+| 产品决策 | 不进 evidence-ledger | `product_decision` + decision 对象 | 仅 OPC/产品 owner 单独记录 |
+
+OPC/产品 owner 的决策**不是竞品证据**。roadmap 方向、改进建议优先级、ontology 变更是否采纳，只能由一条单独记录的 owner decision 批准（decision 对象按共享 schema，含 owner 与 status）。本 skill 输出的 P0/P1/P2 建议只是这类决策的输入，`【判断】`条目最多作为 supporting source，永远不能替 owner 拍板。
+
+**ontology 增量是提案，不是写入**：`standard_term=null` 的未映射术语、或映射存疑的观察，可按共享 `ontology-change-set` 契约打包为 `draft` 提案（`changes[].source_ids` 指向上述 source reference）。约束：
+
+- 永不自动进入 canonical ontology，晋升必须经 owner decision 审批
+- 永不构成"某条 PRD feature 必须做"的依据；competitor observation 只是 source，不是需求
+- 目标产品仅限共享 README 列出的产品 ID；lnkwebsite 不在该契约范围
+
 ### 与增量 PRD 的交接
 
-`lanlnk-product-improvement-recommendations.md` 的 P0/P1/P2 项进入 `product-prd-generator` 后，必须携带原始 evidence IDs 和 trace IDs。每个 Gap 应提供目标仓库可复核的反证入口（OpenSpec spec、代码路径、路由、表或符号），避免把 code-map 漏扫写成新需求。实施完成后由目标仓库返回回写包，docs 侧再更新能力基线。
+`lanlnk-product-improvement-recommendations.md` 的 P0/P1/P2 项进入 `product-prd-generator` 后，必须携带原始 evidence IDs 和 trace IDs。每个 Gap 应提供目标仓库可复核的反证入口（OpenSpec spec、代码路径、路由、表或符号），避免把 code-map 漏扫写成新需求。实施完成后由目标仓库返回回写包，docs 侧再更新能力基线。交接载体按上节「共享产品治理契约集成」的 source-reference 映射执行，evidence IDs 与 trace IDs 原值透传。
 
 ### 合规与凭据安全（红线）
 
@@ -718,5 +752,6 @@ P2 阶段不直接走 doc-generator 的"运行时探测 + Playwright snapshot"�
 6. **新增竞品**时，在 S0 阶段建立三层目录：`incoming/competitor-<vendor>/`、`raw/prd-商管系统/02-competitors/<vendor>/<6类>/`、`materials/13-competitors/<vendor>/<6类>/`；S1 阶段再建 `30-products/lnkcre/evidence/competitors/<vendor>/`
 7. **改对比矩阵权重模型**时，同步 `references/comparison-matrix.md` 并检查与 `requirement-evaluator` 的客户需求优先级口径一致
 8. **遇到新菜单加载机制**（如新的 SPA 框架/新的导航模式）时，更新 `references/page-extraction-strategy.md` 的"4 种典型机制"表，并补充实战经验
+9. **共享治理契约改版**时（`product-governance/` 下 schema 变更），核对「共享产品治理契约集成」一节及 `references/capability-schema.md`、`references/evidence-ledger.md` 的映射说明是否仍成立；映射语义变更须三处同步
 
 **判断标准**：如果一个分析行为或合规坑"下次的我"读到不一定能立刻理解为什么这么做，就应该记录。

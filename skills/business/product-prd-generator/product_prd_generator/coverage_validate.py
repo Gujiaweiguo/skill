@@ -217,6 +217,9 @@ class DeltaReport:
     new_items: tuple[DeltaItem, ...] = ()
     dropped_count: int = 0
     modified_count: int = 0
+    comparison_status: str = "no-baseline"
+    evidence_only_change: bool = False
+    product_input_changed: bool = False
 
 
 # --- Loading ---
@@ -562,6 +565,52 @@ def _requirement_signature(req: dict) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
+def _canonical_json(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _fingerprint(value: object) -> str:
+    return hashlib.sha256(_canonical_json(value).encode()).hexdigest()[:16]
+
+
+def _identity_items(value: object) -> list[object]:
+    if not isinstance(value, list):
+        return []
+    return sorted(value, key=_canonical_json)
+
+
+def build_run_identity(
+    project: str,
+    reconcile: dict,
+    doc_map: dict,
+) -> dict[str, str]:
+    product_input = {
+        "features": _identity_items(doc_map.get("features", [])),
+        "requirements": _identity_items(doc_map.get("requirements", [])),
+    }
+    evidence = {
+        "capabilities": _identity_items(reconcile.get("capabilities", [])),
+        "scan_coverage": reconcile.get("scan_coverage", {}),
+        "source_revision": reconcile.get("source_revision", "unknown"),
+    }
+    product_input_fingerprint = _fingerprint(product_input)
+    evidence_fingerprint = _fingerprint(evidence)
+    identity_payload = {
+        "product_id": project,
+        "source_revision": str(reconcile.get("source_revision", "unknown")),
+        "product_input_fingerprint": product_input_fingerprint,
+        "evidence_fingerprint": evidence_fingerprint,
+    }
+    return {
+        "schema_version": "1",
+        "product_id": project,
+        "source_revision": identity_payload["source_revision"],
+        "product_input_fingerprint": product_input_fingerprint,
+        "evidence_fingerprint": evidence_fingerprint,
+        "run_fingerprint": _fingerprint(identity_payload),
+    }
+
+
 def _load_baseline(path: Path) -> dict | None:
     if not path.exists():
         return None
@@ -571,6 +620,7 @@ def _load_baseline(path: Path) -> dict | None:
 def detect_delta(
     requirements: list[dict],
     baseline: dict | None,
+    current_identity: dict[str, str] | None = None,
 ) -> DeltaReport:
     """Detect new/dropped/modified requirements vs baseline."""
     current_sigs: dict[str, dict] = {}
@@ -592,7 +642,25 @@ def detect_delta(
             )
             for r in requirements
         )
-        return DeltaReport(new_items=new_items)
+        return DeltaReport(new_items=new_items, comparison_status="no-baseline")
+
+    comparison_status = "legacy-baseline"
+    evidence_only_change = False
+    product_input_changed = False
+    baseline_identity = baseline.get("run_identity", {})
+    if current_identity and isinstance(baseline_identity, dict):
+        base_product = baseline_identity.get("product_input_fingerprint")
+        current_product = current_identity.get("product_input_fingerprint")
+        if base_product and current_product:
+            product_input_changed = base_product != current_product
+            evidence_changed = baseline_identity.get("evidence_fingerprint") != current_identity.get("evidence_fingerprint")
+            if product_input_changed:
+                comparison_status = "product-input-change"
+            elif evidence_changed:
+                comparison_status = "evidence-only-change"
+                evidence_only_change = True
+            else:
+                comparison_status = "same-inputs"
 
     baseline_sigs = baseline.get("signatures", {})
     new_sigs = set(current_sigs.keys()) - set(baseline_sigs.keys())
@@ -625,10 +693,18 @@ def detect_delta(
         new_items=new_items,
         dropped_count=len(dropped_sigs),
         modified_count=modified,
+        comparison_status=comparison_status,
+        evidence_only_change=evidence_only_change,
+        product_input_changed=product_input_changed,
     )
 
 
-def build_baseline(requirements: list[dict]) -> dict:
+def build_baseline(
+    requirements: list[dict],
+    project: str = "",
+    reconcile: dict | None = None,
+    doc_map: dict | None = None,
+) -> dict:
     """Build baseline signature snapshot from current requirements."""
     signatures: dict[str, dict] = {}
     for req in requirements:
@@ -642,11 +718,14 @@ def build_baseline(requirements: list[dict]) -> dict:
                 req.get("nearby_text", "").encode()
             ).hexdigest()[:8],
         }
-    return {
+    baseline = {
         "schema_version": "1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "signatures": signatures,
     }
+    if reconcile is not None and doc_map is not None:
+        baseline["run_identity"] = build_run_identity(project, reconcile, doc_map)
+    return baseline
 
 
 # --- Rendering: JSON ---
@@ -854,6 +933,9 @@ def _render_delta_md(delta: DeltaReport, baseline_path: Path | None, doc_map: di
         lines.append("⚠️ 未找到 baseline，本次为首次运行，全部 requirement 计为新增。")
 
     lines.append(f"当前运行: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+    lines.append(f"比较状态: `{delta.comparison_status}`")
+    if delta.evidence_only_change:
+        lines.append("说明：本次仅检测到代码 revision / 扫描证据变化，不构成产品需求或 ontology 意图变化。")
     lines.append("")
 
     new_customer = [d for d in delta.new_items if d.source_type == "customer-requirements"]
@@ -1159,7 +1241,8 @@ def main(argv: list[str] | None = None) -> int:
     # 2. Delta detection
     baseline_path = Path(args.baseline) if args.baseline else None
     baseline = _load_baseline(baseline_path) if baseline_path else None
-    delta = detect_delta(reconcile.get("requirements", []), baseline)
+    current_identity = build_run_identity(args.project, reconcile, doc_map)
+    delta = detect_delta(reconcile.get("requirements", []), baseline, current_identity)
 
     # 3. Write outputs
     # Customer matrix
@@ -1200,6 +1283,22 @@ def main(argv: list[str] | None = None) -> int:
     weak_path.write_text(weak_md, encoding="utf-8")
     print(f"  → {weak_path}")
 
+    run_identity_path = output_dir / "coverage-run.json"
+    run_identity_path.write_text(
+        json.dumps(
+            {
+                "run_identity": current_identity,
+                "comparison_status": delta.comparison_status,
+                "evidence_only_change": delta.evidence_only_change,
+                "product_input_changed": delta.product_input_changed,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    print(f"  → {run_identity_path}")
+
     suggested_path = _write_suggested_changes_yaml(output_dir, rows)
     print(f"  → {suggested_path}")
     prompt_path = _write_mi_consumption_prompt(output_dir, suggested_path)
@@ -1207,7 +1306,12 @@ def main(argv: list[str] | None = None) -> int:
 
     # 4. Update baseline
     if args.update_baseline and baseline_path:
-        new_baseline = build_baseline(reconcile.get("requirements", []))
+        new_baseline = build_baseline(
+            reconcile.get("requirements", []),
+            project=args.project,
+            reconcile=reconcile,
+            doc_map=doc_map,
+        )
         baseline_path.parent.mkdir(parents=True, exist_ok=True)
         baseline_path.write_text(
             json.dumps(new_baseline, ensure_ascii=False, indent=2), encoding="utf-8"

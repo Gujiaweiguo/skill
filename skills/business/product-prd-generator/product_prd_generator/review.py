@@ -90,6 +90,10 @@ def build_report(reconcile: Mapping[str, object]) -> ReviewReport:
             gaps = capability.get("gaps", [])
             has_gaps = isinstance(gaps, list) and len(gaps) > 0
             status = str(capability.get("reconciled_status", "missing"))
+            provenance = str(capability.get("evidence_provenance", ""))
+            if provenance in {"spec-only", "archive-only", "archive-and-spec-only"}:
+                items.append(_build_item(capability))
+                continue
             if confidence == "low" or status == "explicitly-not-do" or (status == "partial" and has_gaps):
                 items.append(_build_item(capability))
                 continue

@@ -16,7 +16,10 @@ import pytest
 from product_prd_generator._paths import (
     _lanlnk_base,
     canonical_product_id,
+    codebase_features_path_for_project,
     competitor_evidence_paths_for_project,
+    default_output_paths,
+    output_dir_for_project,
     domain_knowledge_path_for_project,
     feature_baseline_path_for_project,
     is_lnkre_product,
@@ -24,7 +27,9 @@ from product_prd_generator._paths import (
     ontology_path_for_project,
     PRD_OUTPUT_SUBDIRS,
     resolve_product_paths,
+    resolve_code_root,
     term_aliases_path_for_project,
+    overrides_path_for_project,
 )
 
 
@@ -82,7 +87,6 @@ def test_ontology_path_商管_falls_back_to_business_ontology():
 
 
 def test_ontology_path_langchat_returns_project_specific():
-    """langchat ontology.yaml migrated to 30-products/langchat/."""
     p = ontology_path_for_project("langchat")
     assert p == DEFAULT_LANLNK_BASE / "30-products" / "lnkchat" / "ontology.yaml"
     assert p.is_file(), f"langchat ontology.yaml must exist: {p}"
@@ -146,7 +150,6 @@ def test_term_aliases_path_商管_falls_back_to_skill_references():
 
 
 def test_term_aliases_path_langchat_returns_project_specific():
-    """langchat term-aliases.yaml migrated to 30-products/langchat/."""
     p = term_aliases_path_for_project("langchat", SKILL_ROOT)
     assert p == DEFAULT_LANLNK_BASE / "30-products" / "lnkchat" / "term-aliases.yaml"
     assert p.is_file(), f"langchat term-aliases.yaml must exist: {p}"
@@ -240,8 +243,13 @@ def test_canonical_product_id_lnkchat_family(raw: str) -> None:
     assert canonical_product_id(raw) == "lnkchat"
 
 
+@pytest.mark.parametrize("raw", ["LnkChatBI", "LNKREPORT", "LnkVision", "LnkGateway", "LnkCRM"])
+def test_canonical_product_id_registered_tools_are_case_insensitive(raw: str) -> None:
+    assert canonical_product_id(raw) == raw.lower()
+
+
 def test_canonical_product_id_unknown_stays_identity() -> None:
-    assert canonical_product_id("LnkChatBI") == "LnkChatBI"
+    assert canonical_product_id("unknown-tool") == "unknown-tool"
     assert canonical_product_id("不存在的项目_xyz_123") == "不存在的项目_xyz_123"
 
 
@@ -288,6 +296,58 @@ def test_resolve_product_paths_lnkreport_has_no_lnkcre_legacy() -> None:
     assert paths.canonical_product_id == "lnkreport"
     assert paths.legacy_docs_root is None
     assert paths.docs_root.name == "lnkreport"
+
+
+def test_default_paths_are_company_rooted_and_product_aware(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    base = _fake_company_base(tmp_path, monkeypatch)
+    output, parsed, docs, review = default_output_paths("LnkChatBI")
+    assert output == base / "out" / "prd" / "lnkchatbi" / "output"
+    assert parsed == base / "raw" / "prd-lnkchatbi" / "parsed"
+    assert docs == base / "raw" / "prd-lnkchatbi"
+    assert review == base / "out" / "prd" / "lnkchatbi" / "review"
+
+
+def test_canonical_target_is_explicit_opt_in(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    base = _fake_company_base(tmp_path, monkeypatch)
+    assert output_dir_for_project("LnkChatBI") == base / "out" / "prd" / "lnkchatbi" / "output"
+    assert output_dir_for_project("LnkChatBI", canonical=True, kind="increments") == (
+        base / "30-products" / "lnkchatbi" / "prd" / "increments"
+    )
+
+
+def test_non_cre_code_root_requires_explicit_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("COMPANY_BASE", "/opt/code/docs/lanlnk")
+    monkeypatch.delenv("LANLNK_BASE", raising=False)
+    with pytest.raises(MissingProductDataError):
+        resolve_code_root("LnkVision")
+    assert resolve_code_root("LnkVision", "/tmp/lnkvision") == Path("/tmp/lnkvision")
+
+
+def test_registered_unresolved_ontology_does_not_fallback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _fake_company_base(tmp_path, monkeypatch)
+    for project in ("LnkGateway", "LnkChatBI", "LnkReport", "LnkCRM"):
+        with pytest.raises(MissingProductDataError):
+            ontology_path_for_project(project)
+
+
+def test_lnkvision_markdown_authority_is_returned_without_yaml_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    base = _fake_company_base(tmp_path, monkeypatch)
+    authority = base / "30-products" / "lnkvision" / "ontology" / "域知识.md"
+    authority.parent.mkdir(parents=True)
+    authority.write_text("# LnkVision authority\n", encoding="utf-8")
+    assert ontology_path_for_project("LnkVision") == authority
+
+
+def test_optional_project_paths_use_canonical_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    base = _fake_company_base(tmp_path, monkeypatch)
+    assert codebase_features_path_for_project("LnkChatBI") == (
+        base / "raw" / "prd-lnkchatbi" / "parsed" / "codebase-features.json"
+    )
+    assert overrides_path_for_project("LnkChatBI") == (
+        base / "raw" / "prd-lnkchatbi" / "parsed" / "capability-overrides.yaml"
+    )
 
 
 # ─── feature baseline：canonical 优先 → legacy 迁移 fallback → 显式报错 ───

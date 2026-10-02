@@ -11,7 +11,7 @@ description: |-
   "商管/会员/CRM/供应链产品规划"、"基于现有产品做版本规划"。
   仅面向内部产品规划与决策，不生成报价/方案/投标文件（那些交给 company-intro-generator / pricing-generator / bid-doc-master），
   不直接修改业务系统代码（业务系统自己基于本 skill 输出的交接文档拆 OpenSpec change）。
-compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to-md conversion and image extraction. Reads code from specified code-root (default /opt/code/lnkcre). Outputs to $COMPANY_BASE/out/prd/<项目>/output/（纯生成区；$LANLNK_BASE 为兼容别名，COMPANIES.md §3；30-products 在位产品的交付须附晋升清单，见正文「输出目录」）。
+compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to-md conversion and image extraction. Reads code from an explicit --code-root (LnkCRE retains its historical default; other products must provide an explicit code root). Default candidate artifacts go to $COMPANY_BASE/out/prd/<canonical_product_id>/output/; use --canonical-target with --output-kind for explicit canonical PRD output. $LANLNK_BASE remains a compatibility alias.
 ---
 
 # Product PRD Generator
@@ -34,7 +34,9 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 | `references/term-aliases.yaml` | 跑术语归一（Step 4）时。术语别名表，扩充覆盖率靠加这个文件 |
 | `references/product-semantic-baseline.md` | 配置三层产品基线（本体/PRD/代码）及 Semantic Release 快照边界时 |
 | `references/product-registry.yaml` | 确认目标产品路径、产品适配器和新增产品时 |
+| `references/product-governance/README.md` | 建立/消费三层治理交接记录时；内含 source-reference、layer-reference、ontology-change-set、reconciliation、implementation-return schemas |
 | `references/incremental-prd-handoff.md` | 生成增量 PRD、目标仓消费提示词、实施回写包时 |
+| `references/product-governance/` | 生成 PRD 交接 trace、ontology 变更候选或三层对账记录时。跨层共享机器契约；不是产品 authority |
 | `references/ui-design-system-handoff.md` | 处理统一前端 UI、设计系统、页面模式和视觉验收时 |
 
 ## 目标
@@ -50,6 +52,17 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 - PRD
 
 本 Skill 的用户可见结构只有三层：**本体 → PRD → 代码**。本体定义产品世界（对象、术语、规则、能力；业务系统与平台产品内容不同）；PRD 定义产品目标与本轮变更；代码代表当前实现事实。OpenSpec 属于代码层的实施机制，Semantic Release 是本体层的发布快照，UI 规范是 PRD 的内容，竞品分析是 PRD 的输入——它们都不是独立架构层。已注册产品见 `references/product-registry.yaml`：lnkcre、lnkreport、lnkchatbi、lnkchat、lnkvision、lnkgateway 及未来产品。不得因非 CRE 产品没有传统领域模型而静默套用商管 ontology。
+
+### Product governance modes
+
+按当前任务选择两种模式，不要求串行调用多个 skill：
+
+- **Initial/full**：建立初始 ontology baseline 与完整 PRD baseline；分别记录 authority/version，未知时明确标 unresolved/absent。
+- **Incremental**：记录相对已识别 ontology baseline 的 ontology delta，以及相对 PRD baseline 的 PRD delta；缺失或未知的 baseline 不得猜值或静默按全量处理。
+
+Ontology 负责产品领域概念、关系與规则；PRD 负责产品目标、需求、优先级及本轮改变。Ontology synthesis 可综合客户需求、竞品信息、代码事实和 OPC 产品想法，所有输入分开标记来源与 provenance；OPC 判断必须保留为独立 product decision，不是 evidence。Ontology 候选经 owner approval 後方可晋升至 canonical authority；本 skill 只生成候选/引用，不自动写 canonical ontology。交接依据 `references/product-governance/` 机器契约，并不得编造 owner、path、version、revision 或 release。
+
+增量工作的默认治理顺序是先比较 ontology baseline 并记录影响（包括有依据的“无 ontology 变化”），再形成 PRD delta，最后交由目标代码仓实施。已有代码领先于 PRD/ontology 时，可反向扫描代码/spec/test 以恢复现状事实，并生成 pairwise reconciliation 和 ontology/PRD 候选；反向事实不得自动成为产品意图或直接晋升 canonical。每条 change/return 可记录自己的 `origin_flow`，产品 registry 不记录历史先后顺序。OPC 是产品和 ontology 决策 owner；代码事实需保留仓库 revision、扫描范围和验证证据。产品完整度与 skill adapter 支持度独立记录。
 
 ## 适用场景
 
@@ -233,6 +246,10 @@ CLI `--project` 接受 **MI、MI-CRE、LnkCRE、lnkcre、商管系统**，统一
 - `evidence_state`: `observed | inferred | not_found | not_scanned | inaccessible | conflicting`
 - `implementation_status`: `existing | partial | missing | explicitly-not-do | unknown`
 
+代码反向扫描还必须输出 `scan_coverage`：至少区分 OpenSpec spec、alignment matrix、直接运行时代码和直接测试的扫描状态。direct code/test scanner 只有在项目规则显式启用时才运行；未启用时必须标记为 `not-scanned`，整体 coverage 标记为 `partial`。不能因为没有直接证据就把能力判为 `missing`，也不能把 `existing/high` 解读为运行时验证或产品需求接受。该 manifest 应从 `current-code-map.json` 传递到 `capability-reconciliation.json` 和后续治理交接件。
+
+当前已提供 fixture-first 的 bounded direct scanner contract：只有项目规则显式启用 `direct_code` / `direct_tests`，并提供 `include_paths`、`extensions`、`exclude_paths` 和 capability terms 时才读取文件。它只产生静态 `code` / test-file `test` 证据，不执行代码或测试，不代表 runtime/test verified；真实产品启用仍需单独的 OPC 范围批准。
+
 `not_scanned` 或 `inaccessible` 不得直接输出为 `missing`。
 
 ### Step 6: 合并与对齐
@@ -377,7 +394,7 @@ output/
 上下文：
 - 当前产品代码基线：/opt/code/lnkcre
 - PRD 原始/转换资料根：$LANLNK_BASE/raw/prd-商管系统
-- PRD 输出目录：$LANLNK_BASE/30-products/lnkcre/prd/baseline（交接产物落 prd/handoffs/）
+- 候选输出目录：$LANLNK_BASE/out/prd/lnkcre/output（经 OPC 审阅后，按晋升清单进入 30-products/lnkcre/prd/baseline；交接产物落 prd/handoffs/）
 - parsed 目录：$LANLNK_BASE/raw/prd-商管系统/parsed
 
 要求：
@@ -396,7 +413,7 @@ output/
 上下文：
 - 当前产品代码基线：/opt/code/lnkcre
 - PRD 资料根：$LANLNK_BASE/raw/prd-商管系统
-- PRD 输出目录：$LANLNK_BASE/30-products/lnkcre/prd/increments
+- 候选输出目录：$LANLNK_BASE/out/prd/lnkcre/output（如明确批准直接写 canonical，使用 --canonical-target --output-kind increments）
 - parsed 目录：$LANLNK_BASE/raw/prd-商管系统/parsed
 - baseline：$LANLNK_BASE/raw/prd-商管系统/parsed/coverage-baseline.json
 
@@ -423,8 +440,8 @@ uv run product-prd-generator --project 商管系统 \
    --code-root /opt/code/lnkcre \
   --docs-root $LANLNK_BASE/raw/prd-商管系统 \
   --skill-root /opt/code/skill/skills/business/product-prd-generator \
-  --parsed-dir parsed \
-  --output-dir output
+  --parsed-dir $LANLNK_BASE/raw/prd-商管系统/parsed \
+  --output-dir $LANLNK_BASE/out/prd/lnkcre/output
 ```
 
 #### coverage-validate 模式
@@ -438,7 +455,8 @@ uv run product-prd-generator --project 商管系统 \
   --docs-root $LANLNK_BASE/raw/prd-商管系统 \
   --skill-root /opt/code/skill/skills/business/product-prd-generator \
   --parsed-dir $LANLNK_BASE/raw/prd-商管系统/parsed \
-  --output-dir $LANLNK_BASE/30-products/lnkcre/prd/increments \
+  --canonical-target \
+  --output-kind increments \
   --mode coverage-validate \
   --baseline $LANLNK_BASE/raw/prd-商管系统/parsed/coverage-baseline.json \
   --update-baseline
@@ -524,7 +542,7 @@ uv run product-prd-generator --project 商管系统 \
 
 ### Step 1：设计并创建 ontology
 
-**路径**：`$COMPANY_BASE/out/prd/<project>/output/ontology.yaml`（生成区默认值，代码默认输出不变；$LANLNK_BASE 为兼容别名）
+**候选路径**：`$COMPANY_BASE/out/prd/<canonical_product_id>/output/ontology.yaml`（默认生成区；canonical ontology 只有显式晋升后写入产品本体目录；$LANLNK_BASE 为兼容别名）
 
 > **canonical 位置**以 `$COMPANY_BASE/30-products/<产品>/ontology/README.md` 权威指针为准（lnkreport / lnkchatbi / lnkvision 的 ontology 已在位 `30-products/<产品>/ontology/`）；无该目录的产品沿用 out/ 路径。lnkchat 的 ontology 双件在 `30-products/lnkchat/` 产品根目录（非 ontology/ 子目录）是已知家族变体，同样以该产品 ontology README/INDEX 权威指针为准。
 
@@ -537,18 +555,18 @@ uv run product-prd-generator --project 商管系统 \
 
 **样板参考**：
 - 商管（基线）：`$LANLNK_BASE/config/ontology/business-ontology.yaml`（1572 行，12 模块）
-- langchat（v2 战略）：`$LANLNK_BASE/30-products/langchat/ontology.yaml`（8 模块，源自 v2-strategy/02）
+- LnkChat（v2 战略）：`$LANLNK_BASE/30-products/lnkchat/ontology.yaml`（8 模块，源自 v2-strategy/02）
 - LnkChatBI（问数）：`$LANLNK_BASE/30-products/lnkchatbi/ontology/ontology.yaml`（v2：9 模块 44 capability，32 spec 直挂 + 30 NOT covered，覆盖台账在文件尾；2026-09-27 owner 批准重建；2026-09-26 自 `out/prd/LnkChatBI/output/ontology.yaml` 迁入）
 
 ### Step 2：创建 term-aliases
 
-**路径**：`$COMPANY_BASE/out/prd/<project>/output/term-aliases.yaml`（生成区默认值；canonical 位置同 Step 1 规则——以 `$COMPANY_BASE/30-products/<产品>/ontology/README.md` 权威指针为准，lnkreport / lnkchatbi 已在位）
+**候选路径**：`$COMPANY_BASE/out/prd/<canonical_product_id>/output/term-aliases.yaml`（默认生成区；canonical 位置同 Step 1 规则——以 `$COMPANY_BASE/30-products/<产品>/ontology/README.md` 权威指针为准）
 
 key = capability ID（与 ontology.sub_functions.capabilities 一致），value = 该 capability 的 CN/EN 别名列表。doc_map 加载时会按长度倒序匹配，最长的 alias 优先归一。
 
 **样板参考**：
 - 商管（基线）：`<skill>/references/term-aliases.yaml`
-- langchat：`$LANLNK_BASE/30-products/langchat/term-aliases.yaml`（38 keys，含 v2 对象 + legacy OrchestratorAgent 术语）
+- LnkChat：`$LANLNK_BASE/30-products/lnkchat/term-aliases.yaml`（38 keys，含 v2 对象 + legacy OrchestratorAgent 术语）
 - LnkChatBI：`$LANLNK_BASE/30-products/lnkchatbi/ontology/term-aliases.yaml`（v2：49 keys = 44 能力键一一对应 + 5 legacy/引用键（含产品历史名 mysqlbot/SQLBot）；2026-09-27；2026-09-26 自 `out/prd/LnkChatBI/output/term-aliases.yaml` 迁入）
 
 ### Step 3：创建 raw 目录（用户素材入口）
@@ -578,7 +596,7 @@ touch $LANLNK_BASE/incoming/prd-<project>/.gitkeep
 - `specs.path`：默认 `openspec/specs`（所有 OpenSpec 项目通用，几乎不需要改）
 - `matrix.enabled`：商管 = true，其他产品 = false（商管独有的 product-definition-matrix.md）
 - `matrix.path`：当 enabled=true 时必填，默认 `artifacts/alignment/product-definition-matrix.md`
-- `future_scanners`：占位字段，Phase B 不实现，但定义 schema 让未来激活不需要改 yaml
+- `future_scanners`：产品专属 scanner 预留配置；通用 direct code/test scanner 另由 `direct_code` / `direct_tests` 显式 opt-in，不能仅因存在预留项而扫描
 - `exclude_paths`：全局排除规则（node_modules / .venv / __pycache__ 等）
 
 **样板参考**：
@@ -606,7 +624,7 @@ uv run product-prd-generator --project <project> \
 4. `客户需求未覆盖` 章节列出的 spec IDs 来自新产品的 ontology（不是商管的 `lease-contract-management` 等）
 
 如发现问题：
-- 模块仍是商管的 → 检查 Step 1 ontology.yaml 路径是否正确（`$LANLNK_BASE/out/prd/<project>/output/ontology.yaml`）
+- 模块仍是商管的 → 检查 Step 1 ontology.yaml 路径是否正确（`$LANLNK_BASE/out/prd/<canonical_product_id>/output/ontology.yaml` 或产品 canonical ontology authority）
 - 术语不归一 → 检查 Step 2 term-aliases.yaml 的 key 是否与 ontology.sub_functions.capabilities 中的 ID 一致
 - spec IDs 不对 → 检查 Step 5 code-map-rules 的 `specs.path`
 

@@ -1,10 +1,8 @@
 """Archive evidence ingestion.
 
 Reads archived OpenSpec changes under <code_root>/openspec/changes/archive/
-and exposes their declared capabilities as EvidenceRef payloads that
-reconcile can attach to (or create) capabilities. Archive evidence is the
-strongest available signal that a capability is implemented and verified,
-since OpenSpec archive requires `/opsx-verify` to pass.
+and exposes declared capabilities as historical change evidence. Archive
+evidence does not directly verify current runtime behavior or tests.
 
 The loader is defensive: any single malformed archive is skipped, never
 raised, so a noisy archive tree cannot block PRD generation.
@@ -16,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .models import (
+    CapabilityId,
     CapabilityStatus,
     Confidence,
     EvidenceKind,
@@ -176,13 +175,10 @@ def apply_archive_evidence(
     by_id: dict[str, ReconciledCapability],
     evidence: tuple[ArchiveEvidence, ...],
 ) -> None:
-    """Promote capabilities listed in archived changes to existing/high and
-    attach an `openspec-archive` EvidenceRef to each.
+    """Attach archive references without promoting implementation status.
 
-    Capabilities already present in `by_id` are updated in place; unknown IDs
-    are inserted as freshly-created existing/high capabilities. Archive
-    evidence overrides any prior reconciled_status, since OpenSpec archive
-    requires `/opsx-verify` to pass — it is the strongest signal available.
+    Capabilities already present in `by_id` keep their statuses. Unknown IDs
+    are inserted as unverified capabilities with a reviewable gap.
     """
     for entry in evidence:
         for capability_id in (*entry.new_capabilities, *entry.modified_capabilities):
@@ -194,25 +190,30 @@ def apply_archive_evidence(
             existing = by_id.get(capability_id)
             if existing is None:
                 by_id[capability_id] = ReconciledCapability(
-                    id=capability_id,
+                    id=CapabilityId(capability_id),
                     name=capability_id,
-                    code_status=CapabilityStatus.EXISTING,
-                    doc_status=CapabilityStatus.EXISTING,
-                    reconciled_status=CapabilityStatus.EXISTING,
-                    confidence=Confidence.HIGH,
-                    gaps=(),
+                    code_status=CapabilityStatus.MISSING,
+                    doc_status=CapabilityStatus.MISSING,
+                    reconciled_status=CapabilityStatus.MISSING,
+                    confidence=Confidence.LOW,
+                    gaps=("archive evidence does not directly verify current runtime or tests",),
                     evidence=(archive_ref,),
                 )
                 continue
             merged_evidence = _merge_evidence(existing.evidence, archive_ref)
+            archive_only_gap = "archive evidence does not directly verify current runtime or tests"
+            has_direct_evidence = any(e.kind in {EvidenceKind.CODE, EvidenceKind.TEST} for e in merged_evidence)
+            gaps = existing.gaps
+            if not has_direct_evidence and archive_only_gap not in gaps:
+                gaps += (archive_only_gap,)
             by_id[capability_id] = ReconciledCapability(
                 id=existing.id,
                 name=existing.name,
-                code_status=CapabilityStatus.EXISTING,
+                code_status=existing.code_status,
                 doc_status=existing.doc_status,
-                reconciled_status=CapabilityStatus.EXISTING,
-                confidence=Confidence.HIGH,
-                gaps=(),
+                reconciled_status=existing.reconciled_status,
+                confidence=existing.confidence,
+                gaps=gaps,
                 evidence=merged_evidence,
             )
 

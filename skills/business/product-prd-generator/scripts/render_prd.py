@@ -3,7 +3,6 @@
 #   uv run scripts/render_prd.py \
 #     --reconcile parsed/capability-reconciliation.json \
 #     --doc-map parsed/current-doc-map.json \
-#     --output-dir output
 
 from __future__ import annotations
 
@@ -215,8 +214,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Render PRD markdown from capability-reconciliation.json")
     parser.add_argument("--reconcile", required=True)
     parser.add_argument("--doc-map", default="")
-    parser.add_argument("--output-dir", default="output")
+    parser.add_argument("--project", default="商管系统")
+    parser.add_argument("--output-dir", default="")
     args = parser.parse_args()
+
+    if not args.output_dir:
+        from product_prd_generator._paths import default_output_paths
+
+        args.output_dir = str(default_output_paths(args.project)[0])
 
     doc_map_path = args.doc_map if args.doc_map else None
     inputs = _load_inputs(args.reconcile, doc_map_path)

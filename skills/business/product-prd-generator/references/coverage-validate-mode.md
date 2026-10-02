@@ -38,8 +38,8 @@ product-prd-generator \
   --code-root /opt/code/lnkcre \
   --docs-root $LANLNK_BASE/raw/prd-商管系统 \
   --skill-root ... \
-  --parsed-dir parsed \
-  --output-dir output \
+   --parsed-dir $LANLNK_BASE/raw/prd-商管系统/parsed \
+   --output-dir $LANLNK_BASE/out/prd/lnkcre/output \
   --mode coverage-validate \
   [--baseline parsed/coverage-baseline.json] \
   [--update-baseline] \
@@ -96,9 +96,10 @@ else:
     ├─ output/PRD客户需求覆盖度矩阵.json
     ├─ output/PRD客户需求覆盖度矩阵.md
     ├─ output/PRD竞品覆盖度矩阵.json
-    ├─ output/PRD竞品覆盖度矩阵.md
-    ├─ output/增量gap报告.md
-    ├─ review/evidence-weak-items.md
+     ├─ output/PRD竞品覆盖度矩阵.md
+     ├─ output/增量gap报告.md
+     ├─ output/coverage-run.json
+     ├─ review/evidence-weak-items.md
     └─ parsed/coverage-baseline.json（如果 --update-baseline）
 ```
 
@@ -483,7 +484,8 @@ uv run product-prd-generator \
   --docs-root $LANLNK_BASE/raw/prd-商管系统 \
   --skill-root . \
   --parsed-dir $LANLNK_BASE/raw/prd-商管系统/parsed \
-  --output-dir $LANLNK_BASE/30-products/lnkcre/prd/increments \
+   --canonical-target \
+   --output-kind increments \
   --mode coverage-validate \
   --baseline $LANLNK_BASE/raw/prd-商管系统/parsed/coverage-baseline.json \
   --update-baseline
@@ -497,6 +499,7 @@ uv run product-prd-generator \
 | `output/PRD客户需求覆盖度矩阵.md` | 人类可读，对齐当前手工矩阵格式 |
 | `output/PRD竞品覆盖度矩阵.json` / `.md` | 同上，竞品维度 |
 | `output/增量gap报告.md` | 本次新材料带来的新缺口 |
+| `output/coverage-run.json` | run identity、source revision 与 evidence/product-input 比较状态 |
 | `review/evidence-weak-items.md` | 机器无法确定的证据强度，需人工确认 |
 
 ### 与 generate 模式的区别
@@ -513,6 +516,12 @@ uv run product-prd-generator \
 ### 证据强度说明
 
 （引用本文件 §6 的评分规则表）
+
+`coverage-run.json` 的 `run_identity` 包含 product ID、source revision、产品输入 fingerprint、证据 fingerprint 和 run fingerprint。相同输入必须得到相同 fingerprint；仅代码 revision 或扫描证据变化时，比较状态为 `evidence-only-change`，不得把它解释为产品需求或 ontology 意图变化。旧版没有 `run_identity` 的 baseline 仍可读取，但比较状态会标记为 `legacy-baseline`。
+
+代码侧的 `direct_code` / `direct_tests` scanner 只有在项目 `code-map-rules-<project>.yaml` 显式启用并提供 allowlist、扩展名、排除路径和 capability terms 时才运行。静态代码匹配只产生 `code` 证据，测试文件匹配只产生 `test` 证据；两者都不代表代码运行、测试执行通过或产品接受。没有匹配时保持扫描状态和证据为空，不把能力推断为 `missing`。
+
+Python direct scanner 为每条命中附加语法上下文角色：`import`、`declaration`、`fixture`、`assertion`、`mapping` 或 `other`。角色由 AST 节点和所在函数上下文确定，只用于帮助人工筛选，不是证据强度等级、需求满足判断或运行/测试结果；语法无法解析的文件保留匹配并标为 `other`。
 
 ### 已知限制
 

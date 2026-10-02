@@ -12,7 +12,20 @@ from typing import Any
 
 import yaml
 
-from .models import CapabilityId, CapabilityStatus, CodeCapability, CodeMap, EvidenceKind, EvidenceRef, MatrixRow, Priority
+from .models import (
+    CapabilityId,
+    CapabilityStatus,
+    CodeCapability,
+    CodeMap,
+    EvidenceKind,
+    EvidenceRef,
+    MatrixRow,
+    Priority,
+    ScannerCoverage,
+)
+from ._paths import resolve_code_root
+from .direct_evidence import scan_direct_evidence
+from .scan_coverage import build_scan_coverage, scan_coverage_to_json
 
 
 _SPEC_HEADING = re.compile(r"^### Requirement:\s*(.+)$", re.MULTILINE)
@@ -179,6 +192,7 @@ def extract(
 ) -> CodeMap:
     rules = _load_code_map_rules(project, skill_root)
     specs_root = code_root / rules["specs"]["path"]
+    spec_capabilities = _iter_spec_capabilities(specs_root, code_root)
     matrix_cfg = rules.get("matrix", {})
     matrix_rows: tuple[MatrixRow, ...] = ()
     if matrix_cfg.get("enabled", True):
@@ -186,12 +200,42 @@ def extract(
             "path", "artifacts/alignment/product-definition-matrix.md"
         )
         matrix_rows = _iter_matrix_rows(matrix_path)
+    else:
+        matrix_path = None
+    direct_evidence = scan_direct_evidence(code_root, rules)
+    if direct_evidence.matches:
+        enriched: list[CodeCapability] = []
+        for capability in spec_capabilities:
+            direct_refs = direct_evidence.evidence_for(str(capability.id))
+            enriched.append(
+                CodeCapability(
+                    id=capability.id,
+                    name=capability.name,
+                    status=capability.status,
+                    spec_path=capability.spec_path,
+                    purpose=capability.purpose,
+                    requirement_count=capability.requirement_count,
+                    evidence=capability.evidence + direct_refs,
+                )
+            )
+        spec_capabilities = tuple(enriched)
+    scan_coverage = build_scan_coverage(
+        code_root,
+        specs_root,
+        matrix_path,
+        len(spec_capabilities),
+        len(matrix_rows),
+        direct_code=direct_evidence.code,
+        direct_tests=direct_evidence.tests,
+    )
     return CodeMap(
         project=project,
         source_path=str(code_root),
         commit_sha=_git_head_sha(str(code_root)),
-        spec_capabilities=_iter_spec_capabilities(specs_root, code_root),
+        spec_capabilities=spec_capabilities,
         matrix_rows=matrix_rows,
+        scan_coverage=scan_coverage,
+        direct_evidence=direct_evidence.matches,
     )
 
 
@@ -200,6 +244,21 @@ def to_json(code_map: CodeMap) -> dict[str, object]:
         "project": code_map.project,
         "source_path": code_map.source_path,
         "commit_sha": code_map.commit_sha,
+        "scan_coverage": scan_coverage_to_json(code_map.scan_coverage),
+        "direct_evidence": {
+            "matches": [
+                {
+                    "capability_id": str(getattr(match, "capability_id", "")),
+                    "spec_capability_id": str(getattr(match, "spec_capability_id", "")),
+                    "kind": str(getattr(match, "kind", "")),
+                    "ref": str(getattr(match, "ref", "")),
+                    "term": str(getattr(match, "term", "")),
+                    "evidence_id": str(getattr(match, "evidence_id", "")),
+                    "role": getattr(getattr(match, "role", None), "value", "other"),
+                }
+                for match in code_map.direct_evidence
+            ],
+        },
         "spec_capabilities": [
             {
                 "id": cap.id,
@@ -208,7 +267,14 @@ def to_json(code_map: CodeMap) -> dict[str, object]:
                 "spec_path": cap.spec_path,
                 "purpose": cap.purpose,
                 "requirement_count": cap.requirement_count,
-                "evidence": [{"kind": e.kind.value, "ref": e.ref, "note": e.note} for e in cap.evidence],
+                "evidence": [
+                    {
+                        "kind": e.kind.value if isinstance(e.kind, EvidenceKind) else e.kind,
+                        "ref": e.ref,
+                        "note": e.note,
+                    }
+                    for e in cap.evidence
+                ],
             }
             for cap in code_map.spec_capabilities
         ],
@@ -231,11 +297,14 @@ def to_json(code_map: CodeMap) -> dict[str, object]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Extract code-side capability map from OpenSpec specs + alignment matrix.")
-    parser.add_argument("--code-root", default="/opt/code/lnkcre")
+    parser.add_argument("--code-root", default="")
     parser.add_argument("--project", default="商管系统")
     parser.add_argument("--skill-root", default="")
     parser.add_argument("--output", default="-")
     args = parser.parse_args()
+
+    if not args.code_root:
+        args.code_root = str(resolve_code_root(args.project))
 
     skill_root = Path(args.skill_root) if args.skill_root else None
     code_map = extract(Path(args.code_root), args.project, skill_root=skill_root)

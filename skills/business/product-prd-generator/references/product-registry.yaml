@@ -29,6 +29,8 @@ products:
   lnkcre:
     display_name: LnkCRE 商管系统
     kind: business
+    product_class: business
+    ontology_profile: business-ontology
     aliases: [MI, MI-CRE, 商管系统, lnkcre, LnkCRE]   # canonical product id = lnkcre
     model_kind_hint: operational-domain-model   # legacy 内部提示，非入口概念
     docs_root: /opt/code/docs/lanlnk/30-products/lnkcre
@@ -47,6 +49,8 @@ products:
   lnkreport:
     display_name: LnkReport 自助分析平台
     kind: tool
+    product_class: tool
+    ontology_profile: tool-ontology
     model_kind_hint: capability-model
     docs_root: /opt/code/docs/lanlnk/30-products/lnkreport   # confirmed（feedback 2026-09-24，owner 确认 2026-09-26）
     code_root: /opt/code/lnkreport
@@ -58,7 +62,10 @@ products:
 
   lnkchatbi:
     display_name: LnkChatBI（= mysqlbot = SQLBot，同一产品族）
+    product_status: complete
     kind: tool
+    product_class: tool
+    ontology_profile: tool-ontology
     model_kind_hint: capability-model
     docs_root: /opt/code/docs/lanlnk/30-products/lnkchatbi   # confirmed（feedback v2 2026-09-26 闭环）
     code_root: /opt/code/lnkchatbi   # confirmed（owner 2026-09-26；docs 侧 feedback v2 已同步）
@@ -71,6 +78,8 @@ products:
   lnkchat:
     display_name: LnkChat 岗位 AI 工作流平台（langchat 基座）
     kind: tool
+    product_class: tool
+    ontology_profile: tool-ontology
     model_kind_hint: product-runtime-model
     docs_root: /opt/code/docs/lanlnk/30-products/lnkchat
     code_root: /opt/code/lnkchat
@@ -82,6 +91,8 @@ products:
   lnkvision:
     display_name: LnkVision
     kind: tool
+    product_class: tool
+    ontology_profile: tool-ontology
     model_kind_hint: null
     docs_root: /opt/code/docs/lanlnk/30-products/lnkvision   # confirmed（feedback 2026-09-24，owner 确认 2026-09-26）
     code_root: /opt/code/lnkvision
@@ -94,6 +105,8 @@ products:
   lnkgateway:
     display_name: LnkGateway
     kind: tool
+    product_class: tool
+    ontology_profile: tool-ontology
     model_kind_hint: null
     docs_root: /opt/code/docs/lanlnk/30-products/lnkgateway   # confirmed（feedback v2 2026-09-26）
     code_root: /opt/code/lnkgateway
@@ -104,6 +117,8 @@ products:
   lnkcrm:
     display_name: LnkCRM 商圈会员 CRM 系统
     kind: business
+    product_class: business
+    ontology_profile: business-ontology
     docs_root: /opt/code/docs/lanlnk/30-products/lnkcrm   # proposed（feedback v2 2026-09-26，owner 待确认）
     code_root: null       # unresolved: 无代码仓（planned，即将开发，2026-09-26 owner 定名）
     ontology: /opt/code/docs/lanlnk/30-products/lnkcrm/ontology/ontology.yaml   # proposed（draft v0.1，147 功能清单证据锚定，confirmed 待 owner 评审）

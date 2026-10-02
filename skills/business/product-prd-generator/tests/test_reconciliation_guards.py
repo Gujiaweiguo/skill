@@ -16,6 +16,8 @@ from product_prd_generator.coverage_validate import (
 )
 from product_prd_generator.doc_map import SourceType, _classify_source_type
 from product_prd_generator.reconcile import _add_spec_referenced_capabilities, reconcile
+from product_prd_generator.reconcile import to_json
+from product_prd_generator.review import build_report
 
 
 def test_target_architecture_source_is_not_customer_requirements() -> None:
@@ -72,7 +74,7 @@ def test_codebase_features_path_is_project_scoped(monkeypatch: pytest.MonkeyPatc
     monkeypatch.delenv("COMPANY_BASE", raising=False)
     monkeypatch.setenv("LANLNK_BASE", str(tmp_path))
 
-    expected = tmp_path / "raw" / "prd-langchat" / "parsed" / "codebase-features.json"
+    expected = tmp_path / "raw" / "prd-lnkchat" / "parsed" / "codebase-features.json"
 
     assert codebase_features_path_for_project("langchat") == expected
 
@@ -167,3 +169,87 @@ def test_spec_evidence_promotes_doc_status_from_missing() -> None:
     assert cap.doc_status == "existing"
     assert not any("doc gap" in g for g in cap.gaps)
     assert any(e.kind == "spec" for e in cap.evidence)
+
+
+def test_reconcile_preserves_scan_coverage_manifest() -> None:
+    code_map = {
+        "project": "langchat",
+        "source_path": "/tmp/langchat",
+        "scan_coverage": {
+            "status": "partial",
+            "scope": ["configured OpenSpec specs", "direct runtime code"],
+            "limitations": ["Direct runtime code and test evidence are not scanned."],
+            "scanners": {
+                "specs": {"status": "complete", "artifact_count": 1},
+                "direct_code": {"status": "not-scanned", "artifact_count": 0},
+            },
+        },
+        "spec_capabilities": [],
+        "matrix_rows": [],
+    }
+
+    serialized = reconcile(code_map, {"features": [], "requirements": []})
+    payload = {
+        "scan_coverage": serialized.scan_coverage,
+    }
+
+    assert payload["scan_coverage"]["status"] == "partial"
+    assert payload["scan_coverage"]["scanners"]["direct_code"]["status"] == "not-scanned"
+
+
+def test_spec_only_capability_provenance_serializes_and_enters_review() -> None:
+    code_map = {
+        "project": "lnkchat",
+        "spec_capabilities": [
+            {
+                "id": "spec-only-capability",
+                "name": "spec only capability",
+                "status": "existing",
+                "evidence": [{"kind": "spec", "ref": "openspec/specs/spec-only-capability/spec.md"}],
+            },
+        ],
+        "matrix_rows": [],
+    }
+
+    result = reconcile(code_map, {"features": [], "requirements": []})
+    serialized_capabilities = to_json(result)["capabilities"]
+    assert isinstance(serialized_capabilities, list)
+    serialized = serialized_capabilities[0]
+    assert isinstance(serialized, dict)
+    report = build_report({"project": result.project, "capabilities": [serialized]})
+
+    assert serialized["evidence_provenance"] == "spec-only"
+    assert len(report.items) == 1
+    assert "runtime or tests" in report.items[0].problem
+
+
+def test_direct_code_test_and_combined_evidence_are_distinguished() -> None:
+    code_map = {
+        "spec_capabilities": [
+            {
+                "id": "code-only",
+                "status": "existing",
+                "evidence": [{"kind": "code", "ref": "src/code.py"}],
+            },
+            {
+                "id": "test-only",
+                "status": "existing",
+                "evidence": [{"kind": "test", "ref": "tests/test_code.py"}],
+            },
+            {
+                "id": "code-and-test",
+                "status": "existing",
+                "evidence": [
+                    {"kind": "code", "ref": "src/combined.py"},
+                    {"kind": "test", "ref": "tests/test_combined.py"},
+                ],
+            },
+        ],
+        "matrix_rows": [],
+    }
+
+    result = reconcile(code_map, {"features": [], "requirements": []})
+
+    assert [cap.evidence_provenance for cap in result.capabilities] == [
+        "direct-code", "direct-test", "direct-code-and-test"
+    ]

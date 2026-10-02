@@ -14,7 +14,15 @@
 
 1. 本体层内部可由多个文件组成（如 LnkCRE 的 `business-ontology.yaml` + `30-products/lnkcre/ontology/architecture/domain-model/`），概念上仍是一层。
 2. 业务系统（lnkcre/lnkcrm）与平台/AI 产品（lnkreport/lnkchatbi/lnkchat/lnkvision/lnkgateway）的本体**内容不同**，但**层数相同**——平台产品的本体是产品对象（Skill/Workflow/Dataset/Chart/Capability/Execution），不是业务实体。
-3. 三层之间用对账同步，不互相覆盖：代码证据 → PRD 状态回写；实施发现 → 本体变更候选（人工确认后回写）。
+3. 三层之间用对账同步，不互相覆盖：代码证据 → PRD 状态回写；实施发现 → 本体变更候选（人工确认后回写）。本体回答领域概念、关系和规则是什么；PRD 回答产品目标和本轮要改变什么。PRD 不拥有本体语义，代码也不能单凭实现事实决定产品目标。
+
+## 0. Two Governance Modes
+
+- **Initial/full mode** establishes an initial ontology baseline and a full PRD baseline. Record each layer's authority/version or explicitly mark it unresolved/absent; do not invent versions, revisions, releases, paths, or owners.
+- **Incremental mode** records an ontology delta against its identified baseline and a PRD delta against its identified PRD baseline. Missing baselines remain explicitly unresolved; do not treat an incremental proposal as a replacement baseline.
+- These are task-scoped modes within product-prd-generator. They are not mandatory serial skill chaining or a requirement to invoke other skills for every task.
+- Ontology synthesis may use customer requirements, competitor information, code facts, and OPC product ideas as separately identified inputs. Evidence and product judgment remain distinct provenance. A proposed ontology change requires owner approval before canonical promotion; this skill does not automatically write canonical ontology.
+- Shared machine-readable contracts are in `references/product-governance/`. They define references and governance records, not product authorities.
 
 ## 2. 非独立层产物的归属
 
@@ -32,7 +40,7 @@
 
 ## 3. 产品注册表
 
-已注册产品见 `references/product-registry.yaml`（lnkcre / lnkreport / lnkchatbi / lnkchat / lnkvision / lnkgateway 及未来产品）。规则：
+已注册产品见 `references/product-registry.yaml`（lnkcre / lnkcrm / lnkreport / lnkchatbi / lnkchat / lnkvision / lnkgateway）。每项显式声明 `product_class` 与 `ontology_profile`；路径、状态和权威仍由产品 owner 所有。规则：
 
 - 新产品加入 = 补一条 entry；路径未确认写 `null` + `*_note` 说明，不编造。
 - 未知/未注册产品必须显式降级说明，**不得静默回退到商管 ontology**。
@@ -54,12 +62,15 @@ source_of_truth:
 ontology: <本体层主入口文件>
 term_aliases: <术语别名文件，可 null>
 adapter_status: implemented | partial | unsupported
+product_status: complete | in-development | unknown
 unsupported_areas: []
 verification:
   commands: []
 ```
 
 > LnkCRE 别名口径：MI / MI-CRE / LnkCRE / lnkcre / 商管系统 是同一产品（canonical id `lnkcre`）。MI-* / MI-CRE-* 是历史稳定文档 ID，不代表目录仍叫 mi-cre。路径解析唯一权威源是 skill 的 `_paths.resolve_product_paths()`。
+
+`product_status` 描述产品本身的成熟/完整状态；`adapter_status` 描述本 Skill 对产品 authority、扫描和验证能力的支持状态，两者不得互相推导。产品完整不表示其 ontology/PRD 内容完整，也不自动批准未审核的 ontology baseline。Flow direction 是单次治理任务的属性，不按产品注册。未来增量变更默认先做 ontology impact check，再形成 PRD delta，最后交由目标代码仓实施；对于已有代码领先文档的情况，可反向收集代码事实并形成 ontology/PRD 对账候选，但不得直接改写 canonical 内容。
 
 规则：
 
