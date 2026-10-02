@@ -1,3 +1,8 @@
+# Manual Rendering Specification
+
+## Purpose
+Defines the pure-function contract for render_manual.py: deterministic rendering of the manual, chunks, and llms.txt from the three input artifacts with no network, browser, LLM, or side-effecting I/O.
+## Requirements
 ### Requirement: Pure Function Operation
 
 `render_manual.py` SHALL be a pure function of its inputs: `analysis.json`, `manifest.json`, and `style-fingerprint.json`. The script SHALL NOT make network calls, launch browsers, invoke LLMs, read source code, or perform any I/O outside reading the three input files and writing the three output files.

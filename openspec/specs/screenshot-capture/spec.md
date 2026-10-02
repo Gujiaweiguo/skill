@@ -1,3 +1,8 @@
+# Screenshot Capture Specification
+
+## Purpose
+Defines P2/P3 screenshot-plan generation and execution contracts: page-level task structure, the fixed action vocabulary, locator rules, auth pre-steps, and per-page failure tolerance.
+## Requirements
 ### Requirement: Plan Generation from Analysis
 
 During P2, the skill SHALL generate `screenshot-plan.json` from `analysis.json`. The plan SHALL be a list of page-level tasks, each containing `id`, `page_title`, `url`, `requires_auth` (bool), and an ordered `actions[]` list. Each action SHALL have a `type` from the fixed set `{navigate, wait, screenshot, fill, click, hover, scroll, select, assert}`.

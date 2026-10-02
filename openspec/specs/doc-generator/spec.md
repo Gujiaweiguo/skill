@@ -1,3 +1,8 @@
+# Doc Generator Specification
+
+## Purpose
+Defines the fixed P0-P5 phase pipeline, graceful-degradation rules, and output contracts for generating SPA operation manuals with RAG-friendly artifacts.
+## Requirements
 ### Requirement: Pipeline Phase Ordering
 
 The skill SHALL execute the documentation pipeline in fixed phase order: **P0 环境检测 → P1 应用结构发现 → P2 截图规划 → P2.5 登录凭据 → P3 截图执行 → P4 渲染输出 → P5 交互确认**. The agent SHALL NOT skip P0 (环境检测) under any circumstance. Phases P1-P5 MAY be skipped only when explicitly allowed by graceful degradation rules.
