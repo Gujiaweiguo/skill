@@ -59,6 +59,24 @@ class HasFrontmatterTest(unittest.TestCase):
 
 
 class ProcessDirTest(unittest.TestCase):
+    def test_raw_exclusion_is_path_segment_not_substring(self) -> None:
+        with TemporaryDirectory() as tmp:
+            materials = Path(tmp) / "materials"
+            raw_dir = materials / "raw" / "13-competitors" / "qimao"
+            rawnotes_dir = materials / "raw-notes" / "13-competitors" / "qimao"
+            raw_dir.mkdir(parents=True)
+            rawnotes_dir.mkdir(parents=True)
+            (raw_dir / "skipme.md").write_text("# 原始\n正文", encoding="utf-8")
+            (rawnotes_dir / "processme.md").write_text("# 修补\n正文", encoding="utf-8")
+
+            done, _skipped, counters = add_frontmatter.process_dir(
+                str(materials), str(materials), "2026-01-01", dry_run=True
+            )
+
+        done_paths = [d[0] for d in done]
+        self.assertEqual(done_paths, [str(rawnotes_dir / "processme.md")])
+        self.assertEqual(counters, {"qimao": 1})
+
     def test_unreadable_file_is_not_enqueued_for_rewrite(self) -> None:
         _skip_if_root(self)
         with TemporaryDirectory() as tmp:

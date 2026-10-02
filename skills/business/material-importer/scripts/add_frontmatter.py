@@ -64,7 +64,7 @@ def process_dir(target: str, root: str, created: str, dry_run: bool):
     # 收集所有无 frontmatter 的 md，按 vendor 分组编序号
     files = []
     for dirpath, _, fnames in os.walk(target):
-        if "/raw" in dirpath or os.sep + "raw" in dirpath:
+        if "raw" in dirpath.split(os.sep):
             continue
         for fn in sorted(fnames):
             if fn.endswith(".md"):
