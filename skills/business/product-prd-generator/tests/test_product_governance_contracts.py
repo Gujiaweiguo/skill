@@ -106,7 +106,7 @@ def test_layer_reference_rejects_cross_product_ontology_fallback() -> None:
     assert _validate("layer-reference.schema.json", value)
 
 
-def test_product_registry_contains_seven_products_and_excludes_lnkwebsite() -> None:
+def test_product_registry_contains_seven_software_products_and_lnkwebsite_prd_only() -> None:
     registry = _yaml_mapping(ROOT / "references" / "product-registry.yaml")
     products = registry["products"]
     assert isinstance(products, dict)
@@ -119,13 +119,20 @@ def test_product_registry_contains_seven_products_and_excludes_lnkwebsite() -> N
         "lnkgateway": ("tool", "tool-ontology"),
         "lnkchat": ("tool", "tool-ontology"),
     }
-    assert set(products) == set(expected_profiles)
-    assert "lnkwebsite" not in products
-    for product_id, (product_class, ontology_profile) in expected_profiles.items():
+    # 七产品软件治理契约范围不变；lnkwebsite 2026-10-02 起为 prd-only 登记
+    # （OPC：不建本体层，out of software product contract，仅消 Check 4 漂移信号）。
+    assert set(products) - {"lnkwebsite"} == set(expected_profiles)
+    assert "lnkwebsite" in products
+    website = products["lnkwebsite"]
+    assert isinstance(website, dict)
+    assert website["ontology"] is None
+    assert website["ontology_profile"] is None
+    assert website["adapter_status"] == "unsupported"
+    for product_id in expected_profiles:
         product = products[product_id]
         assert isinstance(product, dict)
-        assert product["product_class"] == product_class
-        assert product["ontology_profile"] == ontology_profile
+        assert product["product_class"] == expected_profiles[product_id][0]
+        assert product["ontology_profile"] == expected_profiles[product_id][1]
         assert "origin_flow" not in product
     chatbi = products["lnkchatbi"]
     assert isinstance(chatbi, dict)

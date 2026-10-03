@@ -20,6 +20,12 @@
 #    回归闸 tests/test_paths.py；lnkvision 无 ontology.yaml，canonical 本体为域知识.md，
 #    以本表登记为准）。未注册产品 tier-4 商管兜底带跨域污染闸门（非 lanlnk 公司
 #    报错引导注册，lanlnk 公司警告）。本表与代码解析保持同步。
+# 9. 2026-10-02 external-owner-follow-up 回填（OPC 6 项裁决，docs 侧决策记录
+#    lanlnk/30-products/external-owner-decisions-2026-10-02.md）：lnkcrm 本体 accepted
+#    v1.0（release SEM-CRM-OPS-001）/ prd_root confirmed v1.0；lnkchatbi 本体 accepted
+#    v2.0（追认 09-27 重建决策，release SEM-BI-CAP-001）；lnkgateway 维持 unresolved
+#    （owner-confirmed）；lnkwebsite prd-only 登记（out of software product contract，
+#    ontology 解析显式降级拒绝回落商管，杜绝静默 fallback）。
 #
 # unresolved 字段由 docs 侧整理（docs-reorg-prompt）产出 registry-feedback 后回填
 # （2026-09-24 已回填：30-products/product-registry-feedback.yaml；2026-09-26
@@ -71,7 +77,7 @@ products:
     code_root: /opt/code/lnkchatbi   # confirmed（owner 2026-09-26；docs 侧 feedback v2 已同步）
     prd_root: /opt/code/docs/lanlnk/30-products/lnkchatbi/prd   # 2026-09-26 方案 B 迁移：PRD 家族自 out/prd/LnkChatBI/output/ 迁入
     ontology: /opt/code/docs/lanlnk/30-products/lnkchatbi/ontology/ontology.yaml   # 2026-09-26 迁移（原 out/prd/LnkChatBI/output/ontology.yaml）
-    ontology_note: canonical 在位（30-products/lnkchatbi/ontology/，含 README.md 权威指针）；canonical 仍 proposed（owner 2026-09-26）
+    ontology_note: canonical 在位（30-products/lnkchatbi/ontology/，含 README.md 权威指针）；accepted v2.0（owner 2026-09-27 批准重建 + OPC 2026-10-02 追认，release 记录 ontology/releases/SEM-BI-CAP-001.yaml，source_revision b712f0d1）
     term_aliases: /opt/code/docs/lanlnk/30-products/lnkchatbi/ontology/term-aliases.yaml   # 2026-09-26 迁移
     adapter_status: partial
 
@@ -110,7 +116,7 @@ products:
     model_kind_hint: null
     docs_root: /opt/code/docs/lanlnk/30-products/lnkgateway   # confirmed（feedback v2 2026-09-26）
     code_root: /opt/code/lnkgateway
-    ontology: null        # unresolved（feedback v2：无已确认 docs ontology 候选）
+    ontology: null        # unresolved（owner-confirmed 2026-10-02：无 docs 候选，不从网关代码反推本体，见 product INDEX 裁定）
     term_aliases: null
     adapter_status: unsupported
 
@@ -119,9 +125,21 @@ products:
     kind: business
     product_class: business
     ontology_profile: business-ontology
-    docs_root: /opt/code/docs/lanlnk/30-products/lnkcrm   # proposed（feedback v2 2026-09-26，owner 待确认）
+    docs_root: /opt/code/docs/lanlnk/30-products/lnkcrm   # confirmed（OPC 2026-10-02）
     code_root: null       # unresolved: 无代码仓（planned，即将开发，2026-09-26 owner 定名）
-    ontology: /opt/code/docs/lanlnk/30-products/lnkcrm/ontology/ontology.yaml   # proposed（draft v0.1，147 功能清单证据锚定，confirmed 待 owner 评审）
-    term_aliases: null    # 暂无；缺失时回落 skill references/term-aliases.yaml
-    prd_root: null        # unresolved: planned（prd_ready: false，PRD skill 引导式 onboarding）
+    ontology: /opt/code/docs/lanlnk/30-products/lnkcrm/ontology/ontology.yaml   # accepted v1.0（OPC 2026-10-02；内容基线 v0.3 七源证据 8 模块/109 capability；release: ontology/releases/SEM-CRM-OPS-001.yaml）
+    term_aliases: /opt/code/docs/lanlnk/30-products/lnkcrm/ontology/term-aliases.yaml   # 109 能力键与 capability ID 一一对应（2026-09-29）
+    prd_root: /opt/code/docs/lanlnk/30-products/lnkcrm/prd   # confirmed v1.0（OPC 2026-09-29，prd/README.md 决策记录；prd_ready: false 待发布准备 change）
     adapter_status: onboarding
+
+  lnkwebsite:
+    display_name: 蓝联科技官网（LnkWebsite）
+    kind: business
+    product_class: business
+    ontology_profile: null        # prd-only：不建本体层（owner 2026-09-27 裁定）
+    docs_root: /opt/code/docs/lanlnk/30-products/lnkwebsite
+    code_root: /opt/code/lnkwebsite
+    ontology: null        # prd-only（owner 2026-09-27 裁定不建本体层；governance README 声明 out of software product contract）；解析显式降级拒绝回落商管
+    term_aliases: null
+    prd_root: /opt/code/docs/lanlnk/30-products/lnkwebsite/prd   # confirmed（首版 PRD 已晋升 canonical，2026-09-27）
+    adapter_status: unsupported   # 未接入三层处理；仅路径登记消 check_docs_consistency Check 4 漂移信号

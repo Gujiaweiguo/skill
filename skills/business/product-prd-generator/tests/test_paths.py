@@ -121,6 +121,18 @@ def test_ontology_path_lnkreport_returns_canonical():
     assert p.is_file(), f"lnkreport canonical ontology.yaml must exist: {p}"
 
 
+def test_ontology_path_lnkwebsite_prd_only_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """lnkwebsite prd-only（owner 2026-09-27 不建本体层）：显式报错，拒绝回落商管。
+
+    2026-10-02 registry 登记的回归闸：未登记时该调用会静默回落
+    business-ontology.yaml（跨域回落，registry 规则 2 禁止项）。
+    """
+    _fake_company_base(tmp_path, monkeypatch)
+    with pytest.raises(MissingProductDataError) as excinfo:
+        ontology_path_for_project("lnkwebsite")
+    assert "prd-only" in str(excinfo.value)
+
+
 def test_ontology_path_unknown_project_falls_back():
     """Unknown project on lanlnk base: warns on stderr, still falls back to business-ontology.yaml."""
     p = ontology_path_for_project("不存在的项目_xyz_123")

@@ -74,6 +74,7 @@ _PRODUCT_ALIASES: dict[str, str] = {
     "lnkvision": "lnkvision",
     "lnkgateway": "lnkgateway",
     "lnkcrm": "lnkcrm",
+    "lnkwebsite": "lnkwebsite",
 }
 
 # 每个产品的"目录段别名"——doc_map 产品过滤用它识别属于该产品的路径段。
@@ -86,6 +87,7 @@ _PRODUCT_DIR_SEGMENTS: dict[str, tuple[str, ...]] = {
     "lnkvision": ("lnkvision",),
     "lnkgateway": ("lnkgateway",),
     "lnkcrm": ("lnkcrm",),
+    "lnkwebsite": ("lnkwebsite",),
 }
 
 _REGISTERED_PRODUCTS = frozenset(_PRODUCT_DIR_SEGMENTS)
@@ -97,6 +99,7 @@ _PRODUCT_CODE_ROOTS: dict[str, str | None] = {
     "lnkvision": "/opt/code/lnkvision",
     "lnkgateway": "/opt/code/lnkgateway",
     "lnkcrm": None,
+    "lnkwebsite": "/opt/code/lnkwebsite",
 }
 
 # PRD 产物细分目录（requirement：基线/增量/需求/决策/交接 各归其位）。
@@ -293,6 +296,10 @@ _PRODUCT_CANONICAL_DIR: dict[str, str] = {
     "lnkreport": "lnkreport",
     "lnkchatbi": "lnkchatbi",
     "lnkvision": "lnkvision",
+    # 2026-10-02 prd-only 登记（OPC）：lnkwebsite 不建本体层（owner 2026-09-27），
+    # 仅登记目录段供 doc 扫描过滤与 canonical 探测；ontology 解析在
+    # ontology_path_for_project 中对该产品显式报错（拒绝回落商管）。
+    "lnkwebsite": "lnkwebsite",
 }
 
 
@@ -390,6 +397,12 @@ def ontology_path_for_project(project: str) -> Path:
     if cid == "lnkgateway":
         raise MissingProductDataError(
             "产品 'lnkgateway' 的 ontology authority 未解析，拒绝回落商管 business-ontology。"
+        )
+
+    if cid == "lnkwebsite":
+        raise MissingProductDataError(
+            "产品 'lnkwebsite' 为 prd-only（owner 2026-09-27 裁定不建本体层，out of software "
+            "product contract），无 ontology authority，拒绝回落商管 business-ontology。"
         )
 
     legacy = base / "out" / "prd" / cid / "output" / "ontology.yaml"
