@@ -17,6 +17,9 @@ compatibility: >
   依赖素材库 $MATERIALS_DIR（通过 LANLNK_BASE 环境变量配置）。
   依赖 markitdown 转化需求文档（docx/pdf → md）。
   依赖产品功能清单（product-prd-generator 产物；canonical-first 解析：优先 $COMPANY_BASE/30-products/<产品>/prd/功能清单.md，回退 $COMPANY_BASE/out/prd/<项目>/output/功能清单.md 生成区；$LANLNK_BASE 为兼容别名）。
+  产品路径事实（产品 ID 归一、ontology/PRD/code 三层 authority、code_root 状态）来自公共
+  shared.product_context resolver（company.yaml 为唯一产品台账，2026-10 迁移）；本 skill
+  不自维护产品-路径映射，不按产品 ID 拼接 /opt/code/<id>。
   纯提示词 skill，无 Python 依赖。
 
   Quick start:
@@ -56,18 +59,38 @@ compatibility: >
 
 评估基准产品的功能清单由 product-prd-generator 生成。
 
-**LnkCRE 功能基线路径契约**（与 product-prd-generator `_paths.resolve_product_paths()` 保持同步，改一边必须改另一边）：
+**产品上下文 resolver-first（2026-10 迁移）**：产品 ID 归一、三层 authority 与路径事实
+一律先经公共 resolver 解析（本 skill 不自维护产品-路径映射表）：
 
-1. 产品代号归一：**MI、MI-CRE、LnkCRE、lnkcre、商管系统 → canonical product id `lnkcre`**（同一产品，大小写不敏感）。
-2. canonical：`$LANLNK_BASE/30-products/lnkcre/prd/baseline/feature-baseline.yaml`（mi-cre 旧路径已随 2026-09 目录合并删除）。
-3. 路径不存在 → **明确报错**（列出产品 ID `lnkcre` 和尝试路径），提示先运行 product-prd-generator；**不得静默改读其他产品（LnkReport / LnkChat / CRM）的功能基线**。
+```bash
+cd /opt/code/skill/skills/meta/openspec-practice
+uv run python scripts/resolve_context.py <产品 ID> [--company-id <id> | --company-base <path>]
+```
+
+按 resolver 返回状态处理：
+
+| resolver 状态 | 处理 |
+|---|---|
+| prd authority complete/partial | 功能清单 = `<prd_root>/功能清单.md`（lnkcre 为 `<prd_root>/baseline/feature-baseline.yaml`）；canonical 不存在时按下方生成区表回退 |
+| 产品未注册 / 匹配不唯一 | **明确失败**（复述 resolver 错误），不回退 lnkcre 或其他产品 |
+| prd unresolved / not-found | 明确报错（列出产品 ID 与尝试路径），提示先运行 product-prd-generator |
+| ontology not-applicable（lnkwebsite）/ unresolved（lnkgateway） | 不消费 ontology 时不阻断评估；需要术语归一时在报告标注该状态 |
+| code present-unconfirmed（如 lnkcrm）或 code_root null | 代码验证（Step 0 / P2.5）不得自动采用观察到的 checkout；必须由用户显式提供 `--code-root /opt/code/<产品>` 等价确认 |
+| 多公司上下文无法唯一判定 | 按 COMPANIES.md §4 询问，绝不静默默认 lanlnk |
+
+**LnkCRE 功能基线**（canonical id `lnkcre`；MI / MI-CRE / LnkCRE / 商管系统 为历史别名，
+归一由 resolver 的产品台账承担，大小写不敏感）：resolver 命中后路径为
+`<prd_root>/baseline/feature-baseline.yaml`（当前即
+`$COMPANY_BASE/30-products/lnkcre/prd/baseline/feature-baseline.yaml`；mi-cre 旧路径已随
+2026-09 目录合并删除）。路径不存在 → **明确报错**（列出产品 ID `lnkcre` 和尝试路径），
+提示先运行 product-prd-generator；**不得静默改读其他产品（LnkReport / LnkChat / CRM）的功能基线**。
 
 **功能清单 canonical-first 解析顺序**（2026-09-26 方案 B 家族迁移后）：
 
 1. 优先 `$COMPANY_BASE/30-products/<产品>/prd/功能清单.md`（canonical）
 2. 回退 `$COMPANY_BASE/out/prd/<项目>/output/功能清单.md`（生成区，历史目录名）
 
-**产品 id 与目录名映射**（canonical 目录一律小写；生成区为历史目录名）：
+**生成区回退目录名**（仅 canonical 缺失时使用；canonical 目录一律小写）：
 
 | 产品 id | canonical 路径（优先） | 生成区回退（历史目录名） |
 |---|---|---|
@@ -179,11 +202,11 @@ status_distribution: {existing: 183, partial: 1, missing: 85}
 | `generated_at` 距今 >7 天 OR `mi_commit` 与当前 HEAD 不一致 | ⚠️ **警告** | 提示用户："功能清单 N 天未刷新 / 落后 M commits，建议先跑 product-prd-generator；是否继续？" |
 | `generated_at` 距今 >30 天 | ❌ **过期** | 强烈建议重跑；继续评估则报告头部必须标红 + 附录说明 |
 
-**当前 HEAD 获取**：
+**当前 HEAD 获取**（`<code_root>` = resolver context 的 code_root；present-unconfirmed 时需用户显式确认后才可用）：
 ```bash
-git -C <mi_code_root> rev-parse HEAD
-git -C <mi_code_root> log -1 --format=%cI  # 最新提交时间
-git -C <mi_code_root> rev-list <mi_commit>..HEAD --count  # 落后多少 commits
+git -C <code_root> rev-parse HEAD
+git -C <code_root> log -1 --format=%cI  # 最新提交时间
+git -C <code_root> rev-list <mi_commit>..HEAD --count  # 落后多少 commits
 ```
 
 **用户拒绝重跑时**：
@@ -258,11 +281,12 @@ Agent：好的，继续评估。报告头部会标注"基于过期快照"。
 
 ```
 Step 0: grep 代码库验证（防"功能清单漏抽"误判，必跑）
-    └── 用需求关键词 + 路由前缀 + 模块名，扫 lnkcre_code_root（默认 /opt/code/lnkcre）
+    └── 代码根 = resolver context 的 code_root（仅 code authority = complete 时直接使用）
+    └── code_root null / present-unconfirmed（如 lnkcrm）→ 必须用户显式确认 --code-root，不得自动采用 /opt/code/<产品> 观察 checkout
     └── 命中代码（路由/模型/前端组件）→ 重新走 Step 1（很可能判 ✅ 而非 🔨/🔗）
     └── 无命中 → 进入 Step 1
     └── 必查项：所有 🔨 二开判定、所有 🔗 第三方判定
-    └── 工具：grep -r <kw> /opt/code/lnkcre/{backend,backend-mobile,frontend,frontend-staff,frontend-tenant}
+    └── 工具：grep -r <kw> <code_root>（lnkcre 完整配置时含 backend/backend-mobile/frontend/frontend-staff/frontend-tenant）
     └── 反例：v1 评估把"预约看房+接待"判 🔨 二开（M 11 人天），实际 leasingfunnel 模块已存在
     └── 反例：v1 评估把"电子巡检"8 项全判 🔗 第三方，实际 backend/internal/patrol/ 已原生实现
 
@@ -369,8 +393,10 @@ Step 8: 技术上难以可靠实现？
 
 ```
 对所有 🔨 项：
-  1. 用需求关键词（中英文 + 路由前缀 + 模块名）grep mi_code_root
-     grep -r -l <kw> /opt/code/lnkcre/{backend,backend-mobile,frontend,frontend-staff,frontend-tenant}
+  1. 用需求关键词（中英文 + 路由前缀 + 模块名）grep code_root（resolver context；
+     lnkcre 完整配置时含 backend/backend-mobile/frontend/frontend-staff/frontend-tenant；
+     code present-unconfirmed 的产品必须先获用户显式 --code-root 确认）
+     grep -r -l <kw> <code_root>/<子目录>
   2. 命中代码（路由/模型/前端组件）→ 标记"误判修正"，重走 §2.2 决策树
      很可能修正为 ✅（已实现），从而移出二开清单
   3. 未命中 → P2 表"代码验证"列填 "grep <kw> 未命中（确认 missing）"

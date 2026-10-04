@@ -1,0 +1,82 @@
+# adapter-capabilities —— company-intro-generator 私有声明（方案 B）
+#
+# 治理红线（owner decision O1/O2，2026-10-04，references/adapter-capability-owner-decision-2026-10-04.md）：
+# - 本文件只描述本 skill 对各产品的 adapter 能力，不是产品事实；产品三层 authority 一律经
+#   shared.product_context resolver 解析，本文件禁止出现产品路径/revision/authority 字段。
+# - authority.status != adapter_capability.status，两者不得互相推导。
+# - 未经证据不得标 implemented；状态变更必须同时更新 evidence/verified_at 与校验测试。
+# - 跨产品借用禁令：不得从 lnkcre 复制其他产品的功能、报价或叙事资产；V5 领域包仅适用 lnkcre，
+#   其他产品的「领域页」不得用 lnkcre 领域包顶替。
+# - resolver 不读取本文件；本文件不接入生产路径。
+
+schema_version: 1
+consumer_id: company-intro-generator
+owner: opc
+verified_at: "2026-10-04"
+decision_record: "references/adapter-capability-owner-decision-2026-10-04.md"
+capabilities:
+  - consumer_id: company-intro-generator
+    product_id: lnkcre
+    status: implemented
+    evidence:
+      - "V5 领域包（30-products/lnkcre ontology 架构域模型，resolver-first 检查）+ 商管叙事 + 案例库（设计包 §3.3.E）"
+      - "V1-V4 与模式 A-E 全模式可用（设计包 §3.3.E）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "V5 领域驱动仅适用 lnkcre（基于 MI 代码反推的 Bounded Context，非 prd-gen 产物），不得顶替其他产品。"
+  - consumer_id: company-intro-generator
+    product_id: lnkcrm
+    status: partial
+    evidence:
+      - "materials/03-products/商圈会员CRM系统.md + CRM会员系统功能清单.md（模式 C D 路线会员切口）（设计包 §3.3.E）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "产品特定架构包无（V5 仅 lnkcre）；案例属历史 CRM 交付叙事，归属登记随 O6（pending）。"
+  - consumer_id: company-intro-generator
+    product_id: lnkchat
+    status: partial
+    evidence:
+      - "materials/03-products/AI知识库与工作流平台.md（模式 C AI 切口）（设计包 §3.3.E）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "叙事资产在位；产品特定架构包无（V5 类扩展可选）。"
+  - consumer_id: company-intro-generator
+    product_id: lnkchatbi
+    status: partial
+    evidence:
+      - "materials/03-products/AI智能问数系统.md（设计包 §3.3.E）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "叙事资产在位；产品特定架构包无。"
+  - consumer_id: company-intro-generator
+    product_id: lnkreport
+    status: unsupported
+    evidence:
+      - "设计包 §3.3.E：materials/03-products/ grep 无 lnkreport 专属叙事命中（missing-narrative）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "缺产品叙事资产；O10-report（pending）可启动建设，未批准前不得用其他产品叙事顶替。"
+  - consumer_id: company-intro-generator
+    product_id: lnkvision
+    status: unsupported
+    evidence:
+      - "设计包 §3.3.E：materials grep 无 MallSenseAI/LnkVision 命中（更名前后均无，missing-narrative）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "缺叙事资产；O10-vision（pending）先确认定位、目标客户与 lnkreport 边界。"
+  - consumer_id: company-intro-generator
+    product_id: lnkgateway
+    status: not-applicable
+    evidence:
+      - "设计包 §3.3.E/§3.9：无叙事资产；内部基础设施无面客叙事场景证据"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "★ 改判 unsupported→not-applicable（O2 首版矩阵）；O9 定位裁决 pending——若未来裁定面客，须凭证据重评。"
+  - consumer_id: company-intro-generator
+    product_id: lnkwebsite
+    status: not-applicable
+    evidence:
+      - "官网是公司门面，非叙事对象产品（设计包 §3.3.E/§13.3）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "站点内容运营由 content-operations 系 skill 承担（矩阵外）。"

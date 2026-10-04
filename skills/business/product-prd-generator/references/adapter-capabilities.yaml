@@ -1,0 +1,92 @@
+# adapter-capabilities —— product-prd-generator 私有声明（方案 B）
+#
+# 治理红线（owner decision O1/O2，2026-10-04，references/adapter-capability-owner-decision-2026-10-04.md）：
+# - 本文件只描述本 skill 对各产品的 adapter 能力，不是产品事实；产品三层 authority 一律经
+#   shared.product_context resolver 解析，本文件禁止出现产品路径/revision/authority 字段。
+# - authority.status != adapter_capability.status，两者不得互相推导。
+# - 未经证据不得标 implemented；状态变更必须同时更新 evidence/verified_at 与校验测试。
+# - 跨产品借用禁令：不得从 lnkcre 复制其他产品的功能、报价或叙事资产。
+# - resolver 不读取本文件；本文件不接入生产路径。
+# - evidence 溯源自 2026-10-04（B6）起不引用 product-registry.yaml 条目，改指
+#   references/product-registry-迁移审计-2026-10-04.md §2/§3（registry 冻结快照与
+#   对齐矩阵）与 references/adapter-capability-owner-decision-o3-batch2-2026-10-04.md
+#   （冻结决定）——历史 registry 值经审计 §3 仍可追溯。
+
+schema_version: 1
+consumer_id: product-prd-generator
+owner: opc
+verified_at: "2026-10-04"
+decision_record: "references/adapter-capability-owner-decision-2026-10-04.md"
+capabilities:
+  - consumer_id: product-prd-generator
+    product_id: lnkcre
+    status: implemented
+    evidence:
+      - "references/product-registry-迁移审计-2026-10-04.md §3（registry 冻结快照 lnkcre=implemented ↔ capability 权威源一致）"
+      - "设计包 references/adapter-capability-decision-2026-10.md §3.3.A：feature-baseline 全链路 + tier-4 兜底所有权"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "全链路在位，无 missing_inputs。"
+  - consumer_id: product-prd-generator
+    product_id: lnkcrm
+    status: onboarding
+    evidence:
+      - "references/product-registry-迁移审计-2026-10-04.md §3（registry 冻结快照 lnkcrm=onboarding ↔ capability 权威源一致）"
+      - "30-products/lnkcrm prd/功能清单.md confirmed v1.0（2026-09-29 OPC 裁决，设计包 §3.3.B 勘误）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "code authority 未配置（present-unconfirmed）：resolve_code_root 一律报错需显式指定；升级条件见 O5（pending，冻结）。"
+  - consumer_id: product-prd-generator
+    product_id: lnkchat
+    status: partial
+    evidence:
+      - "references/product-registry-迁移审计-2026-10-04.md §3（registry 冻结快照 lnkchat=partial ↔ capability 权威源一致）"
+      - "设计包 §3.3.A：ontology.yaml 扁平布局 + PRD-LC-* 家族 40+ 文件"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "结构与 PRD 家族在位；保持 partial。"
+  - consumer_id: product-prd-generator
+    product_id: lnkchatbi
+    status: partial
+    evidence:
+      - "references/product-registry-迁移审计-2026-10-04.md §3（registry 冻结快照 lnkchatbi=partial ↔ capability 权威源一致）"
+      - "设计包 §3.3.A：ontology accepted v2.0 + As-is-PRD"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "ontology 基线 accepted；保持 partial。"
+  - consumer_id: product-prd-generator
+    product_id: lnkreport
+    status: partial
+    evidence:
+      - "references/product-registry-迁移审计-2026-10-04.md §3（registry 冻结快照 lnkreport=partial ↔ capability 权威源一致）"
+      - "设计包 §3.3.A：ontology.yaml + PRD baseline"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "ontology 与 PRD baseline 在位；保持 partial。"
+  - consumer_id: product-prd-generator
+    product_id: lnkvision
+    status: unsupported
+    evidence:
+      - "references/product-registry-迁移审计-2026-10-04.md §3（registry 冻结快照 lnkvision=unsupported ↔ capability 权威源一致）"
+      - "设计包 §3.3.A：canonical 本体为「域知识.md」，无机器 ontology.yaml"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "缺 yaml 机器本体（capability schema 链路）；升 partial 需一次验证 run + registry 登记，属 skill 自治，不依赖 owner 决策。"
+  - consumer_id: product-prd-generator
+    product_id: lnkgateway
+    status: blocked
+    evidence:
+      - "references/product-registry-迁移审计-2026-10-04.md §3（lnkgateway：ontology+prd unresolved owner-confirmed、O11 pending 阻塞；registry 枚举不可表达 blocked，以本文件为权威）"
+      - "product_prd_generator/_paths.py 显式拒绝回落（设计包 §3.3.A）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "被 authority 阻塞：ontology+prd unresolved（O11 pending）；解除阻塞=产品层 owner 决策，非 skill 侧。"
+  - consumer_id: product-prd-generator
+    product_id: lnkwebsite
+    status: not-applicable
+    evidence:
+      - "references/product-registry-迁移审计-2026-10-04.md §3（lnkwebsite：2026-09-27 owner prd-only 裁定、O2 改判 not-applicable；registry 枚举不可表达，以本文件为权威）"
+      - "owner 2026-09-27 prd-only 裁定（设计包 §3.3.A/§13.3）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "★ 改判 unsupported→not-applicable（O2 首版矩阵）：无 PRD 生成场景，产品在软件产品契约之外。"

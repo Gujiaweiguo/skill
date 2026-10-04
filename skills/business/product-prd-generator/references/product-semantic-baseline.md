@@ -40,7 +40,7 @@
 
 ## 3. 产品注册表
 
-已注册产品见 `references/product-registry.yaml`（lnkcre / lnkcrm / lnkreport / lnkchatbi / lnkchat / lnkvision / lnkgateway）。每项显式声明 `product_class` 与 `ontology_profile`；路径、状态和权威仍由产品 owner 所有。规则：
+已注册产品以 company.yaml products（唯一产品台账）为准：lnkcre / lnkcrm / lnkreport / lnkchatbi / lnkchat / lnkvision / lnkgateway / lnkwebsite。`references/product-registry.yaml` 保留为本 skill 迁移期兼容元数据（不再承担 Check 4 产品目录对账等运行时职责，对账面 2026-10-04 起为 company.yaml products）；迁移期内每项 entry 仍显式声明 `product_class` 与 `ontology_profile`，adapter 支持度权威源见 `references/adapter-capabilities.yaml`。路径、状态和权威仍由产品 owner 所有。规则：
 
 - 新产品加入 = 补一条 entry；路径未确认写 `null` + `*_note` 说明，不编造。
 - 未知/未注册产品必须显式降级说明，**不得静默回退到商管 ontology**。
@@ -71,6 +71,14 @@ verification:
 > LnkCRE 别名口径：MI / MI-CRE / LnkCRE / lnkcre / 商管系统 是同一产品（canonical id `lnkcre`）。MI-* / MI-CRE-* 是历史稳定文档 ID，不代表目录仍叫 mi-cre。路径解析唯一权威源是 skill 的 `_paths.resolve_product_paths()`。
 
 `product_status` 描述产品本身的成熟/完整状态；`adapter_status` 描述本 Skill 对产品 authority、扫描和验证能力的支持状态，两者不得互相推导。产品完整不表示其 ontology/PRD 内容完整，也不自动批准未审核的 ontology baseline。Flow direction 是单次治理任务的属性，不按产品注册。未来增量变更默认先做 ontology impact check，再形成 PRD delta，最后交由目标代码仓实施；对于已有代码领先文档的情况，可反向收集代码事实并形成 ontology/PRD 对账候选，但不得直接改写 canonical 内容。
+
+> **迁移期注记（2026-10-04，owner O3/Batch 2 批准）**：per-consumer adapter capability
+> 的唯一权威源已迁移至 `references/adapter-capabilities.yaml`（方案 B，Batch 1 落地）。
+> 注册表 `adapter_status` 自 2026-10-04 起冻结为迁移期兼容快照——状态变更不再写注册表
+> （evidence/verified_at/校验测试随 capability 文件同 commit 原子化）；capability 文件的
+> `blocked` / `not-applicable` 两态本表枚举不可表达（lnkgateway / lnkwebsite），以 capability
+> 文件为准。消费方、字段替代来源与删除阻塞项见 skill 仓
+> `references/product-registry-迁移审计-2026-10-04.md`。
 
 规则：
 

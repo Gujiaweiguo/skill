@@ -47,7 +47,8 @@
 ```bash
 cd /opt/code/skill/skills/meta/openspec-practice
 uv run python scripts/scan_openspec.py /opt/code/lnkcre --json
-uv run python scripts/scan_openspec.py /opt/code/langchat --json
+uv run python scripts/resolve_context.py lnkchat --company-id lanlnk
+uv run python scripts/scan_openspec.py /opt/code/lnkchat --json
 uv run python -m unittest discover -s tests -p "test_*.py"
 ```
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Final, TypeAlias
@@ -9,6 +10,12 @@ import yaml
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012, Schema
+
+from product_prd_generator import _paths
+
+# 与 tests/test_paths.py 同款环境兜底：resolver 需要 COMPANY_BASE / LANLNK_BASE。
+if not (os.environ.get("COMPANY_BASE") or os.environ.get("LANLNK_BASE")):
+    os.environ["LANLNK_BASE"] = "/opt/code/docs/lanlnk"
 
 ROOT: Final = Path(__file__).resolve().parents[1]
 CONTRACTS: Final = ROOT / "references" / "product-governance"
@@ -33,14 +40,6 @@ def _schema(path: Path) -> Schema:
     parsed = _json_value(raw)
     if not isinstance(parsed, dict):
         raise TypeError(f"{path.name} must contain a JSON schema object")
-    return parsed
-
-
-def _yaml_mapping(path: Path) -> dict[str, JsonValue]:
-    raw: JsonValue = yaml.safe_load(path.read_text(encoding="utf-8"))
-    parsed = _json_value(raw)
-    if not isinstance(parsed, dict):
-        raise TypeError(f"{path.name} must contain a YAML mapping")
     return parsed
 
 
@@ -106,38 +105,71 @@ def test_layer_reference_rejects_cross_product_ontology_fallback() -> None:
     assert _validate("layer-reference.schema.json", value)
 
 
-def test_product_registry_contains_seven_software_products_and_lnkwebsite_prd_only() -> None:
-    registry = _yaml_mapping(ROOT / "references" / "product-registry.yaml")
-    products = registry["products"]
-    assert isinstance(products, dict)
-    expected_profiles = {
-        "lnkcre": ("business", "business-ontology"),
-        "lnkcrm": ("business", "business-ontology"),
-        "lnkchatbi": ("tool", "tool-ontology"),
-        "lnkreport": ("tool", "tool-ontology"),
-        "lnkvision": ("tool", "tool-ontology"),
-        "lnkgateway": ("tool", "tool-ontology"),
-        "lnkchat": ("tool", "tool-ontology"),
-    }
+# 七软件产品 product_class / ontology_profile 的 baseline 契约映射（可执行形态）。
+# 语义权威源 = references/product-semantic-baseline.md §1 规则 2（业务系统 lnkcre/lnkcrm
+# ↔ business-ontology；平台/AI 产品 ↔ tool-ontology）。company.yaml 产品台账不携带
+# 这两个字段；product-registry.yaml 同名字段为冻结兼容快照（迁移审计
+# references/product-registry-迁移审计-2026-10-04.md §4-B1，B1 迁移 2026-10-04）。
+SOFTWARE_PRODUCT_PROFILES: dict[str, tuple[str, str]] = {
+    "lnkcre": ("business", "business-ontology"),
+    "lnkcrm": ("business", "business-ontology"),
+    "lnkchatbi": ("tool", "tool-ontology"),
+    "lnkreport": ("tool", "tool-ontology"),
+    "lnkvision": ("tool", "tool-ontology"),
+    "lnkgateway": ("tool", "tool-ontology"),
+    "lnkchat": ("tool", "tool-ontology"),
+}
+
+_CAPABILITIES: Final = ROOT / "references" / "adapter-capabilities.yaml"
+
+
+def _capability_status(product_id: str) -> str:
+    """读取本 skill 私有 capability 声明中某产品的 adapter 支持度。
+
+    唯一权威源 = references/adapter-capabilities.yaml（方案 B，Batch 1，O1/O2 批准）；
+    product-registry.yaml 的同名字段自 2026-10-04 起冻结为迁移期兼容快照，
+    不再作为断言来源（lnkgateway=blocked / lnkwebsite=not-applicable 两格
+    registry 枚举不可表达，以 capability 文件为准）。
+    """
+    raw = yaml.safe_load(_CAPABILITIES.read_text(encoding="utf-8"))
+    assert isinstance(raw, dict), f"{_CAPABILITIES.name} 必须是 YAML mapping"
+    assert raw.get("consumer_id") == "product-prd-generator"
+    units = raw["capabilities"]
+    assert isinstance(units, list)
+    matched = [u for u in units if isinstance(u, dict) and u.get("product_id") == product_id]
+    assert len(matched) == 1, (
+        f"{product_id} 在 {_CAPABILITIES.name} 中应有且仅有一条 capability 单元"
+    )
+    return str(matched[0]["status"])
+
+
+def test_company_ledger_registers_seven_software_products_and_lnkwebsite_prd_only() -> None:
+    """B1 迁移（2026-10-04）：断言来源自 product-registry.yaml 改为 go-forward 权威源。
+
+    - 产品宇宙（7 软件 + lnkwebsite）→ company.yaml products（唯一产品台账，经 resolver）；
+    - lnkwebsite prd-only / 无本体层 → resolver product_status + ontology authority
+      （替代 registry 的 ontology=null / ontology_profile=null 镜像值）；
+    - adapter 支持度 → 本 skill 私有 references/adapter-capabilities.yaml
+      （lnkwebsite = not-applicable 为 O2 首版矩阵改判口径）；
+    - product_class / ontology_profile → SOFTWARE_PRODUCT_PROFILES baseline 契约映射。
+    """
+    company = _paths.resolve_company(company_id="lanlnk")
+    product_ids = {str(item["id"]) for item in company.products}
     # 七产品软件治理契约范围不变；lnkwebsite 2026-10-02 起为 prd-only 登记
     # （OPC：不建本体层，out of software product contract，仅消 Check 4 漂移信号）。
-    assert set(products) - {"lnkwebsite"} == set(expected_profiles)
-    assert "lnkwebsite" in products
-    website = products["lnkwebsite"]
-    assert isinstance(website, dict)
-    assert website["ontology"] is None
-    assert website["ontology_profile"] is None
-    assert website["adapter_status"] == "unsupported"
-    for product_id in expected_profiles:
-        product = products[product_id]
-        assert isinstance(product, dict)
-        assert product["product_class"] == expected_profiles[product_id][0]
-        assert product["ontology_profile"] == expected_profiles[product_id][1]
-        assert "origin_flow" not in product
-    chatbi = products["lnkchatbi"]
-    assert isinstance(chatbi, dict)
-    assert chatbi["product_status"] == "complete"
-    assert chatbi["adapter_status"] == "partial"
+    assert product_ids - {"lnkwebsite"} == set(SOFTWARE_PRODUCT_PROFILES)
+    assert "lnkwebsite" in product_ids
+    website = _paths.resolve_product("lnkwebsite", company)
+    assert website.product_status == "prd-only"
+    assert website.authority["ontology"].status == "not-applicable"
+    assert website.layers.get("ontology_entry") is None
+    assert _capability_status("lnkwebsite") == "not-applicable"
+    # flow direction 是单次治理任务的属性，不按产品注册（baseline §3）
+    for item in company.products:
+        assert "origin_flow" not in item
+    chatbi = _paths.resolve_product("lnkchatbi", company)
+    assert chatbi.product_status == "complete"
+    assert _capability_status("lnkchatbi") == "partial"
 
 
 def test_source_reference_keeps_decisions_separate_from_observations() -> None:

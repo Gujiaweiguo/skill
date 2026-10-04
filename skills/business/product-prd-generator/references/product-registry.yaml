@@ -1,15 +1,24 @@
 # Product Registry —— 三层模型产品注册表（本体 / PRD / 代码）
 #
 # 规则：
-# 1. 新产品加入 = 补一条 entry；路径未确认一律写 null + *_note 说明，不编造。
+# 1. 新产品注册入口 = docs 仓 onboarding 契约（B3 迁移，2026-10-04）：
+#    bash scripts/onboard.sh product <company> <pid> --name "<产品名>"
+#    ——写 company.yaml products 台账（唯一产品台账）并创建
+#    30-products/<pid>/{prd,ontology} 骨架；代码侧 canonical 目录名与 pid 不同时，
+#    另在 skill 的 _paths._PRODUCT_CANONICAL_DIR 补映射（先例 lnkcrm，acbae37）。
+#    本表不再是新产品注册入口（保留为迁移期兼容元数据，见规则 10(c)）；
+#    本表条目内路径未确认一律写 null + *_note 说明，不编造。
 # 2. 未知/未注册产品必须显式降级说明，禁止静默回退到商管 ontology。
 # 3. ontology 指向该产品本体层主入口文件；本体层允许多文件（见 product-semantic-baseline.md §1）。
 # 4. model_kind 等旧分类字段仅为可选内部提示，不作为入口概念。
 # 5. lnkcre 条目：canonical root 为 30-products/lnkcre；mi-cre 目录已于 2026-09
 #    三层整理中合并删除（legacy_* fallback 字段随之移除）。MI-* / MI-CRE-* 文档 ID
 #    与 mi-cre 路径段别名（历史文档识别用）保持不变。
-# 6. 代码侧路径解析唯一权威源是 skill 的 _paths.resolve_product_paths()，
-#    本表与其保持同步（改一边必须改另一边）。
+# 6. 路径解析的运行时唯一权威源是 resolver——skill 的 _paths.resolve_product_paths()
+#    （resolver-first，经 shared.product_context，未配置/null 一律显式报错）。本表不
+#    承担运行时路径解析，保留为迁移期兼容元数据/历史镜像；路径字段与 resolver 不
+#    构成双源同步义务——原「改一边必须改另一边」契约已撤销（B4，2026-10-04，见
+#    references/product-registry-迁移审计-2026-10-04.md §4-B4）。
 # 7. 2026-09-26 方案 B 家族迁移（owner 批准）：lnkreport / lnkvision / lnkchatbi 的
 #    canonical PRD 家族与本体自 out/prd/<项目>/output/ 迁入 30-products/<产品>/{prd,ontology}/；
 #    out/prd/ 降为纯生成区（skill 生成产物仍落 out/，经 owner 审后"晋升"并入 canonical，
@@ -18,14 +27,44 @@
 #    canonical_root 重复字段。
 # 8. _PRODUCT_CANONICAL_DIR 已登记 lnkreport/lnkchatbi/lnkvision（2026-09-26 同日修复，
 #    回归闸 tests/test_paths.py；lnkvision 无 ontology.yaml，canonical 本体为域知识.md，
-#    以本表登记为准）。未注册产品 tier-4 商管兜底带跨域污染闸门（非 lanlnk 公司
-#    报错引导注册，lanlnk 公司警告）。本表与代码解析保持同步。
+#    现行事实来源 = company.yaml / 治理 README / resolver，本表仅为迁移期兼容元数据/
+#    历史镜像）。未注册产品 tier-4 商管兜底带跨域污染闸门（非 lanlnk 公司
+#    报错引导注册，lanlnk 公司警告）。本表路径字段为迁移期兼容快照/历史镜像，
+#    与代码解析（resolver）不构成同步义务（规则 6，B4 撤销）。
 # 9. 2026-10-02 external-owner-follow-up 回填（OPC 6 项裁决，docs 侧决策记录
 #    lanlnk/30-products/external-owner-decisions-2026-10-02.md）：lnkcrm 本体 accepted
 #    v1.0（release SEM-CRM-OPS-001）/ prd_root confirmed v1.0；lnkchatbi 本体 accepted
 #    v2.0（追认 09-27 重建决策，release SEM-BI-CAP-001）；lnkgateway 维持 unresolved
 #    （owner-confirmed）；lnkwebsite prd-only 登记（out of software product contract，
 #    ontology 解析显式降级拒绝回落商管，杜绝静默 fallback）。
+# 10. adapter capability 语义边界与迁移期冻结（2026-10-04 消费方审计迁移；
+#     2026-10-04 O3/Batch 2 owner 批准更新，决策记录
+#     references/adapter-capability-owner-decision-o3-batch2-2026-10-04.md）：
+#     (a) 本表 adapter_status 描述 product-prd-generator 一家的 adapter 支持度
+#     （implemented/partial/onboarding/unsupported），不是 ontology/PRD/code 三层
+#     authority 状态（complete/partial/unresolved/planned/present-unconfirmed/
+#     prd-only/not-applicable——权威源 = company.yaml + 30-products 治理 README，
+#     经 shared.product_context resolver 解析）。公共 resolver 禁止读取本表；
+#     业务 skill 禁止把本表字段解释为 authority 状态或公司/产品事实台账
+#     （company.yaml 是唯一产品台账）。
+#     (b) per-consumer adapter capability 的唯一权威源已迁移至方案 B capability
+#     文件（Batch 1，2026-10-04 落地）：本 skill 见
+#     references/adapter-capabilities.yaml；其余消费方见各自
+#     skills/business/<skill>/references/adapter-capabilities.yaml。
+#     本表 adapter_status 自 2026-10-04 起冻结为迁移期兼容快照——状态变更一律
+#     改 capability 文件（evidence/verified_at/校验测试同 commit 原子化），
+#     不再写本表；两格与权威源存在已登记的枚举性差异（lnkgateway 实为 blocked、
+#     lnkwebsite 实为 not-applicable，本表枚举不可表达），以 capability 文件为准。
+#     (c) 本表整体保留为 product-prd-generator 迁移期兼容元数据/历史镜像（产品
+#     注册入口 = docs 仓 scripts/onboard.sh product + company.yaml products，
+#     见规则 1；本表与 _paths 不构成路径同步对——路径与 authority 事实以
+#     company.yaml / resolver 为准，见规则 6；_PRODUCT_CANONICAL_DIR 为代码侧
+#     目录别名/映射实现细节，非产品台账来源，canonical 目录名与 pid 不同时
+#     仍需在代码侧补映射，先例 lnkcrm）；check_docs_consistency.sh Check 4 的产品
+#     目录对账面自 2026-10-04（B2 迁移）起为 company.yaml products（唯一产品
+#     台账），本表不再承担该对账职责；不建立公共 adapter
+#     capability registry；删除本表是独立 owner 批准动作，删除阻塞项 B1-B7
+#     见 references/product-registry-迁移审计-2026-10-04.md（skill 仓 references/）。
 #
 # unresolved 字段由 docs 侧整理（docs-reorg-prompt）产出 registry-feedback 后回填
 # （2026-09-24 已回填：30-products/product-registry-feedback.yaml；2026-09-26

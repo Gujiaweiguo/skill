@@ -1,0 +1,82 @@
+# adapter-capabilities —— competitor-product-analyzer 私有声明（方案 B）
+#
+# 治理红线（owner decision O1/O2，2026-10-04，references/adapter-capability-owner-decision-2026-10-04.md）：
+# - 本文件只描述本 skill 对各产品的 adapter 能力，不是产品事实；产品三层 authority 一律经
+#   shared.product_context resolver 解析，本文件禁止出现产品路径/revision/authority 字段。
+# - authority.status != adapter_capability.status，两者不得互相推导。
+# - 未经证据不得标 implemented；状态变更必须同时更新 evidence/verified_at 与校验测试。
+# - 跨产品借用禁令：不得从 lnkcre 复制其他产品的功能、报价或叙事资产；非 CRE 产品不得静默回落商管 ontology。
+# - resolver 不读取本文件；本文件不接入生产路径。
+
+schema_version: 1
+consumer_id: competitor-product-analyzer
+owner: opc
+verified_at: "2026-10-04"
+decision_record: "references/adapter-capability-owner-decision-2026-10-04.md"
+capabilities:
+  - consumer_id: competitor-product-analyzer
+    product_id: lnkcre
+    status: implemented
+    evidence:
+      - "30-products/lnkcre ontology + feature-baseline（设计包 §3.3.D）"
+      - "evidence/competitors/ 分析先例（旗茂/海鼎）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "能力抽取 + 加权矩阵 + 借鉴建议链路完整。"
+  - consumer_id: competitor-product-analyzer
+    product_id: lnkcrm
+    status: partial
+    evidence:
+      - "30-products/lnkcrm ontology accepted v1.0 + prd/竞品覆盖矩阵.md（S13-S17 五源竞品证据已入 PRD 包）"
+      - "设计包 §3.3.D"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "status_vs_lanlnk 的 existing/partial/missing 判定不可用（功能清单实现状态全 unknown，只能标 unknown）；evidence/competitors/<vendor>/ 分析结论树未建。间接联动 O5（pending）。"
+  - consumer_id: competitor-product-analyzer
+    product_id: lnkchat
+    status: onboarding
+    evidence:
+      - "30-products/lnkchat ontology.yaml + 功能清单（200 existing）结构在位（设计包 §3.3.D）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "结构在位但无对照先例；目标能力模型未按该产品校准——首次真实使用前不得宣称支持。"
+  - consumer_id: competitor-product-analyzer
+    product_id: lnkchatbi
+    status: onboarding
+    evidence:
+      - "30-products/lnkchatbi ontology v2.0 + 功能清单（设计包 §3.3.D）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "同 lnkchat：无对照先例，能力模型未校准。"
+  - consumer_id: competitor-product-analyzer
+    product_id: lnkreport
+    status: onboarding
+    evidence:
+      - "30-products/lnkreport ontology + 功能清单 79 项（设计包 §3.3.D）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "同上：结构在位，无先例。"
+  - consumer_id: competitor-product-analyzer
+    product_id: lnkvision
+    status: onboarding
+    evidence:
+      - "30-products/lnkvision「域知识.md」本体 + 功能清单（设计包 §3.3.D）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "域知识非机器本体，术语归一走域知识入口；无对照先例。"
+  - consumer_id: competitor-product-analyzer
+    product_id: lnkgateway
+    status: blocked
+    evidence:
+      - "SKILL.md S1.2/S1.3 降级契约（unresolved 时显式标注，不回落商管）（设计包 §3.3.D）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "被 authority 阻塞：ontology unresolved → 术语归一不可进行（owner-confirmed 不从网关代码反推本体）；解除=O11（pending）。"
+  - consumer_id: competitor-product-analyzer
+    product_id: lnkwebsite
+    status: not-applicable
+    evidence:
+      - "SKILL.md 明确不进 ontology-change-set 契约（owner 2026-09-27）（设计包 §3.3.D）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "无竞品对照场景。"

@@ -37,11 +37,15 @@ LnkCRE / lnkcre。
 Canonical layout note (2026-09-26 方案 B 家族迁移): lnkreport / lnkchatbi /
 lnkvision 的 canonical PRD 家族与本体已迁入 30-products/<pid>/{prd,ontology}/，
 out/prd/ 降为纯生成区（skill 生成产物仍落 out/，经 owner 审后晋升并入
-canonical，双源不并存）。canonical 布局登记见 references/product-registry.yaml；
+canonical，双源不并存）。canonical 布局与路径事实以 company.yaml / resolver
+（本模块 resolve_product_paths，resolver-first）为准；references/product-registry.yaml
+为迁移期兼容元数据/历史镜像，不构成路径解析权威源或双源同步义务。
 本模块的代码默认输出仍是生成区 out/prd/<project>/output/，不改行为。
 _PRODUCT_CANONICAL_DIR 已登记上述三个产品（2026-09-26 修复，回归闸在
-tests/test_paths.py）。lnkvision 无 ontology.yaml——canonical 本体为
-ontology/域知识.md，登记在 product-registry.yaml。未注册产品的 tier-4
+tests/test_paths.py）——该映射是代码侧目录别名/映射实现细节，非产品台账
+来源（产品台账 = company.yaml products）。lnkvision 无 ontology.yaml——
+canonical 本体为 ontology/域知识.md，路径事实以 company.yaml / resolver 为准
+（product-registry.yaml 仅存迁移期兼容快照）。未注册产品的 tier-4
 商管兜底带跨域污染闸门（_guard_unregistered_fallback）：非 lanlnk 公司
 直接报错引导注册，lanlnk 公司警告后兜底。
 """
@@ -51,6 +55,17 @@ import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
+import importlib
+
+_product_context = importlib.import_module("shared.product_context")
+ProductContextError = _product_context.ProductContextError
+resolve_company = _product_context.resolve_company
+resolve_product = _product_context.resolve_product
 
 # ─── LnkCRE canonical / legacy 目录契约 ────────────────────────────────
 
@@ -145,7 +160,10 @@ def product_dir_aliases(project: str) -> tuple[str, ...]:
 
 def _legacy_fallback_enabled() -> bool:
     """迁移期兼容开关。docs 仓 mi-cre → lnkcre 合并已于 2026-09 完成（三层整理，
-    证据：30-products/product-registry-feedback.yaml），fallback 关闭。"""
+    历史证据：docs 仓 30-products/product-registry-feedback.yaml——回填反馈文件，
+    非 skill 侧 references/product-registry.yaml）。当前产品与路径事实来源 =
+    company.yaml / resolver（本模块 resolve_product_paths，resolver-first）；skill 侧
+    product-registry.yaml 仅为迁移期兼容元数据/历史镜像。fallback 关闭。"""
     return False
 
 
@@ -184,6 +202,20 @@ def resolve_product_paths(project: str) -> ProductPaths:
     base = _lanlnk_base()
     cid = canonical_product_id(project)
     products_dir = base / "30-products"
+    context = _shared_product_context(project)
+    if context is not None:
+        docs_root = context.layers.get("docs_root") or (products_dir / context.id)
+        ontology_root = context.layers.get("ontology_root") or (docs_root / "ontology")
+        prd_root = context.layers.get("prd_root") or (docs_root / "prd")
+        if context.id != "lnkcre":
+            return ProductPaths(
+                canonical_product_id=context.id,
+                docs_root=docs_root,
+                ontology_root=ontology_root,
+                prd_root=prd_root,
+                feature_baseline_path=prd_root / "baseline" / "feature-baseline.yaml",
+                competitor_evidence_root=docs_root / "evidence" / "competitors",
+            )
 
     if cid == "lnkcre":
         docs_root = products_dir / LNKCRE_CANONICAL_DIR
@@ -291,7 +323,8 @@ _PRODUCT_CANONICAL_DIR: dict[str, str] = {
     # 2026-09-26 方案 B 家族迁移（owner 批准，补齐 SKILL.md 登记的解析缺口）：
     # lnkreport / lnkchatbi / lnkvision 的 canonical ontology 双件已在
     # 30-products/<pid>/ontology/。lnkvision 无 ontology.yaml/term-aliases.yaml
-    # （canonical 本体为 ontology/域知识.md，登记在 product-registry.yaml；
+    # （canonical 本体为 ontology/域知识.md，路径事实以 company.yaml / resolver
+    # 为准，product-registry.yaml 仅存迁移期兼容快照；
     # 本映射仅供 tier-1 探测，不会误命中其他产品）。
     "lnkreport": "lnkreport",
     "lnkchatbi": "lnkchatbi",
@@ -341,6 +374,15 @@ def _lanlnk_base() -> Path:
     return path
 
 
+def _shared_product_context(project: str):
+    base = _lanlnk_base()
+    try:
+        company = resolve_company(company_base=base, require_explicit=True)
+        return resolve_product(project, company)
+    except ProductContextError:
+        return None
+
+
 # 商管 business-ontology / 商管 term-aliases 的归属公司 slug：
 # 非 lanlnk 公司的未注册产品回落它们 = 跨域污染（registry 规则 2 禁止项）。
 _FALLBACK_OWNER_COMPANY = "lanlnk"
@@ -360,8 +402,11 @@ def _guard_unregistered_fallback(project: str, base: Path, fallback: Path) -> No
     if base.name == _FALLBACK_OWNER_COMPANY:
         print(
             f"警告: 未注册产品 {project!r} 回落商管默认件 {fallback}。"
-            "若该产品不属于商管域，请先在 references/product-registry.yaml 注册"
-            "（先例 lnkcrm，acbae37），否则输出将带商管跨域污染。",
+            "若该产品不属于商管域，请先在 docs 仓运行 "
+            "scripts/onboard.sh product <company> <pid> --name \"<产品名>\" 注册"
+            "（写 company.yaml products 台账并创建 30-products/<pid>/{prd,ontology} 骨架；"
+            "canonical 目录名与 pid 不同时另在 _paths._PRODUCT_CANONICAL_DIR 补映射，"
+            "先例 lnkcrm，acbae37），否则输出将带商管跨域污染。",
             file=sys.stderr,
         )
         return
@@ -370,10 +415,12 @@ def _guard_unregistered_fallback(project: str, base: Path, fallback: Path) -> No
         f"ontology/term-aliases，拒绝静默回落商管默认件 {fallback}"
         "（跨域污染，registry 规则 2）。\n"
         "修复路径（任选其一）：\n"
-        "  1. 在 skill 的 references/product-registry.yaml 注册该产品，并在"
-        " _paths._PRODUCT_CANONICAL_DIR 补目录映射（先例 lnkcrm，acbae37）；\n"
-        f"  2. 在 {base / '30-products' / '<pid>' / 'ontology'} 创建自有 ontology.yaml"
-        "（docs 仓 onboard.sh product 骨架），或在 out/prd/<项目>/output/ 生成区自建。"
+        "  1. 在 docs 仓运行 scripts/onboard.sh product <company> <pid> "
+        "--name \"<产品名>\" 注册该产品（写 company.yaml products 台账并创建 "
+        "30-products/<pid>/{prd,ontology} 骨架；canonical 目录名与 pid 不同时另在 "
+        "_paths._PRODUCT_CANONICAL_DIR 补目录映射，先例 lnkcrm，acbae37）；\n"
+        f"  2. 在 {base / '30-products' / '<pid>' / 'ontology'} 创建自有 ontology.yaml，"
+        "或在 out/prd/<项目>/output/ 生成区自建。"
     )
 
 
@@ -381,6 +428,17 @@ def ontology_path_for_project(project: str) -> Path:
     base = _lanlnk_base()
 
     cid = canonical_product_id(project)
+    context = _shared_product_context(project)
+    if context is not None:
+        entry = context.layers.get("ontology_entry")
+        status = context.authority["ontology"].status
+        if entry and entry.is_file():
+            return entry
+        if status in {"not-applicable", "unresolved", "not-found", "inaccessible"}:
+            raise MissingProductDataError(
+                f"产品 {context.id!r} 的 ontology authority 状态为 {status}，"
+                "拒绝回落其他产品的 ontology。"
+            )
     for subdir in _canonical_dirs_for(project):
         nested = base / "30-products" / subdir / "ontology" / "ontology.yaml"
         if nested.is_file():
@@ -421,6 +479,15 @@ def ontology_path_for_project(project: str) -> Path:
 def term_aliases_path_for_project(project: str, skill_root: Path) -> Path:
     base = _lanlnk_base()
     cid = canonical_product_id(project)
+    context = _shared_product_context(project)
+    if context is not None:
+        entry = context.layers.get("ontology_entry")
+        if entry and entry.parent.joinpath("term-aliases.yaml").is_file():
+            return entry.parent / "term-aliases.yaml"
+        if context.authority["ontology"].status in {"not-applicable", "unresolved", "not-found", "inaccessible"}:
+            raise MissingProductDataError(
+                f"产品 {context.id!r} 的 term-aliases authority 无法从 shared.product_context 解析。"
+            )
 
     for subdir in _canonical_dirs_for(project):
         nested = base / "30-products" / subdir / "ontology" / "term-aliases.yaml"
@@ -510,11 +577,16 @@ def output_dir_for_project(project: str, explicit: str = "", canonical: bool = F
 def resolve_code_root(project: str, explicit: str = "") -> Path:
     if explicit:
         return Path(explicit)
+    context = _shared_product_context(project)
+    if context is not None:
+        configured = context.code_root
+        if configured is not None and context.authority["code"].status == "complete":
+            return configured
+        raise MissingProductDataError(
+            f"产品 {context.id!r} 的 code_root 未由 company.yaml 明确配置；"
+            f"当前 code authority 状态为 {context.authority['code'].status}，请显式传入 --code-root。"
+        )
     cid = canonical_product_id(project)
-    if cid == "lnkcre":
-        configured = _PRODUCT_CODE_ROOTS[cid]
-        if configured is not None:
-            return Path(configured)
     configured = _PRODUCT_CODE_ROOTS.get(cid)
     if configured is None:
         raise MissingProductDataError(

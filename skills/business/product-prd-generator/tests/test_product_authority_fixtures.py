@@ -1,9 +1,9 @@
 """Product authority contract fixtures (tasks 1.1 / 1.4).
 
-Seven-product layer fixtures mirroring references/product-registry.yaml:
-every product declares business/tool profile plus per-layer authority or an
-explicit unresolved state. Registry nulls are never upgraded to invented
-authority refs (task 1.4), and no product borrows another product's ontology.
+Seven-product layer fixtures mirroring the product-semantic-baseline contract
+(business/tool split, §1 rule 2) plus per-layer authority or an explicit
+unresolved state. Registry nulls are never upgraded to invented authority
+refs (task 1.4), and no product borrows another product's ontology.
 """
 
 from __future__ import annotations
@@ -13,10 +13,11 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Final, TypeAlias
 
-import yaml
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012, Schema
+
+from tests.test_product_governance_contracts import SOFTWARE_PRODUCT_PROFILES
 
 ROOT: Final = Path(__file__).resolve().parents[1]
 CONTRACTS: Final = ROOT / "references" / "product-governance"
@@ -74,6 +75,7 @@ def _ref(
     authority_ref: str | None = None,
     reason: str | None = None,
     version: str | None = None,
+    revision: str | None = None,
 ) -> dict[str, JsonValue]:
     value: dict[str, JsonValue] = {
         "product_id": product_id,
@@ -89,11 +91,18 @@ def _ref(
         value["authority_ref"] = authority_ref
         if version is not None:
             value["version"] = version
+        if revision is not None:
+            value["revision"] = revision
     return value
 
 
 def _layer_fixtures() -> dict[str, dict[str, dict[str, JsonValue]]]:
-    """7 products × 3 layers, mirroring product-registry.yaml declared state."""
+    """7 products × 3 layers, mirroring the declared three-layer state.
+
+    Profile 对账面 = baseline 契约（product-semantic-baseline.md §1 规则 2 的
+    可执行形态见 tests.test_product_governance_contracts.SOFTWARE_PRODUCT_PROFILES）；
+    product-registry.yaml 同名字段为冻结迁移快照（B1 迁移 2026-10-04）。
+    """
     business, tool = "business-ontology", "tool-ontology"
     return {
         "lnkcre": {
@@ -102,10 +111,23 @@ def _layer_fixtures() -> dict[str, dict[str, dict[str, JsonValue]]]:
             "code": _ref("lnkcre", "business", business, "code", authority_ref="/opt/code/lnkcre"),
         },
         "lnkcrm": {
-            # ontology.yaml exists as draft v0.1; authority file resolvable, no accepted version yet
+            # lnkcrm ontology accepted v1.0 (release SEM-CRM-OPS-001, OPC 2026-10-02,
+            # registry rule 9); resolver status complete (revision v1.0), authority
+            # file = 30-products/lnkcrm/ontology/ontology.yaml. code = complete per
+            # O5-lnkcrm-code reconciliation (see code fixture below).
             "ontology": _ref("lnkcrm", "business", business, "ontology", authority_ref="30-products/lnkcrm/ontology/ontology.yaml"),
             "prd": _ref("lnkcrm", "business", business, "prd", reason="PRD baseline unresolved: planned (prd_ready false, guided onboarding)"),
-            "code": _ref("lnkcrm", "business", business, "code", reason="Code repository unresolved: no repo yet (planned, named 2026-09-26)"),
+            # O5-lnkcrm-code reconciliation (route A, 2026-10-04): source =
+            # company.yaml code_root (docs c41a978 ratified); code authority
+            # complete per resolver. revision is the ratify-time snapshot.
+            "code": _ref(
+                "lnkcrm",
+                "business",
+                business,
+                "code",
+                authority_ref="/opt/code/lnkcrm",
+                revision="4323b8c9f6f195dd82083348dd6e854e7360afa3",
+            ),
         },
         "lnkchatbi": {
             "ontology": _ref("lnkchatbi", "tool", tool, "ontology", authority_ref="30-products/lnkchatbi/ontology/ontology.yaml"),
@@ -148,17 +170,19 @@ def test_all_seven_products_declare_three_layers_with_valid_contracts() -> None:
             assert _validate(layer_ref) == [], f"{product_id}/{layer}: {_validate(layer_ref)}"
 
 
-def test_fixture_profiles_match_registry_and_business_tool_split() -> None:
-    registry_raw = yaml.safe_load(
-        (ROOT / "references" / "product-registry.yaml").read_text(encoding="utf-8")
-    )
-    products = registry_raw["products"]
+def test_fixture_profiles_match_baseline_contract_and_business_tool_split() -> None:
+    """B1 迁移（2026-10-04）：镜像对账面自 product-registry.yaml 改为 baseline 契约。
+
+    product_class / ontology_profile 的语义权威源 = product-semantic-baseline.md
+    §1 规则 2（业务系统 lnkcre/lnkcrm ↔ business-ontology；平台/AI 产品 ↔
+    tool-ontology）；company.yaml 产品台账不携带这两个字段（迁移审计 §4-B1）。
+    """
     fixtures = _layer_fixtures()
     for product_id, layers in fixtures.items():
-        entry = products[product_id]
+        product_class, ontology_profile = SOFTWARE_PRODUCT_PROFILES[product_id]
         for layer_ref in layers.values():
-            assert layer_ref["product_class"] == entry["product_class"]
-            assert layer_ref["ontology_profile"] == entry["ontology_profile"]
+            assert layer_ref["product_class"] == product_class
+            assert layer_ref["ontology_profile"] == ontology_profile
     business_products = {p for p, l in fixtures.items() if l["ontology"]["product_class"] == "business"}
     tool_products = set(fixtures) - business_products
     assert business_products == {"lnkcre", "lnkcrm"}
@@ -169,10 +193,16 @@ def test_registry_nulls_stay_unresolved_without_invented_authority() -> None:
     fixtures = _layer_fixtures()
     unresolved_expectations = {
         ("lnkcrm", "prd"): "planned",
-        ("lnkcrm", "code"): "no repo",
         ("lnkgateway", "ontology"): "no owner-confirmed",
         ("lnkgateway", "prd"): "no prd_root",
     }
+    # lnkcrm/code left the unresolved set via O5-lnkcrm-code reconciliation
+    # (route A, 2026-10-04): company.yaml code_root ratified, so it must now
+    # stay resolved with an authority_ref and a revision.
+    lnkcrm_code = fixtures["lnkcrm"]["code"]
+    assert lnkcrm_code["status"] == "resolved", "lnkcrm/code regressed to unresolved"
+    assert lnkcrm_code["authority_ref"] == "/opt/code/lnkcrm"
+    assert lnkcrm_code["revision"], "lnkcrm/code missing revision"
     for (product_id, layer), reason_fragment in unresolved_expectations.items():
         layer_ref = fixtures[product_id][layer]
         assert layer_ref["status"] == "unresolved", f"{product_id}/{layer}"

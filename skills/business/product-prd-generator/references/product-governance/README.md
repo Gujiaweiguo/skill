@@ -36,7 +36,9 @@ For existing code that leads its PRD or ontology documentation, code/spec/test s
 
 Flow direction belongs to an individual change/return record, never to a product registry entry. OPC is the approval owner for product and ontology decisions. Code facts remain evidence tied to a target repository revision and scan scope; OPC approval does not imply unperformed technical verification.
 
-Product completeness is separate from skill adapter maturity. A complete product may have a partial or unsupported adapter; an accepted ontology baseline may still be explicitly incomplete in coverage. Registry `product_status` describes product lifecycle/completeness, while `adapter_status` describes the skill's ability to resolve and process that product.
+Product completeness is separate from skill adapter maturity. A complete product may have a partial or unsupported adapter; an accepted ontology baseline may still be explicitly incomplete in coverage. `product_status` (authoritative source: `company.yaml` products, the sole product ledger) describes product lifecycle/completeness, while `adapter_status` (authoritative source: the consuming skill's `references/adapter-capabilities.yaml`; registry values frozen as a migration-period snapshot) describes the skill's ability to resolve and process that product.
+
+Migration-period note (owner decision O3/Batch 2, 2026-10-04): the per-consumer adapter capability authority now lives in each consuming skill's `references/adapter-capabilities.yaml` (Plan B, Batch 1). Registry `adapter_status` is frozen as a compatibility snapshot; its enum cannot express `blocked`/`not-applicable` (lnkgateway, lnkwebsite), so the capability file prevails. Registry consumers, replacement sources, and deletion blockers are audited in skill-repo `references/product-registry-迁移审计-2026-10-04.md`.
 
 Consumers MUST retain product-specific IDs such as competitor `evidence_id` and `capability_id` and material index paths. These schemas link to those IDs; they do not replace the owning skill's records.
 

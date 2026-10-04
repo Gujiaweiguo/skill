@@ -180,16 +180,18 @@ company-intro-generator（客户方案）/ bid-doc-master（投标）
 | 政策/监管文件、市场报告 | `incoming/<主题>/` | 政策驱动型行业的关键输入 |
 | 行业运营 SOP | `incoming/<主题>/` | 真实业务流程证据 |
 | 竞品原始资料 | `incoming/prd-<pid>/02-competitors/` 或 `incoming/<主题>/` | 抽取结果由 P3 直产到 materials/13-competitors/ |
-| 自身源码资产 | 不复制；`source-ref.md` 记录 code_root 路径，放 `incoming/<主题>/` | 路径取自 company.yaml products[].code_root |
+| 自身源码资产 | 不复制；`source-ref.md` 记录 code_root 路径，放 `incoming/<主题>/` | 路径取自 resolver 输出（company.yaml products[].code_root 经 shared.product_context 解析） |
 | 自身产品资料 | 引用 `$MATERIALS_DIR/` 已分解资料，在《资料来源清单》登记 | 不建 04-self 目录 |
 
 ### 源码类资料处理
 
-产品资产以源码为主的（code_root 非空）：不复制。处理方式：
+产品资产以源码为主的（code authority complete）：不复制。处理方式：
 
-1. 在《资料来源清单.md》登记源码根路径（来自 company.yaml）与盘点范围
+1. 在《资料来源清单.md》登记源码根路径（来自 resolver 输出的 `layers.code_root`）与盘点范围
 2. 后续由 Agent 读取源码，抽取能力清单写入自身能力盘点（P4）
 3. 有 PRD 产物的产品（prd_ready: true）直接复用其 PRD/功能清单作盘点输入
+4. code_root null / present-unconfirmed 的产品按 P4 判定表降级，不按产品 ID 猜
+   `/opt/code/<产品 id>`
 
 ## 处理流程
 
@@ -248,9 +250,16 @@ uv run scripts/extract_images.py "$INCOMING_DIR"
 
 | 资产来源 | 判定 | 盘点内容 |
 |------|------|---------|
-| code_root 非空 | 读源码（source-ref.md 指路） | 已有模块、能力成熟度、技术栈 |
+| code authority complete（code_root 配置且存在） | 读源码（source-ref.md 指路） | 已有模块、能力成熟度、技术栈 |
+| code_root null / planned（如 lanlnk 的 lnkcrm） | 不猜 `/opt/code/<产品 id>`；降级走 materials 资料 | 产品功能、案例、行业覆盖 |
+| code authority present-unconfirmed（配置 null 但观察到外部 checkout） | 观察 checkout 只作证据登记，不当作 configured authority；深度读码需 owner 确认 | 模块级浅盘点（标注 unconfirmed） |
 | code_root 空 + materials 有资料 | 引用 `$MATERIALS_DIR/03-products/` 等 | 产品功能、案例、行业覆盖 |
 | prd_ready: true | 复用 PRD/功能清单 | 权威能力基线 |
+
+> 产品的 code 状态判定经公共 `shared.product_context` resolver
+> （`openspec-practice/scripts/resolve_context.py <产品 ID>`，输出 `authority.code.status`
+> 与 `layers.code_root`）；company.yaml 是产品台账，但状态语义（present-unconfirmed /
+> planned 等）以 resolver 输出为准，本 skill 不自行推断。
 
 ### P5 市场信号整理（含政策升格）
 

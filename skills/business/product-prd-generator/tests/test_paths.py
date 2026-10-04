@@ -207,7 +207,9 @@ def test_ontology_unregistered_product_on_non_lanlnk_company_raises(
     msg = str(excinfo.value)
     assert "溯源APP" in msg
     assert str(base) in msg
-    assert "product-registry.yaml" in msg  # 引导注册
+    # B3（2026-10-04）：注册入口迁移为 docs 仓 onboarding 契约，断言改指其关键词，不再指向 registry。
+    assert "onboard.sh product" in msg  # 引导注册
+    assert "company.yaml" in msg
 
 
 def test_term_aliases_unregistered_product_on_non_lanlnk_company_raises(
@@ -327,12 +329,23 @@ def test_canonical_target_is_explicit_opt_in(tmp_path: Path, monkeypatch: pytest
     )
 
 
-def test_non_cre_code_root_requires_explicit_override(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_configured_code_root_comes_from_shared_resolver(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("COMPANY_BASE", "/opt/code/docs/lanlnk")
     monkeypatch.delenv("LANLNK_BASE", raising=False)
-    with pytest.raises(MissingProductDataError):
-        resolve_code_root("LnkVision")
+    assert resolve_code_root("LnkVision") == Path("/opt/code/lnkvision")
     assert resolve_code_root("LnkVision", "/tmp/lnkvision") == Path("/tmp/lnkvision")
+
+
+def test_configured_lnkcrm_code_root_resolves_without_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    """lnkcrm code_root 已配置（2026-10-04 对账，ratify docs c41a978）。
+
+    company.yaml 登记 lnkcrm code_root=/opt/code/lnkcrm → authority=complete，
+    resolve_code_root 直接返回配置值，无需显式 --code-root 覆盖。
+    旧断言（present-unconfirmed 须显式覆盖）基于 code_root=null 旧基线，已过时。
+    """
+    monkeypatch.setenv("COMPANY_BASE", "/opt/code/docs/lanlnk")
+    monkeypatch.delenv("LANLNK_BASE", raising=False)
+    assert resolve_code_root("lnkcrm") == Path("/opt/code/lnkcrm")
 
 
 def test_registered_unresolved_ontology_does_not_fallback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

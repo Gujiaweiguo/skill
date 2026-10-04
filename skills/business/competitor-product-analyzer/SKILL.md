@@ -19,8 +19,14 @@ compatibility: >
   纯提示词 skill，无 Python 依赖。
   文档转换复用 material-importer（markitdown + 图片提取 + OCR）。
   Demo 探测复用 doc-generator 的 Playwright 模式与文本/角色 locator 规范。
-   能力对齐参考目标产品的三层基线（本体层 ontology/aliases，产品注册表见 product-prd-generator 的 `references/product-registry.yaml`）；不得在非 CRE 产品上静默回退到商管 ontology。
-   商管域知识仅在目标产品为 LnkCRE/MI-CRE 时经 lnkcre ontology 入口解析（`30-products/lnkcre/ontology/`，mi-cre 目录已于 2026-09 合并删除）。
+   能力对齐参考目标产品的三层基线（本体层 ontology/aliases）；产品路径事实（产品 ID 归一、
+   ontology/PRD/code 三层 authority、code_root 状态）来自公共 shared.product_context resolver
+   （company.yaml 为唯一产品台账，2026-10 迁移），不得在非 CRE 产品上静默回退到商管 ontology。
+   product-prd-generator 的 references/product-registry.yaml 仅是迁移期 adapter 元数据
+   （其 adapter_status 描述该 skill 的 adapter 支持度），不是公司/产品事实台账，不得据此
+   解析路径或判定 authority 状态。
+   商管域知识仅在目标产品为 LnkCRE/MI-CRE 时经 lnkcre ontology 入口解析（resolver 的
+   ontology authority；mi-cre 目录已于 2026-09 合并删除）。
    跨 skill 交接契约：product-prd-generator 的 `references/product-governance/`（共享 source-reference / ontology-change-set；本 skill 只消费不修改）。
 
   Quick start:
@@ -203,9 +209,20 @@ OPC/产品 owner 的决策**不是竞品证据**。roadmap 方向、改进建议
 
 ### 产品代号与竞品证据隔离（LnkCRE）
 
-- 对照产品代号 **LnkCRE / MI / MI-CRE / lnkcre / 商管系统** 统一解析为 canonical product id **`lnkcre`**（同一产品；MI-* 文档 ID 稳定不变，不代表目录仍叫 mi-cre）。
-- 竞品证据写入根：`$LANLNK_BASE/30-products/lnkcre/evidence/competitors/<vendor>/`（canonical，唯一写入位置；mi-cre 旧根已随 2026-09 目录合并删除，无迁移期读取）。
-- **跨产品隔离**：LnkReport / LnkChat / LnkChatBI 的竞品资料与分析结论不得混入 LnkCRE 的 evidence 树（反之亦然）；目标产品不是 lnkcre 时不读取商管 ontology / LnkCRE feature-baseline。
+- 对照产品代号 **LnkCRE / MI / MI-CRE / lnkcre / 商管系统** 统一经公共 resolver 按
+  company.yaml 产品台账归一为 canonical product id **`lnkcre`**（同一产品；MI-* 文档 ID
+  稳定不变，不代表目录仍叫 mi-cre）。本 skill 不自维护第二套产品列表，不按产品 ID 拼接
+  `/opt/code/<id>`（resolver 边界：`openspec-practice/scripts/resolve_context.py`）。
+- 竞品证据写入根：resolver context 的 `layers.docs_root`（lnkcre 命中时即
+  `$LANLNK_BASE/30-products/lnkcre/`）下 `evidence/competitors/<vendor>/`（canonical，
+  唯一写入位置；mi-cre 旧根已随 2026-09 目录合并删除，无迁移期读取）。
+- **跨产品隔离**：LnkReport / LnkChat / LnkChatBI 的竞品资料与分析结论不得混入 LnkCRE 的
+  evidence 树（反之亦然）；目标产品不是 lnkcre 时不读取商管 ontology / LnkCRE
+  feature-baseline。
+- **authority 状态显式处理**：目标产品 ontology authority 为 not-applicable（lnkwebsite）
+  或 unresolved（lnkgateway）时，术语归一明确降级标注、不回落商管 ontology；code authority
+  为 present-unconfirmed（如 lnkcrm）时，观察到的 checkout 只作只读证据定位，不当作
+  configured code authority。
 
 ### S0 采集入库：三层归属（遵循 lanlnk 统一素材库规范）
 
@@ -523,19 +540,23 @@ markitdown "<原始文件>" -o "<raw 目录>/<6类>/<同名>.md"
 
 ### S1.2 术语归一
 
-把竞品的原始术语映射到蓝联标准功能名，复用：
+把竞品的原始术语映射到蓝联标准功能名。入口路径来自 resolver 的 ontology authority
+（lnkcre 命中时的优先序）：
 
-- LnkCRE 域知识入口（优先 `30-products/lnkcre/ontology/domain-knowledge.md` → `ontology/README.md` → `INDEX.md`；商管域术语别名表）
-- `$LANLNK_BASE/config/ontology/business-ontology.yaml`（8 模块 482 术语）
+- resolver `ontology_entry`（LnkCRE 域知识入口：优先 `30-products/lnkcre/ontology/domain-knowledge.md` → `ontology/README.md` → `INDEX.md`；商管域术语别名表）
+- `$LANLNK_BASE/config/ontology/business-ontology.yaml`（8 模块 482 术语；lnkcre 的注册入口本体）
 - `product-prd-generator/references/term-aliases.yaml`
+
+ontology authority 为 not-applicable（lnkwebsite）/ unresolved（lnkgateway）时：不回落
+商管 ontology，未映射术语全部进 review 并在报告标注该状态。
 
 找不到映射的术语进 `review/pending-items.md`，不强行归一。
 
 ### S1.3 蓝联现状映射
 
-读对照产品的功能清单：
+读对照产品的功能清单（路径来自 resolver 的 prd authority；下表为 lnkcre/CRM/AI 命中时的当前值）：
 
-| 对照产品 | 功能清单路径 |
+| 对照产品 | 功能清单路径（当前值） |
 |---|---|
 | LnkCRE / MI / MI-CRE / 商管系统（canonical id `lnkcre`） | `$LANLNK_BASE/30-products/lnkcre/prd/baseline/feature-baseline.yaml` |
 | CRM / 会员系统 | `$LANLNK_BASE/materials/03-products/CRM会员系统功能清单.md` |
@@ -693,8 +714,8 @@ export LANLNK_BASE=/opt/code/docs/lanlnk
 | `$INCOMING_VENDOR_DIR` | `$LANLNK_BASE/incoming/competitor-<vendor>/` | **S0 原始证据入口**（百度盘）|
 | `$RAW_VENDOR_DIR` | `$LANLNK_BASE/raw/prd-商管系统/02-competitors/<vendor>/` | **S0 转换产物**（gitignored，百度盘）|
 | `$MATERIALS_VENDOR_DIR` | `$COMPETITORS_DIR/<vendor>/` | **S0 权威精华**（进 Git）|
-| `$PRD_DIR` | `$LANLNK_BASE/30-products/lnkcre` | LnkCRE canonical 产品根 |
-| `$ANALYSIS_ROOT` | `$LANLNK_BASE/30-products/lnkcre/evidence/competitors/<vendor>` | **S1 能力分析输出根**（不含原始素材）|
+| `$PRD_DIR` | `$LANLNK_BASE/30-products/lnkcre`（= resolver context 的 `layers.docs_root`） | LnkCRE canonical 产品根 |
+| `$ANALYSIS_ROOT` | `$LANLNK_BASE/30-products/lnkcre/evidence/competitors/<vendor>`（docs_root 下推导） | **S1 能力分析输出根**（不含原始素材）|
 | `$USERGUIDE_BASE` | `$LANLNK_BASE/materials/03-products/user-guides` | doc-generator 的输出根（如需生成竞品操作手册）|
 
 ## 已知限制

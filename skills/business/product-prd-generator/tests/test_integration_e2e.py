@@ -28,6 +28,10 @@ LANLNK_BASE = Path(os.environ["COMPANY_BASE"] if os.environ.get("COMPANY_BASE") 
 
 SHANGGUAN_CODE_ROOT = Path("/opt/code/lnkcre")
 SHANGGUAN_DOCS_ROOT = LANLNK_BASE / "raw" / "prd-商管系统"
+# 历史语义（2026-08 遗留）：langchat 仓已改名为 /opt/code/lnkchat 且 /opt/code/langchat、
+# /opt/code/LnkChatBI 均已不存在，下列 e2e 场景因此长期 skip。当前产品路由一律走
+# company.yaml + shared/product_context resolver（lnkchat → /opt/code/lnkchat，
+# lnkchatbi → /opt/code/lnkchatbi），不再从本常量推导任何运行时路径。
 LANGCHAT_CODE_ROOT = Path("/opt/code/langchat")
 LANGCHAT_DOCS_ROOT = LANLNK_BASE / "raw" / "prd-langchat"
 LNKCHATBI_CODE_ROOT = Path("/opt/code/LnkChatBI")

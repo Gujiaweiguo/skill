@@ -33,7 +33,7 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 | `references/rollout-plan-template.md` | S10-A 战略级架构调整 / S5 高复杂度增量 PRD 时产出"建议实施切片"。WP/Gate/跨仓库所有权表/START-RESUME prompt 模板 |
 | `references/term-aliases.yaml` | 跑术语归一（Step 4）时。术语别名表，扩充覆盖率靠加这个文件 |
 | `references/product-semantic-baseline.md` | 配置三层产品基线（本体/PRD/代码）及 Semantic Release 快照边界时 |
-| `references/product-registry.yaml` | 确认目标产品路径、产品适配器和新增产品时 |
+| `references/product-registry.yaml` | 迁移期兼容元数据（路径/adapter 元数据的历史快照）：核对历史条目或新增产品补录 entry 时读；运行时产品路径以 `_paths` resolver（company.yaml layers）为准，adapter 支持度以 `references/adapter-capabilities.yaml` 为权威源 |
 | `references/product-governance/README.md` | 建立/消费三层治理交接记录时；内含 source-reference、layer-reference、ontology-change-set、reconciliation、implementation-return schemas |
 | `references/incremental-prd-handoff.md` | 生成增量 PRD、目标仓消费提示词、实施回写包时 |
 | `references/product-governance/` | 生成 PRD 交接 trace、ontology 变更候选或三层对账记录时。跨层共享机器契约；不是产品 authority |
@@ -51,7 +51,7 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 - 版本规划
 - PRD
 
-本 Skill 的用户可见结构只有三层：**本体 → PRD → 代码**。本体定义产品世界（对象、术语、规则、能力；业务系统与平台产品内容不同）；PRD 定义产品目标与本轮变更；代码代表当前实现事实。OpenSpec 属于代码层的实施机制，Semantic Release 是本体层的发布快照，UI 规范是 PRD 的内容，竞品分析是 PRD 的输入——它们都不是独立架构层。已注册产品见 `references/product-registry.yaml`：lnkcre、lnkreport、lnkchatbi、lnkchat、lnkvision、lnkgateway 及未来产品。不得因非 CRE 产品没有传统领域模型而静默套用商管 ontology。
+本 Skill 的用户可见结构只有三层：**本体 → PRD → 代码**。本体定义产品世界（对象、术语、规则、能力；业务系统与平台产品内容不同）；PRD 定义产品目标与本轮变更；代码代表当前实现事实。OpenSpec 属于代码层的实施机制，Semantic Release 是本体层的发布快照，UI 规范是 PRD 的内容，竞品分析是 PRD 的输入——它们都不是独立架构层。已注册产品以 company.yaml products（唯一产品台账）为准：lnkcre、lnkcrm、lnkreport、lnkchatbi、lnkchat、lnkvision、lnkgateway、lnkwebsite。`references/product-registry.yaml` 保留为本 skill 迁移期兼容元数据，不再承担 Check 4 产品目录对账等运行时职责（对账面 2026-10-04 起为 company.yaml products）。不得因非 CRE 产品没有传统领域模型而静默套用商管 ontology。
 
 ### Product governance modes
 

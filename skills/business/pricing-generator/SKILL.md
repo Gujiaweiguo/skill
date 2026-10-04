@@ -17,6 +17,8 @@ compatibility: >
   依赖素材库 $MATERIALS_DIR（通过 LANLNK_BASE 环境变量配置）。
   依赖报价模板 references/报价模板_<模式>.md。
   依赖产品功能清单（canonical-first 解析：优先 $COMPANY_BASE/30-products/<产品>/prd/功能清单.md，回退 $COMPANY_BASE/out/prd/<项目>/output/功能清单.md 生成区；$LANLNK_BASE 为兼容别名）。
+  产品路径事实（lnkcre 功能基线）resolver-first：generate_quote.py 经公共 shared.product_context
+  解析 prd 层推导候选（2026-10 迁移，详见「产品功能清单定位」节）。
   可选接收 requirement-evaluator 的二开清单。
   Excel 格式参考正祥报价单（深蓝表头 001E5A8A / 浅红汇总 00F9E5DD / 微软雅黑）。
 
@@ -66,6 +68,26 @@ compatibility: >
 | 私有化模板 | `$REFERENCES_DIR/报价模板_私有化.md` | 终生授权+实施，次年售后可选 |
 
 ### 产品功能清单定位
+
+**产品路径事实 resolver-first（2026-10 迁移）**：产品 ID 解析与 PRD 层路径先经公共
+`shared.product_context` resolver（company.yaml 为唯一产品台账）：
+
+```bash
+cd /opt/code/skill/skills/meta/openspec-practice
+uv run python scripts/resolve_context.py <产品 ID> [--company-base $COMPANY_BASE]
+```
+
+- 功能基线（lnkcre）路径 = resolver 的 `prd_root` 推导 `<prd_root>/baseline/feature-baseline.yaml`
+  （`generate_quote.py` 已按此实现：resolver 候选在前，resolver 不可用时保留既有
+  canonical 候选 `30-products/lnkcre/prd/baseline/feature-baseline.yaml`，绝不跨产品回退）。
+- 产品未注册 / 匹配不唯一 → 明确失败，不回退 lnkcre 或其他产品。
+- 多公司上下文无法唯一判定 → 按 COMPANIES.md §4 询问，绝不静默默认 lanlnk。
+- resolver 输出的 `adapter_status` 是 adapter capability 元数据，不是 PRD/ontology/code
+  authority 状态，不得据此判定清单可用性；adapter 支持度的权威来源是本 skill 的
+  `references/adapter-capabilities.yaml`，capability 状态不得覆盖 product authority
+  （产品台账以 company.yaml products 为准）；`product-registry.yaml` 的 `adapter_status`
+  仅为迁移期冻结兼容元数据，registry 不再是 adapter 支持度的权威来源；
+  `product-registry.yaml` 保留，删除仍需独立 owner 批准。
 
 **canonical-first 解析顺序**（2026-09-26 方案 B 家族迁移后）：优先 `$COMPANY_BASE/30-products/<产品>/prd/功能清单.md`，回退 `$COMPANY_BASE/out/prd/<项目>/output/功能清单.md`（生成区，历史目录名）。
 

@@ -1,0 +1,82 @@
+# adapter-capabilities —— strategy-brief-generator 私有声明（方案 B）
+#
+# 治理红线（owner decision O1/O2，2026-10-04，references/adapter-capability-owner-decision-2026-10-04.md）：
+# - 本文件只描述本 skill 对各产品的 adapter 能力，不是产品事实；产品三层 authority 一律经
+#   shared.product_context resolver 解析，本文件禁止出现产品路径/revision/authority 字段。
+# - authority.status != adapter_capability.status，两者不得互相推导。
+# - 未经证据不得标 implemented；状态变更必须同时更新 evidence/verified_at 与校验测试。
+# - resolver 不读取本文件；本文件不接入生产路径。
+# - implemented 语义说明（设计包 §3.2 注/§3.3.F）：本 skill 只消费公司/产品事实
+#   （company.yaml 台账 + resolver 状态），不依赖任何产品业务基线，故结构上全产品可用；
+#   implemented 表达的是「盘点维度」可用，深度分级见各格 notes。
+
+schema_version: 1
+consumer_id: strategy-brief-generator
+owner: opc
+verified_at: "2026-10-04"
+decision_record: "references/adapter-capability-owner-decision-2026-10-04.md"
+capabilities:
+  - consumer_id: strategy-brief-generator
+    product_id: lnkcre
+    status: implemented
+    evidence:
+      - "SKILL.md P4 判定表：company.yaml 台账 + resolver code 状态，code complete 可源码级盘点（设计包 §3.3.F）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "盘点维度 implemented（深盘点可用）。"
+  - consumer_id: strategy-brief-generator
+    product_id: lnkcrm
+    status: partial
+    evidence:
+      - "SKILL.md P4 判定表 present-unconfirmed 行：浅盘点（标注 unconfirmed）（设计包 §3.3.F）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "深读码需 owner 确认（O5 pending，冻结）；观察 checkout 仅作证据登记，不得作为 authority。"
+  - consumer_id: strategy-brief-generator
+    product_id: lnkchat
+    status: implemented
+    evidence:
+      - "SKILL.md P4 台账驱动：company.yaml products + resolver 状态（设计包 §3.3.F）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "台账驱动结构可用（code complete 可深盘点）。"
+  - consumer_id: strategy-brief-generator
+    product_id: lnkchatbi
+    status: implemented
+    evidence:
+      - "SKILL.md P4 台账驱动：company.yaml products + resolver 状态（设计包 §3.3.F）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "台账驱动结构可用（code complete 可深盘点）。"
+  - consumer_id: strategy-brief-generator
+    product_id: lnkreport
+    status: implemented
+    evidence:
+      - "SKILL.md P4 台账驱动：company.yaml products + resolver 状态（设计包 §3.3.F）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "台账驱动结构可用（code complete 可深盘点）。"
+  - consumer_id: strategy-brief-generator
+    product_id: lnkvision
+    status: implemented
+    evidence:
+      - "SKILL.md P4 台账驱动：company.yaml products + resolver 状态（设计包 §3.3.F）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "台账驱动结构可用（code complete 可深盘点）。"
+  - consumer_id: strategy-brief-generator
+    product_id: lnkgateway
+    status: implemented
+    evidence:
+      - "SKILL.md P4 台账驱动：company.yaml products + resolver 状态（设计包 §3.3.F）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "盘点维度 implemented；叙事层薄（ontology/prd unresolved 不阻断盘点，只降深度，设计包 §3.3.F）。"
+  - consumer_id: strategy-brief-generator
+    product_id: lnkwebsite
+    status: implemented
+    evidence:
+      - "SKILL.md P4 台账驱动：company.yaml products + resolver 状态（设计包 §3.3.F）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "盘点维度 implemented（公司资产盘点含官网产品事实）。"
