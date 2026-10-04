@@ -7,7 +7,8 @@ Usage:
     uv run python generate_quote.py --customer XX资产公司 --product MI --mode SAAS [--date 20260705]
 
 环境变量：
-    LANLNK_BASE  素材库根目录（默认 /opt/code/docs/lanlnk）
+    COMPANY_BASE  公司基座（兼容 LANLNK_BASE；必须绝对路径且根下有
+                  config/company.yaml，无静默默认，见 docs 仓 COMPANIES.md §3）
 """
 
 from __future__ import annotations
@@ -17,12 +18,27 @@ import os
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.worksheet.page import PageMargins
 from openpyxl.worksheet.properties import PageSetupProperties
+
+# ─── 公共产品上下文（shared.product_context，resolver-first）────────────
+# 导入边界约定（shared/product_context/README.md）：显式把 skill 仓库根加入
+# sys.path，不依赖业务 skill venv 或全局安装；仓库根缺失（独立部署）时降级为
+# None，走既有兼容候选路径。
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
+try:
+    import importlib
+
+    _product_context = importlib.import_module("shared.product_context")
+except ImportError:  # pragma: no cover - 独立部署（无 skill 仓库根）时降级
+    _product_context = None
 
 # A4 纸张代码（Excel paperSize）
 PAPER_A4 = 9
@@ -81,16 +97,41 @@ def _load_devkit_rate() -> int:
 DEVKIT_RATE = _load_devkit_rate()
 
 
+def _resolve_shared_product(product_id: str, base: Path):
+    """经公共 resolver 解析产品上下文；解析失败（未注册产品 / 缺 30-products 结构 /
+    独立部署）返回 None，由调用方走兼容候选，绝不静默跨产品回退。"""
+    if _product_context is None:
+        return None
+    try:
+        company = _product_context.resolve_company(company_base=base, require_explicit=True)
+        return _product_context.resolve_product(product_id, company)
+    except _product_context.ProductContextError:
+        return None
+
+
 def _mi_feature_baseline_paths() -> list[Path]:
-    """LnkCRE 功能基线的候选路径（canonical；mi-cre legacy 已随 2026-09 目录合并删除）。
+    """LnkCRE 功能基线候选路径（resolver-first）。
+
+    候选顺序：
+    1. shared.product_context 解析 lnkcre（company.yaml 为唯一产品台账）的 PRD 层：
+       <prd_root>/baseline/feature-baseline.yaml；
+    2. resolver 不可用/解析失败时的既有 canonical 候选（迁移前行为，兼容
+       未按标准骨架建 30-products 的公司基座）。
 
     与 product-prd-generator `_paths.resolve_product_paths()` 的契约保持同步：
-    LnkCRE / MI / MI-CRE / 商管系统 是同一产品（canonical id lnkcre）。
+    LnkCRE / MI / MI-CRE / 商管系统 是同一产品（canonical id lnkcre），
+    绝不读取 LnkReport / LnkChat 等其他产品的基线。
     """
     base = get_company_base()
-    return [
-        base / "30-products" / "lnkcre" / "prd" / "baseline" / "feature-baseline.yaml",   # canonical
-    ]
+    candidates: list[Path] = []
+    context = _resolve_shared_product("lnkcre", base)
+    if context is not None:
+        prd_root = context.layers.get("prd_root")
+        if prd_root is not None:
+            candidates.append(prd_root / "baseline" / "feature-baseline.yaml")
+    candidates.append(base / "30-products" / "lnkcre" / "prd" / "baseline" / "feature-baseline.yaml")
+    seen: set[str] = set()
+    return [p for p in candidates if not (str(p) in seen or seen.add(str(p)))]
 
 
 def _load_mi_feature_baseline() -> dict[str, Any]:
@@ -306,6 +347,173 @@ CRM_DATA: dict[str, Any] = {
     "standard_first_year_total": 100000,
     "standard_next_year_total": 30000,
 }
+
+
+# === LnkReport 报表平台数据（O7-report Phase 3，2026-10-04）===
+# 依据（已核定口径，不得改动）：
+# - owner 决策 references/adapter-capability-owner-decision-o7-report-phase1-2026-10-04.md
+#   （decision: approved-phase1-3；phase3_ratification：G4 按 Phase 2 报告 §3 草案默认
+#   核定，八项复核按草案默认）
+# - Phase 2 报告 references/adapter-capability-owner-decision-o7-report-phase2-report-2026-10-04.md
+#   §3.2（G4 模块分组总表，:70-83）/ §4（八列四段报价基线结构，金额全留空，:107-157）
+# 金额纪律：全部单价/报价/人天数留空——None=待定价，"—"=结构性不适用（含在 3.1）；
+# 例外仅两类，均为 phase3_ratification 草案默认而非编造数值：
+#   (1) 已核定结构性 0：实施服务 3.1 新增项目 0/0、售后 4.1 首年赠送 0；
+#   (2) 费率引用：二开 DEVKIT_RATE 元/人天、含税 6%（pricing-basis.yaml 唯一权威源）。
+# 定价数值待 OPC 提供后另开授权填入（Phase 1 报告 :83 硬前置：不得自拟、不得复制
+# 其他产品单价）。
+# 行结构（八列，对齐 Phase 2 报告 §4.1）：
+#   (序号, 名称, 内容说明, 首项目单价, 首项目报价, 新增项目单价, 新增项目报价, 备注)
+LNKREPORT_DATA: dict[str, Any] = {
+    "product_name": "LnkReport 报表平台",
+    "product_label": "LnkReport",
+    "pricing_status": "待定价（金额留空；O7-report Phase 3 结构落地）",
+    # 一、软件核心模块（年租用）——G4：1.1/1.2/1.3 必选，1.4/1.5/1.6 可选
+    "core_modules": [
+        ("1.1", "LnkReport 平台基座",
+         "组织/用户/角色/菜单权限、品牌与外观、水印与操作审计、工作台、"
+         "数据源与数据集（SQL 执行引擎、行权限、变量治理）、"
+         "模板治理与分享（市场/回收站/收藏/导入导出）",
+         None, None, None, None,
+         "必选；租用费；待定价"),
+        ("1.2", "报表设计与查看导出",
+         "参数化查询、多 Sheet、交叉表/钻取/循环块/分版分栏、富文本、图表 SSR、"
+         "PDF/XLSX/DOCX/图片导出、批量服务渲染、网格编辑器（工具栏/合并/剪贴板/"
+         "图片单元格）、移动端只读 viewer",
+         None, None, None, None,
+         "必选；租用费；撤销/重做不在范围；待定价"),
+        ("1.3", "打印模板与套打",
+         "mm 绝对定位、背景套打、明细循环与跨页续排、流式长文本、"
+         "QR/条码/签章/水印、打印模板分享",
+         None, None, None, None,
+         "必选；租用费；本地打印客户端不在范围；待定价"),
+        ("1.4", "Excel/Word 导入工作台",
+         "统一导入外壳与发布门禁、Excel 分区识别与字段映射、受控公式转换、"
+         "Word 双栏预览、重导入 diff 与版本管理",
+         None, None, None, None,
+         "可选；租用费；存量报表迁移场景增值模块；待定价"),
+        ("1.5", "治理单元格动态取数",
+         "静态 lookup 文法、取数前 fail-closed 授权校验",
+         None, None, None, None,
+         "可选（可并入 1.2，待 OPC 裁决）；待定价"),
+        ("1.6", "可视化与仪表板",
+         "图表字段操作、交互联动、仪表板主题、地图与地理数据",
+         None, None, None, None,
+         "可选；是否随 1.1 随附待 OPC；待定价"),
+    ],
+    # 二、第三方对接（可选，单独计费）——2.1/2.2 可选对接；2.3 二开通道（费率引用）
+    "integration_items": [
+        ("2.1", "LNKCRE 报表中心嵌入",
+         "embed token 鉴权、嵌入控制面、API Key 管理、嵌入契约与联调支持",
+         None, None, None, None,
+         "可选；消费者端到端可用性边界需在话术注明（话术待定）；待定价"),
+        ("2.2", "LnkChatBI 数据问答集成",
+         "LnkChatBI（mysqlbot）数据源问答对接",
+         None, None, None, None,
+         "可选；待定价"),
+        ("2.3", "其他系统对接",
+         "未列入上述目录的数据源/系统对接",
+         None, None, None, None,
+         f"按二开 {DEVKIT_RATE:,} 元/人天（pricing-basis.yaml 唯一权威源）；不设固定条目"),
+    ],
+    # 三、实施服务内容——人天数留空（八项复核草案默认：不沿用 CRM 模板数值）
+    "implementation_items": [
+        ("3.1", "项目启动与实施",
+         "项目启动、业务调研、制定计划、需求确认、项目管理协调、产品部署、"
+         "数据准备、上线切换与检查、验收与文档提交",
+         None, None, 0, 0,
+         "人天数待 OPC 确认（留空；不沿用 CRM 模板数值）；待定价"),
+        ("3.2", "方案设计",
+         "蓝图规划、原型规划、首版界面设计",
+         "—", "—", "—", "—",
+         "含在 3.1"),
+        ("3.3", "上线运行",
+         "上线计划、切换确认、上线检查、问题跟踪",
+         "—", "—", "—", "—",
+         "含在 3.1"),
+        ("3.4", "项目总结",
+         "验收准备、文档提交、售后交接、验收签字",
+         "—", "—", "—", "—",
+         "含在 3.1"),
+    ],
+    # 四、售后服务内容——首年赠送（八项复核草案默认，对齐模板惯例）
+    "after_sales_items": [
+        ("4.1", "年度售后服务",
+         "问题排查、修复、安全漏洞修补、年度服务经理、技术维护服务",
+         None, 0, None, 0,
+         "首年赠送（对齐模板惯例，待 OPC 确认）；单价与次年费待定价"),
+    ],
+    # 汇总（§4.2）：费用项 / 首项目 / 新增项目 / 说明
+    "summary_rows": [
+        ("首年费用合计", None, None,
+         "含税 6%（税率口径引用 pricing-basis.yaml tax_rate_default）；"
+         "首年费用，若增加项目按上述标准叠加"),
+        ("次年费用合计", None, None,
+         "SAAS：年度租用费（必须）+ 年度售后服务；私有化：年度售后费（可选）"),
+        ("首年优惠价", None, None, "供销售谈判填写"),
+        ("次年优惠价", None, None, "供销售谈判填写"),
+    ],
+    # 服务说明（§4.3，费率引用）
+    "service_notes": [
+        f"1. 二开单价：新需求与定制候补项（partial/not-do 补齐），按 {DEVKIT_RATE:,} 元/人天"
+        "结算（引用 config/pricing/pricing-basis.yaml devkit_rate，跨 skill 唯一权威源）；",
+        "2. 税率：含税 6%（引用 config/pricing/pricing-basis.yaml tax_rate_default）；",
+        "3. 其余服务承诺条款待 OPC 按 lnkreport 交付实际补写（不复制 CRM 场景承诺）；",
+        "4. 本报价结构金额全部留空（待定价），定价数值由 OPC 提供后另行授权填入。",
+    ],
+    # SAAS vs 私有化（§4.4，G1 双模式差异行，5 维度）
+    "saas_vs_private": [
+        ("软件授权性质", "年度租用（模块 × 年）", "终生授权（模块 × 一次性）"),
+        ("数据归属", "蓝联云", "客户自有服务器"),
+        ("次年费用", "年度租用费（必须）+ 年度售后", "年度售后费（可选）"),
+        ("适合场景", "快速上线、轻量、无需自运维", "数据合规要求高、长期使用"),
+        ("实施差异", "蓝联侧开通",
+         "含部署交付（1.1 所含部署支撑 4 项在客户环境执行）"),
+    ],
+    # 功能清单（Sheet2 备用，模块级；条目级第二 Sheet 映射 = Phase 2 报告 §6-5 deferred）
+    "modules": [
+        ("LnkReport 平台基座",
+         "组织/用户/角色/菜单权限、品牌与外观、水印与操作审计、工作台、数据源与数据集"
+         "（SQL 执行引擎、行权限、变量治理）、模板治理与分享（G4 模块 1.1，existing 67 项）"),
+        ("报表设计与查看导出",
+         "参数化查询、多 Sheet、交叉表/钻取/循环块/分版分栏、富文本、图表 SSR、"
+         "PDF/XLSX/DOCX/图片导出、批量服务渲染、网格编辑器、移动端只读 viewer"
+         "（G4 模块 1.2，existing 31 项）"),
+        ("打印模板与套打",
+         "mm 绝对定位、背景套打、明细循环与跨页续排、流式长文本、QR/条码/签章/水印、"
+         "打印模板分享（G4 模块 1.3，existing 7 项）"),
+        ("Excel/Word 导入工作台",
+         "统一导入外壳与发布门禁、Excel 分区识别与字段映射、受控公式转换、Word 双栏预览、"
+         "重导入 diff 与版本管理（G4 模块 1.4，existing 7 项）"),
+        ("治理单元格动态取数",
+         "静态 lookup 文法、取数前 fail-closed 授权校验（G4 模块 1.5，existing 1 项）"),
+        ("可视化与仪表板",
+         "图表字段操作、交互联动、仪表板主题、地图与地理数据（G4 模块 1.6，existing 6 项）"),
+        ("LNKCRE 报表中心嵌入",
+         "embed token 鉴权、平台集成、嵌入控制面、API Key 管理（G4 模块 2.1，existing 5 项）"),
+        ("LnkChatBI 数据问答集成",
+         "LnkChatBI（mysqlbot）advanced api 与 credentials 对接（G4 模块 2.2，existing 2 项）"),
+    ],
+}
+
+
+def build_lnkreport_data() -> NoReturn:
+    """LnkReport 报价数据访问入口（O7-report Phase 3 最小正确实现）。
+
+    定价数值提供前显式拒绝生成：LNKREPORT_DATA 金额留空/「待定价」是唯一合法
+    状态（决策记录 phase3_ratification；Phase 1 报告 :83 硬前置——不得自拟、
+    不得复制其他产品单价）。现有渲染管线（build_quote_sheet 6 列 + 数值汇总）
+    无法安全消费留空金额（sum(None) 崩溃 / 填 0 = 编造免费），故选择显式拒绝
+    而非占位渲染。待 OPC 提供定价并另开授权后，本函数才放开生成（届时实现
+    八列渲染与 pricing-basis.yaml 登记，均不在本轮范围）。
+    """
+    sys.exit(
+        "[REFUSED] LnkReport 报价结构已落地（LNKREPORT_DATA，O7-report Phase 3），"
+        "但定价数值待 OPC 提供：金额留空/待定价状态下拒绝生成报价单，绝不编造数值。\n"
+        "结构依据：references/adapter-capability-owner-decision-o7-report-phase2-report-2026-10-04.md"
+        " §3.2（G4 模块分组）+ §4（八列四段）。\n"
+        "定价数值到位后另行授权填入 LNKREPORT_DATA 并放开生成。"
+    )
 
 
 # === AI 岗位 Skill 数据（动态生成，按 positions 岗位数计算费用）===
@@ -1082,7 +1290,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--positions", type=int, default=3,
                    help="AI Skills 岗位数（仅 --product AI 有效，默认 3，范围 2-6）")
     args = p.parse_args(argv)
-    valid_products = {"MI", "CRM", "AI", "LNKCHATBI"}
+    valid_products = {"MI", "CRM", "AI", "LNKCHATBI", "LNKREPORT"}
     # LnkCRE 家族别名：LnkCRE / MI-CRE / mi_cre / 商管系统 → 内部代号 MI（同一产品）。
     # 输出文件命名统一用 LnkCRE（新文件用新名；历史 MI 命名报价单不重命名）。
     lnkcre_aliases = {"LNKCRE", "MI-CRE", "MI_CRE", "商管系统"}
@@ -1116,6 +1324,8 @@ def main(argv: list[str] | None = None) -> int:
             products_data.append(CRM_DATA)
         elif code == "LNKCHATBI":
             products_data.append(build_lnkchatbi_data())
+        elif code == "LNKREPORT":
+            products_data.append(build_lnkreport_data())
 
     if len(products_data) == 1:
         data = products_data[0]

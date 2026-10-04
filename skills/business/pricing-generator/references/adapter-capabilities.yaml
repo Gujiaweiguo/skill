@@ -1,0 +1,86 @@
+# adapter-capabilities —— pricing-generator 私有声明（方案 B）
+#
+# 治理红线（owner decision O1/O2，2026-10-04，references/adapter-capability-owner-decision-2026-10-04.md）：
+# - 本文件只描述本 skill 对各产品的 adapter 能力，不是产品事实；产品三层 authority 一律经
+#   shared.product_context resolver 解析，本文件禁止出现产品路径/revision/authority 字段。
+# - authority.status != adapter_capability.status，两者不得互相推导。
+# - 未经证据不得标 implemented；状态变更必须同时更新 evidence/verified_at 与校验测试。
+# - 跨产品借用禁令：不得从 lnkcre 复制其他产品的功能、报价或叙事资产；不得套用 lnkchat/lnkcre 价格。
+# - resolver 不读取本文件；本文件不接入生产路径。
+# - CLI 产品代号 AI（岗位 Skill 报价）是跨 langchat+LnkChatBI+OrchestratorAgent 的服务打包，
+#   非 company.yaml 产品条目，不占矩阵行（设计包 §3.3.C 注）。
+
+schema_version: 1
+consumer_id: pricing-generator
+owner: opc
+verified_at: "2026-10-04"
+decision_record: "references/adapter-capability-owner-decision-2026-10-04.md"
+capabilities:
+  - consumer_id: pricing-generator
+    product_id: lnkcre
+    status: implemented
+    evidence:
+      - "generate_quote.py MI_DATA + resolver-first baseline（设计包 §3.3.C）"
+      - "config/pricing/pricing-basis.yaml 费率"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "标准报价链路完整；私有化模式定价待补（SKILL.md 待办）。"
+  - consumer_id: pricing-generator
+    product_id: lnkcrm
+    status: partial
+    evidence:
+      - "generate_quote.py CRM_DATA（正祥交付物受管副本 materials/03-products/CRM功能清单.xlsx）"
+      - "设计包 §3.3.C：历史 CRM 报价可出"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "历史「CRM 会员营销系统」定价与 lnkcrm 产品实体的对应关系未登记（O6 pending：是否追认为 lnkcrm 报价基线）；lnkcrm 功能清单未接入报价链。不得从 lnkcre 复制价格顶替。"
+  - consumer_id: pricing-generator
+    product_id: lnkchat
+    status: unsupported
+    evidence:
+      - "设计包 §3.3.C：generate_quote.py 无 lnkchat 报价数据；功能清单未接入"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "缺定价资料（missing-pricing）；当前以「AI 岗位 Skill 服务」打包售卖，是否单列产品报价待 O7-chat（pending）。"
+  - consumer_id: pricing-generator
+    product_id: lnkchatbi
+    status: partial
+    evidence:
+      - "generate_quote.py LNKCHATBI_DATA 结构 + LNKCHATBI_PRICE_Y1/Y2 环境变量"
+      - "设计包 §3.3.C"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "结构在位、标准定价未登记（env 默认 0，每次人工输入；pricing-basis.yaml 只有费率无产品定价）；O8（pending）批准后可 partial→implemented。"
+  - consumer_id: pricing-generator
+    product_id: lnkreport
+    status: onboarding
+    evidence:
+      - "generate_quote.py LNKREPORT_DATA 结构落地（G4 模块分组 + Phase 2 §4 八列四段；金额留空/待定价，build_lnkreport_data 无数值时显式拒绝生成，tests/test_lnkreport_data.py 同批原子化校验）"
+      - "references/adapter-capability-owner-decision-o7-report-phase2-report-2026-10-04.md:70-83（§3.2 G4 模块分组总表）、:111-157（§4 报价基线结构，金额全留空）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "O7-report Phase 3 已落地（结构 + pytest；执行记录 references/adapter-capability-owner-decision-o7-report-phase3-execution-2026-10-04.md）；定价数值待 OPC 提供后另开授权填数并升级 implemented；不得从 lnkcre 复制价格。"
+  - consumer_id: pricing-generator
+    product_id: lnkvision
+    status: unsupported
+    evidence:
+      - "设计包 §3.3.C：无报价数据（missing-pricing）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "O7-vision（pending）先确认产品定位与是否面客；不得从 lnkcre 复制价格。"
+  - consumer_id: pricing-generator
+    product_id: lnkgateway
+    status: not-applicable
+    evidence:
+      - "设计包 §3.3.C/§3.9：内部 AI 网关，无独立售卖场景证据"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "★ 改判 unsupported→not-applicable（O2 首版矩阵）；O9 定位裁决 pending——若未来裁定面客，须凭证据重评并补全套报价输入。"
+  - consumer_id: pricing-generator
+    product_id: lnkwebsite
+    status: not-applicable
+    evidence:
+      - "官网非对外软件商品（owner 2026-09-27 prd-only 裁定，设计包 §3.3.C/§13.3）"
+    verified_at: "2026-10-04"
+    owner: opc
+    notes: "无售前报价商业场景。"
