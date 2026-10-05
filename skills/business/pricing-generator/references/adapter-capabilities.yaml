@@ -37,12 +37,14 @@ capabilities:
     notes: "O6 已裁决（2026-10-04 decided-A / evidence-registered）：CRM_DATA 归属已登记为正祥单一客户历史成交证据（customer-specific / historical），可作参考 / 客户特定报价生成依据，不是 lnkcrm 标准价；正式报价基线未建，未来若建走 B 路线六要素另案；lnkcrm 功能清单未接入报价链。不得从 lnkcre 复制价格顶替。"
   - consumer_id: pricing-generator
     product_id: lnkchat
-    status: unsupported
+    status: not-applicable
     evidence:
       - "设计包 §3.3.C：generate_quote.py 无 lnkchat 报价数据；功能清单未接入"
+      - "O7-chat 裁决 bundled-not-listed（references/adapter-capability-owner-decision-o7-chat-2026-10-04.md，2026-10-04 decided）：lnkchat 随 AI 岗位 Skill 服务打包售卖，不建独立产品报价、不在报价单单列"
+      - "打包报价落点：generate_quote.py AI 岗位 Skill 产品线（build_ai_data，product_name「LnkAgent AI岗位Skill增强服务」，2 岗起卖）+ materials/references/报价模板_AI岗位Skill_SAAS.md"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "缺定价资料（missing-pricing）；当前以「AI 岗位 Skill 服务」打包售卖，是否单列产品报价待 O7-chat（pending）。"
+    notes: "O7-chat 已定判（2026-10-04 decided / bundled-not-listed）：打包售卖不单列。打包报价走 AI 岗位 Skill 套餐数据/模板，不建 lnkchat 独立报价数据结构（forbidden——独立报价路线被本轮裁决否决）；OPC 可改裁「独立报价」路线（届时另落记录，走 LNKCHATBI 式独立数据结构 + 定价流程）。"
   - consumer_id: pricing-generator
     product_id: lnkchatbi
     status: implemented
@@ -64,12 +66,14 @@ capabilities:
     notes: "O7-report Phase 3 已落地（结构 + pytest；执行记录 references/adapter-capability-owner-decision-o7-report-phase3-execution-2026-10-04.md）；定价数值待 OPC 提供后另开授权填数并升级 implemented；不得从 lnkcre 复制价格。"
   - consumer_id: pricing-generator
     product_id: lnkvision
-    status: unsupported
+    status: onboarding
     evidence:
       - "设计包 §3.3.C：无报价数据（missing-pricing）"
+      - "O7-vision 裁决 customer-facing（references/adapter-capability-owner-decision-o7-vision-2026-10-04.md:9，2026-10-04 decided）：lnkvision 为独立面客产品，启动报价基线建设（结构先行、金额留空、定价数值挂起，完全复用 LNKREPORT_DATA 已核定模式）"
+      - "generate_quote.py LNKVISION_DATA 结构落地（模块分组草案 + 八列四段；金额留空/待定价，build_lnkvision_data 无数值时显式拒绝生成，tests/test_lnkvision_data.py 同批原子化校验；模块分组草案与功能清单行数审计见 references/adapter-capability-owner-decision-o7-vision-execution-2026-10-04.md §3）"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "O7-vision（pending）先确认产品定位与是否面客；不得从 lnkcre 复制价格。"
+    notes: "O7-vision 已定判（2026-10-04 decided / customer-facing）：独立面客产品；报价基线结构在位（LNKVISION_DATA 四段八列，金额一律留空），定价数值待 OPC 提供后另开授权填数并升级 implemented；不得从 lnkcre 或其他产品复制价格。"
   - consumer_id: pricing-generator
     product_id: lnkgateway
     status: not-applicable

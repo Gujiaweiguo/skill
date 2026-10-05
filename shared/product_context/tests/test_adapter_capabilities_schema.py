@@ -91,6 +91,14 @@ AUDIT_DATE = "2026-10-04"
 # （owner decision references/adapter-capability-owner-decision-o8-2026-10-04.md，
 # rejected-registration：随单赠送/打包策略为设计语义，env 人工输入非缺口，
 # 不登记标准价；evidence 同批更新）。
+# 修订（O7-chat，2026-10-04）：pricing-generator×lnkchat unsupported→not-applicable
+# （owner decision references/adapter-capability-owner-decision-o7-chat-2026-10-04.md，
+# bundled-not-listed：lnkchat 随 AI 岗位 Skill 服务打包售卖不单列，不建独立报价
+# 数据结构；evidence 同批更新；pricing 本地八产品全景钉同批）。
+# 修订（O7-vision，2026-10-04）：pricing-generator×lnkvision unsupported→onboarding
+# （owner decision references/adapter-capability-owner-decision-o7-vision-2026-10-04.md，
+# customer-facing：lnkvision 为独立面客产品，报价基线结构落地（LNKVISION_DATA
+# 四段八列、金额留空待定价）；evidence 同批更新；pricing 本地八产品全景钉同批）。
 EXPECTED_MATRIX: dict[str, dict[str, str]] = {
     "product-prd-generator": {
         "lnkcre": "implemented",
@@ -115,10 +123,10 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
     "pricing-generator": {
         "lnkcre": "implemented",
         "lnkcrm": "partial",
-        "lnkchat": "unsupported",
+        "lnkchat": "not-applicable",
         "lnkchatbi": "implemented",
         "lnkreport": "onboarding",
-        "lnkvision": "unsupported",
+        "lnkvision": "onboarding",
         "lnkgateway": "not-applicable",
         "lnkwebsite": "not-applicable",
     },
@@ -157,9 +165,9 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
 EXPECTED_DISTRIBUTION = {
     "implemented": 14,
     "partial": 13,
-    "onboarding": 6,
-    "unsupported": 5,
-    "not-applicable": 7,
+    "onboarding": 7,
+    "unsupported": 3,
+    "not-applicable": 8,
     "blocked": 3,
 }
 

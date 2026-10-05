@@ -525,6 +525,162 @@ def build_lnkreport_data() -> NoReturn:
     )
 
 
+# === LnkVision 视觉巡检平台数据（O7-vision，2026-10-04 decided / customer-facing）===
+# 依据（不得改动）：
+# - owner 决策 references/adapter-capability-owner-decision-o7-vision-2026-10-04.md
+#   （decision: customer-facing——lnkvision 为独立面客产品；启动报价基线建设：
+#   结构先行、金额留空、定价数值挂起，完全复用 LNKREPORT_DATA 已核定模式）
+# - 模块分组草案 references/adapter-capability-owner-decision-o7-vision-execution-2026-10-04.md
+#   §3（功能域→报价模块分配审计表，待 OPC 复核；existing 18 = 5+5+5+2+1，
+#   依据 30-products/lnkvision/prd/功能清单.md canonical 全 31 行）
+# 金额纪律（同 LNKREPORT_DATA）：全部单价/报价/人天数留空——None=待定价，
+# "—"=结构性不适用（含在 3.1）；例外仅两类：
+#   (1) 已核定结构性 0：实施服务 3.1 新增项目 0/0、售后 4.1 首年赠送 0；
+#   (2) 费率引用：二开 DEVKIT_RATE 元/人天、含税 6%（pricing-basis.yaml 唯一权威源）。
+# 定价数值待 OPC 提供后另开授权填入（不得自拟、不得从其他产品复制价格）。
+# 行结构（八列，对齐 LNKREPORT_DATA）：
+#   (序号, 名称, 内容说明, 首项目单价, 首项目报价, 新增项目单价, 新增项目报价, 备注)
+LNKVISION_DATA: dict[str, Any] = {
+    "product_name": "LnkVision 视觉巡检平台",
+    "product_label": "LnkVision",
+    "pricing_status": "待定价（金额留空；O7-vision 面客定判后结构落地）",
+    # 一、软件核心模块（年租用）——模块分组草案：1.1-1.4 必选，1.5 可选
+    "core_modules": [
+        ("1.1", "LnkVision 平台基座（认证权限/摄像头/场景与 ROI）",
+         "JWT 登录与刷新、登录限流、admin/operator/viewer RBAC、"
+         "摄像头 CRUD 与状态截图、HTTP/Mock 接入、场景/基线图/ROI 管理",
+         None, None, None, None,
+         "必选；租用费；多租户/SSO/LDAP 与 RTSP/视频流/边缘网关不在范围"
+         "（missing，需要时走二开）；待定价"),
+        ("1.2", "AI 检测引擎",
+         "障碍物检测、YOLO-World 开放词表检测、火灾/烟雾检测、地面脏污图像对比、"
+         "模型上传/指派/加载校验/热加载",
+         None, None, None, None,
+         "必选；租用费；检测治理（模型卡/评测集/分场景指标）不在范围（missing）；"
+         "火灾/烟雾模型质量未量化（话术需注明）；待定价"),
+        ("1.3", "规则引擎与告警工单中心",
+         "停留时长/面积超限/禁入区/脏污/火灾规则与标准模板、冷却限流与人工告警抑制、"
+         "告警四态生命周期（pending/confirmed/false_positive/resolved）、"
+         "证据图与检测事件 CSV 导出、告警确认后工单创建分配流转",
+         None, None, None, None,
+         "必选；租用费；告警操作审计/变更历史/申诉不在范围（missing，"
+         "需要时走二开）；待定价"),
+        ("1.4", "通知与实时协同",
+         "按严重级别和通知组路由、测试发送、企业微信/邮件通知、"
+         "Redis/in-memory EventBus 实时事件、JWT WebSocket 推送",
+         None, None, None, None,
+         "必选；租用费；短信通道国内服务商待确认（partial，补齐走二开）；待定价"),
+        ("1.5", "运营看板",
+         "告警趋势、置信度、设备与 worker 状态看板",
+         None, None, None, None,
+         "可选；待定价"),
+    ],
+    # 二、第三方对接（可选，单独计费）——2.1 二开通道（费率引用）
+    "integration_items": [
+        ("2.1", "其他系统对接",
+         "未列入上述目录的数据源/系统对接（视频平台、工单系统等）",
+         None, None, None, None,
+         f"按二开 {DEVKIT_RATE:,} 元/人天（pricing-basis.yaml 唯一权威源）；"
+         "不设固定条目；封闭系统边界——capability/MCP/OpenClaw 接入为"
+         " explicitly-not-do，需单独评审"),
+    ],
+    # 三、实施服务内容——人天数留空（不沿用 CRM 模板数值）
+    "implementation_items": [
+        ("3.1", "项目启动与实施",
+         "项目启动、业务调研、制定计划、需求确认、项目管理协调、产品部署、"
+         "数据准备、上线切换与检查、验收与文档提交",
+         None, None, 0, 0,
+         "人天数待 OPC 确认（留空；不沿用 CRM 模板数值）；待定价"),
+        ("3.2", "方案设计",
+         "蓝图规划、原型规划、首版界面设计",
+         "—", "—", "—", "—",
+         "含在 3.1"),
+        ("3.3", "上线运行",
+         "上线计划、切换确认、上线检查、问题跟踪",
+         "—", "—", "—", "—",
+         "含在 3.1"),
+        ("3.4", "项目总结",
+         "验收准备、文档提交、售后交接、验收签字",
+         "—", "—", "—", "—",
+         "含在 3.1"),
+    ],
+    # 四、售后服务内容——首年赠送（对齐模板惯例，待 OPC 确认）
+    "after_sales_items": [
+        ("4.1", "年度售后服务",
+         "问题排查、修复、安全漏洞修补、年度服务经理、技术维护服务",
+         None, 0, None, 0,
+         "首年赠送（对齐模板惯例，待 OPC 确认）；单价与次年费待定价"),
+    ],
+    # 汇总：费用项 / 首项目 / 新增项目 / 说明
+    "summary_rows": [
+        ("首年费用合计", None, None,
+         "含税 6%（税率口径引用 pricing-basis.yaml tax_rate_default）；"
+         "首年费用，若增加项目按上述标准叠加"),
+        ("次年费用合计", None, None,
+         "SAAS：年度租用费（必须）+ 年度售后服务；私有化：年度售后费（可选）"),
+        ("首年优惠价", None, None, "供销售谈判填写"),
+        ("次年优惠价", None, None, "供销售谈判填写"),
+    ],
+    # 服务说明（费率引用 + 产品边界诚实声明）
+    "service_notes": [
+        f"1. 二开单价：新需求与定制候补项（partial/missing 补齐），按 {DEVKIT_RATE:,} 元/人天"
+        "结算（引用 config/pricing/pricing-basis.yaml devkit_rate，跨 skill 唯一权威源）；",
+        "2. 税率：含税 6%（引用 config/pricing/pricing-basis.yaml tax_rate_default）；",
+        "3. 产品边界（功能清单 explicitly-not-do 4 项）：客流/访问者分析、人脸识别/身份追踪、"
+        "消防联动/门禁控制、capability/MCP/OpenClaw 接入不在报价范围；",
+        "4. 隐私合规：人脸脱敏、公共场所告知、DPIA 未实现（功能清单 missing），"
+        "客户有隐私合规要求时走二开/专项评审；",
+        "5. 本报价结构金额全部留空（待定价），定价数值由 OPC 提供后另行授权填入。",
+    ],
+    # SAAS vs 私有化（5 维度；私有化交付载体现状如实声明）
+    "saas_vs_private": [
+        ("软件授权性质", "年度租用（模块 × 年）", "终生授权（模块 × 一次性）"),
+        ("数据归属", "蓝联云", "客户自有服务器"),
+        ("次年费用", "年度租用费（必须）+ 年度售后", "年度售后费（可选）"),
+        ("适合场景", "快速上线、轻量、无需自运维", "数据合规要求高、长期使用"),
+        ("实施差异", "蓝联侧开通",
+         "含部署交付（私有化交付载体当前处于重建期——Docker Compose/离线安装为"
+         " B6.1 验证期移除项，恢复时间待 OPC 确认）"),
+    ],
+    # 功能清单（Sheet2 备用，模块级；条目级映射 = 分组草案审计表，见执行记录 §3）
+    "modules": [
+        ("LnkVision 平台基座",
+         "JWT 登录与刷新、登录限流、RBAC、摄像头 CRUD 与状态截图、HTTP/Mock 接入、"
+         "场景/基线图/ROI 管理（模块分组草案 1.1，existing 5 项）"),
+        ("AI 检测引擎",
+         "障碍物、YOLO-World 开放词表、火灾/烟雾、地面脏污检测、"
+         "模型上传/指派/加载校验/热加载（模块分组草案 1.2，existing 5 项）"),
+        ("规则引擎与告警工单中心",
+         "规则引擎与标准模板、冷却限流与告警抑制、告警生命周期、证据图与 CSV 导出、"
+         "工单流转（模块分组草案 1.3，existing 5 项）"),
+        ("通知与实时协同",
+         "通知组路由与测试发送、企业微信/邮件通知、EventBus 与 WebSocket 实时推送"
+         "（模块分组草案 1.4，existing 2 项）"),
+        ("运营看板",
+         "告警趋势、置信度、设备与 worker 状态（模块分组草案 1.5，existing 1 项）"),
+    ],
+}
+
+
+def build_lnkvision_data() -> NoReturn:
+    """LnkVision 报价数据访问入口（O7-vision 面客定判后的最小正确实现）。
+
+    定价数值提供前显式拒绝生成（完全复用 build_lnkreport_data 模式）：
+    LNKVISION_DATA 金额留空/「待定价」是唯一合法状态（O7-vision 决策：
+    结构先行、定价数值挂起）。现有渲染管线（build_quote_sheet 6 列 +
+    数值汇总）无法安全消费留空金额（sum(None) 崩溃 / 填 0 = 编造免费），
+    故显式拒绝而非占位渲染。待 OPC 提供定价并另开授权后，本函数才放开
+    生成（届时实现八列渲染与 pricing-basis.yaml 登记，均不在本轮范围）。
+    """
+    sys.exit(
+        "[REFUSED] LnkVision 报价结构已落地（LNKVISION_DATA，O7-vision 面客定判），"
+        "但定价数值待 OPC 提供：金额留空/待定价状态下拒绝生成报价单，绝不编造数值。\n"
+        "结构依据：references/adapter-capability-owner-decision-o7-vision-execution-2026-10-04.md"
+        " §3（模块分组草案 + 功能清单行数审计）。\n"
+        "定价数值到位后另行授权填入 LNKVISION_DATA 并放开生成。"
+    )
+
+
 # === AI 岗位 Skill 数据（动态生成，按 positions 岗位数计算费用）===
 AI_POSITION_SKILLS: list[tuple[str, str]] = [
     ("营运分析 Skill",
@@ -1299,7 +1455,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--positions", type=int, default=3,
                    help="AI Skills 岗位数（仅 --product AI 有效，默认 3，范围 2-6）")
     args = p.parse_args(argv)
-    valid_products = {"MI", "CRM", "AI", "LNKCHATBI", "LNKREPORT"}
+    valid_products = {"MI", "CRM", "AI", "LNKCHATBI", "LNKREPORT", "LNKVISION"}
     # LnkCRE 家族别名：LnkCRE / MI-CRE / mi_cre / 商管系统 → 内部代号 MI（同一产品）。
     # 输出文件命名统一用 LnkCRE（新文件用新名；历史 MI 命名报价单不重命名）。
     lnkcre_aliases = {"LNKCRE", "MI-CRE", "MI_CRE", "商管系统"}
@@ -1335,6 +1491,8 @@ def main(argv: list[str] | None = None) -> int:
             products_data.append(build_lnkchatbi_data())
         elif code == "LNKREPORT":
             products_data.append(build_lnkreport_data())
+        elif code == "LNKVISION":
+            products_data.append(build_lnkvision_data())
 
     if len(products_data) == 1:
         data = products_data[0]

@@ -1,9 +1,10 @@
-"""O7-report Phase 3 落地校验：LNKREPORT_DATA 结构 + 金额留空 + capability onboarding。
+"""O7-vision 落地校验：LNKVISION_DATA 结构 + 金额留空 + capability onboarding。
 
-依据：references/adapter-capability-owner-decision-o7-report-phase1-2026-10-04.md
-（decision: approved-phase1-3；phase3_ratification）+ Phase 2 报告
-references/adapter-capability-owner-decision-o7-report-phase2-report-2026-10-04.md
-§3.2（G4 模块分组）/ §4（八列四段，金额全留空）。
+依据：references/adapter-capability-owner-decision-o7-vision-2026-10-04.md
+（decision: customer-facing——独立面客产品；结构先行、金额留空、定价数值挂起，
+完全复用 LNKREPORT_DATA 已核定模式）+ 执行记录
+references/adapter-capability-owner-decision-o7-vision-execution-2026-10-04.md
+§3（模块分组草案 + 功能清单行数审计：existing 18 = 5+5+5+2+1，全 31 行闭合）。
 金额纪律：不填任何单价/金额/人天数；例外仅已核定结构性 0（3.1 新增项目、
 4.1 首年赠送）与费率引用（二开 DEVKIT_RATE 元/人天、含税 6%）。
 """
@@ -38,16 +39,16 @@ RATIFIED_ZEROS = {("3.1", 5), ("3.1", 6), ("4.1", 4), ("4.1", 6)}
 def _company_env(tmp_path_factory):
     """generate_quote 导入即触发 _load_devkit_rate → get_company_base
     （COMPANIES.md §3 无静默默认），须先备好公司基座再首次导入
-    （同 test_product_context_integration.py 惯例）。"""
-    base = tmp_path_factory.mktemp("lnkreport-company")
+    （同 test_lnkreport_data.py 惯例）。"""
+    base = tmp_path_factory.mktemp("lnkvision-company")
     (base / "config").mkdir()
     (base / "config" / "company.yaml").write_text(
         "schema_version: 1\n"
         f"id: {base.name}\n"
         "brand: Test\n"
         "products:\n"
-        "  - id: lnkreport\n"
-        "    name: LnkReport Test\n"
+        "  - id: lnkvision\n"
+        "    name: LnkVision Test\n"
         "    code_root: null\n"
         "    prd_ready: false\n",
         encoding="utf-8",
@@ -67,55 +68,58 @@ def _gq():
     return generate_quote
 
 
-# ── LNKREPORT_DATA 结构完整性 ────────────────────────────────────────
+# ── LNKVISION_DATA 结构完整性 ────────────────────────────────────────
 
 
-def test_lnkreport_segments_and_seq():
-    data = _gq().LNKREPORT_DATA
-    assert data["product_label"] == "LnkReport"
+def test_lnkvision_segments_and_seq():
+    data = _gq().LNKVISION_DATA
+    assert data["product_label"] == "LnkVision"
     assert "待定价" in data["pricing_status"]
-    assert [r[0] for r in data["core_modules"]] == [f"1.{i}" for i in range(1, 7)]
-    assert [r[0] for r in data["integration_items"]] == ["2.1", "2.2", "2.3"]
+    assert [r[0] for r in data["core_modules"]] == [f"1.{i}" for i in range(1, 6)]
+    assert [r[0] for r in data["integration_items"]] == ["2.1"]
     assert [r[0] for r in data["implementation_items"]] == [f"3.{i}" for i in range(1, 5)]
     assert [r[0] for r in data["after_sales_items"]] == ["4.1"]
-    for seg in AMOUNT_SEGS:  # 八列行结构（Phase 2 报告 §4.1 列结构）
+    for seg in AMOUNT_SEGS:  # 八列行结构（对齐 LNKREPORT_DATA）
         for row in data[seg]:
             assert len(row) == 8, (seg, row[0])
 
 
-def test_lnkreport_g4_required_optional_and_notes():
+def test_lnkvision_required_optional_and_notes():
     gq = _gq()
-    data = gq.LNKREPORT_DATA
+    data = gq.LNKVISION_DATA
     core_notes = {r[0]: r[7] for r in data["core_modules"]}
-    for seq in ("1.1", "1.2", "1.3"):
+    for seq in ("1.1", "1.2", "1.3", "1.4"):
         assert "必选" in core_notes[seq], seq
-    for seq in ("1.4", "1.5", "1.6"):
-        assert "可选" in core_notes[seq], seq
+    assert "可选" in core_notes["1.5"]
     integ_notes = {r[0]: r[7] for r in data["integration_items"]}
-    # 2.3 二开通道 = 费率引用（pricing-basis.yaml 唯一权威源）
-    assert f"{gq.DEVKIT_RATE:,}" in integ_notes["2.3"] and "元/人天" in integ_notes["2.3"]
-    # 2.1 话术边界标待定（八项复核草案默认）
-    assert "话术待定" in integ_notes["2.1"]
+    # 2.1 二开通道 = 费率引用（pricing-basis.yaml 唯一权威源）
+    assert f"{gq.DEVKIT_RATE:,}" in integ_notes["2.1"] and "元/人天" in integ_notes["2.1"]
+    # 边界诚实性：封闭系统边界（explicitly-not-do）在 2.1 备注声明
+    assert "explicitly-not-do" in integ_notes["2.1"]
 
 
-def test_lnkreport_existing_counts_sum_126():
-    """G4 分组条目数合计 = existing 126（G3 标准范围总边界，Phase 2 §3.3）。"""
-    data = _gq().LNKREPORT_DATA
-    counts = [67, 31, 7, 7, 1, 6, 5, 2]
+def test_lnkvision_existing_counts_sum_18():
+    """模块分组条目数合计 = existing 18（功能清单全 31 行审计闭合，
+    执行记录 §3：18 = 5+5+5+2+1）。"""
+    data = _gq().LNKVISION_DATA
+    counts = [5, 5, 5, 2, 1]
     assert len(data["modules"]) == len(counts)
     for (name, desc), n in zip(data["modules"], counts):
         assert f"existing {n} 项" in desc, (name, n)
-    assert sum(counts) == 126
+    assert sum(counts) == 18
 
 
-def test_lnkreport_summary_service_notes_saas_private():
-    data = _gq().LNKREPORT_DATA
+def test_lnkvision_summary_service_notes_saas_private():
+    data = _gq().LNKVISION_DATA
     assert [r[0] for r in data["summary_rows"]] == [
         "首年费用合计", "次年费用合计", "首年优惠价", "次年优惠价",
     ]
     notes = "\n".join(data["service_notes"])
     assert "6%" in notes  # 税率引用（pricing-basis.yaml tax_rate_default）
     assert "待定价" in notes
+    # 产品边界诚实声明（explicitly-not-do 4 项）与隐私缺口披露
+    assert "客流" in notes and "人脸识别" in notes
+    assert "DPIA" in notes
     assert [r[0] for r in data["saas_vs_private"]] == [
         "软件授权性质", "数据归属", "次年费用", "适合场景", "实施差异",
     ]
@@ -124,9 +128,9 @@ def test_lnkreport_summary_service_notes_saas_private():
 # ── 金额留空纪律 ─────────────────────────────────────────────────────
 
 
-def test_lnkreport_amounts_left_blank():
+def test_lnkvision_amounts_left_blank():
     """金额一律留空/None（待定价）；"—"=结构性不适用；0 仅限已核定两处。"""
-    data = _gq().LNKREPORT_DATA
+    data = _gq().LNKVISION_DATA
     for seg in AMOUNT_SEGS:
         for row in data[seg]:
             for idx in (3, 4, 5, 6):
@@ -139,19 +143,19 @@ def test_lnkreport_amounts_left_blank():
         assert row[1] is None and row[2] is None, row[0]
 
 
-def test_lnkreport_pricing_rows_marked_pending():
-    """每个定价行的备注携带「待定价」标记（费率通道 2.3 与含在 3.1 的行除外）。"""
-    data = _gq().LNKREPORT_DATA
+def test_lnkvision_pricing_rows_marked_pending():
+    """每个定价行的备注携带「待定价」标记（费率通道 2.1 与含在 3.1 的行除外）。"""
+    data = _gq().LNKVISION_DATA
     for seg in AMOUNT_SEGS:
         for row in data[seg]:
-            if row[0] == "2.3":
+            if row[0] == "2.1":
                 continue
             assert "待定价" in row[7] or "含在 3.1" in row[7], (seg, row[0])
 
 
-def test_lnkreport_no_cross_product_price_copy():
+def test_lnkvision_no_cross_product_price_copy():
     """跨产品借用禁令：不携带 MI/CRM/AI/LnkChatBI 的任何价格数值。"""
-    text = repr(_gq().LNKREPORT_DATA)
+    text = repr(_gq().LNKVISION_DATA)
     for banned in ("50000", "60000", "100000", "110000", "130000", "20000", "30000"):
         assert banned not in text, banned
 
@@ -159,28 +163,28 @@ def test_lnkreport_no_cross_product_price_copy():
 # ── 生成行为：无数值时显式拒绝 ────────────────────────────────────────
 
 
-def test_build_lnkreport_data_refuses_without_prices():
+def test_build_lnkvision_data_refuses_without_prices():
     with pytest.raises(SystemExit) as ei:
-        _gq().build_lnkreport_data()
+        _gq().build_lnkvision_data()
     msg = str(ei.value.code)
     assert "待定价" in msg and "拒绝" in msg
 
 
-def test_cli_lnkreport_single_refuses():
+def test_cli_lnkvision_single_refuses():
     with pytest.raises(SystemExit):
-        _gq().main(["--customer", "测试客户", "--product", "LNKREPORT", "--mode", "SAAS"])
+        _gq().main(["--customer", "测试客户", "--product", "LNKVISION", "--mode", "SAAS"])
 
 
-def test_cli_lnkreport_in_combo_refuses():
+def test_cli_lnkvision_in_combo_refuses():
     with pytest.raises(SystemExit):
-        _gq().main(["--customer", "测试客户", "--product", "MI,LNKREPORT", "--mode", "SAAS"])
+        _gq().main(["--customer", "测试客户", "--product", "MI,LNKVISION", "--mode", "SAAS"])
 
 
-def test_cli_parse_accepts_lnkreport():
+def test_cli_parse_accepts_lnkvision():
     args = _gq().parse_args(
-        ["--customer", "X", "--product", "lnkreport", "--mode", "SAAS"]
+        ["--customer", "X", "--product", "lnkvision", "--mode", "SAAS"]
     )
-    assert args.product_codes == ["LNKREPORT"]
+    assert args.product_codes == ["LNKVISION"]
 
 
 # ── capability 条目（与 yaml 修改同批原子化）──────────────────────────
@@ -193,41 +197,16 @@ def _capabilities() -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
-def test_capability_lnkreport_onboarding():
+def test_capability_lnkvision_onboarding():
     caps = _capabilities()
-    entry = next(c for c in caps["capabilities"] if c["product_id"] == "lnkreport")
+    entry = next(c for c in caps["capabilities"] if c["product_id"] == "lnkvision")
     assert entry["status"] == "onboarding"
     assert entry["verified_at"] == "2026-10-04"
     assert entry["owner"] == "opc"
     evidence = " ".join(entry["evidence"])
-    assert "LNKREPORT_DATA" in evidence
+    assert "LNKVISION_DATA" in evidence
     assert (
-        "adapter-capability-owner-decision-o7-report-phase2-report-2026-10-04.md" in evidence
+        "adapter-capability-owner-decision-o7-vision-2026-10-04.md" in evidence
     )
-    assert re.search(r"phase2-report-2026-10-04\.md:\d+", evidence)
-
-
-def test_capability_other_products_untouched():
-    """禁改其他产品条目：八产品状态全景钉住（lnkreport 除外七项不变）。
-
-    lnkchatbi partial→implemented 为 O8 同批修订（rejected-registration，
-    2026-10-04，references/adapter-capability-owner-decision-o8-2026-10-04.md）。
-    lnkchat unsupported→not-applicable 为 O7-chat 同批修订（bundled-not-listed，
-    2026-10-04，references/adapter-capability-owner-decision-o7-chat-2026-10-04.md；
-    shared 钉线 EXPECTED_MATRIX/EXPECTED_DISTRIBUTION 同 commit）。
-    lnkvision unsupported→onboarding 为 O7-vision 同批修订（customer-facing，
-    2026-10-04，references/adapter-capability-owner-decision-o7-vision-2026-10-04.md；
-    shared 钉线同 commit）。
-    """
-    caps = _capabilities()
-    statuses = {c["product_id"]: c["status"] for c in caps["capabilities"]}
-    assert statuses == {
-        "lnkcre": "implemented",
-        "lnkcrm": "partial",
-        "lnkchat": "not-applicable",
-        "lnkchatbi": "implemented",
-        "lnkreport": "onboarding",
-        "lnkvision": "onboarding",
-        "lnkgateway": "not-applicable",
-        "lnkwebsite": "not-applicable",
-    }
+    assert re.search(r"o7-vision-2026-10-04\.md:\d+", evidence)
+    assert "customer-facing" in evidence

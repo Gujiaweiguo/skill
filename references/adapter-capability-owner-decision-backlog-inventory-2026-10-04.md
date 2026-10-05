@@ -427,3 +427,36 @@ D2_adapter_status_deletion:   # pending | approved | rejected   # 文档表述�
   `references/adapter-capability-owner-decision-o9-execution-2026-10-04.md`。
   §3.7 行「当前状态 frozen」为落盘时快照，以本注记为准。
 - **其余维持冻结**：O7-vision / O10-* / O11、删除动作、lnkreport 定价（挂起）。
+
+## 14. 状态更新（2026-10-05 O7-chat 执行后追加）
+
+- **O7-chat：frozen → decided-B / bundled（bundled-not-listed 已落地）**。owner 决策
+  bundled-not-listed（`references/adapter-capability-owner-decision-o7-chat-2026-10-04.md`，
+  OWNER SIGN-OFF: RECORDED (OPC)）：lnkchat 随 AI 岗位 Skill 服务打包售卖，不建独立
+  产品报价、不在报价单单列；打包报价走 generate_quote.py AI 岗位 Skill 产品线
+  （build_ai_data，product_name「LnkAgent AI岗位Skill增强服务」）与
+  materials/references/报价模板_AI岗位Skill_SAAS.md（均零改动，只读取证）；pricing
+  capability lnkchat 条目 unsupported→not-applicable（evidence/notes 同批更新；shared
+  钉线 EXPECTED_MATRIX/EXPECTED_DISTRIBUTION 与 pricing 本地八产品全景钉同 commit）。
+  执行记录见 `references/adapter-capability-owner-decision-o7-chat-execution-2026-10-04.md`。
+  §3.3 行「当前状态 frozen」为落盘时快照，以本注记为准。
+- **其余维持冻结**：O7-vision / O10-* / O11、删除动作、lnkreport 定价（挂起）。
+
+## 15. 状态更新（2026-10-05 O7-vision 执行后追加）
+
+- **O7-vision：frozen → decided / customer-facing（面客定判 + 报价基线结构落地，金额留空
+  待定价）**。owner 决策 customer-facing
+  （`references/adapter-capability-owner-decision-o7-vision-2026-10-04.md`，OWNER SIGN-OFF:
+  RECORDED (OPC)）：lnkvision 为独立面客产品；generate_quote.py LNKVISION_DATA 落地（完全
+  复用 LNKREPORT_DATA 已核定模式：四段八列、金额一律留空/None + 「待定价」标记、
+  RATIFIED_ZEROS 白名单外零值、build_lnkvision_data 无数值时显式拒绝生成、组合报价含
+  lnkvision 时写盘前拒绝；模块分组草案依据 30-products/lnkvision/prd/功能清单.md 落执行
+  记录 §3 待 OPC 复核，existing 18 = 5+5+5+2+1 全 31 行分配闭合）；pricing capability
+  lnkvision 条目 unsupported→onboarding（evidence/notes 同批更新；shared 钉线
+  EXPECTED_MATRIX/EXPECTED_DISTRIBUTION（unsupported 4→3 / onboarding 6→7）与 pricing
+  本地八产品全景钉同 commit）。执行记录见
+  `references/adapter-capability-owner-decision-o7-vision-execution-2026-10-04.md`。
+  §3.5 行「当前状态 frozen」为落盘时快照，以本注记为准。定价数值挂起（待 OPC 提供，
+  提供前另开授权填数并升级 implemented）；「面客」定判同时构成 O10-vision 叙事面的定位
+  依据，但 O10-vision 启动仍为独立签署项。
+- **其余维持冻结**：O10-* / O11、删除动作、lnkreport / lnkvision 定价（挂起）。
