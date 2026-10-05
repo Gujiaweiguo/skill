@@ -69,9 +69,10 @@ capabilities:
     status: not-applicable
     evidence:
       - "设计包 §3.3.E/§3.9：无叙事资产；内部基础设施无面客叙事场景证据"
+      - "O9 decided-B（2026-10-04）：暂不独立面客，预改判转定判，可复议；引 references/adapter-capability-owner-decision-o9-2026-10-04.md"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "★ 改判 unsupported→not-applicable（O2 首版矩阵）；O9 定位裁决 pending——若未来裁定面客，须凭证据重评。"
+    notes: "★ 改判 unsupported→not-applicable（O2 首版矩阵）；O9 decided-B（2026-10-04）：暂不独立面客，预改判转定判，可复议；引 references/adapter-capability-owner-decision-o9-2026-10-04.md——若未来改裁 A（面客），须凭证据重评。"
   - consumer_id: company-intro-generator
     product_id: lnkwebsite
     status: not-applicable

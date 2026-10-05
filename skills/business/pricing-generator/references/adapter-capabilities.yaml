@@ -75,9 +75,10 @@ capabilities:
     status: not-applicable
     evidence:
       - "设计包 §3.3.C/§3.9：内部 AI 网关，无独立售卖场景证据"
+      - "O9 decided-B（2026-10-04）：暂不独立面客，预改判转定判，可复议；引 references/adapter-capability-owner-decision-o9-2026-10-04.md"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "★ 改判 unsupported→not-applicable（O2 首版矩阵）；O9 定位裁决 pending——若未来裁定面客，须凭证据重评并补全套报价输入。"
+    notes: "★ 改判 unsupported→not-applicable（O2 首版矩阵）；O9 decided-B（2026-10-04）：暂不独立面客，预改判转定判，可复议；引 references/adapter-capability-owner-decision-o9-2026-10-04.md——若未来改裁 A（面客），须凭证据重评并补全套报价输入。"
   - consumer_id: pricing-generator
     product_id: lnkwebsite
     status: not-applicable

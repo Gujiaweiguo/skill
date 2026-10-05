@@ -415,3 +415,15 @@ D2_adapter_status_deletion:   # pending | approved | rejected   # 文档表述�
   `references/adapter-capability-owner-decision-o6-execution-2026-10-04.md`。
   §3.2 行「当前状态 frozen」为落盘时快照，以本注记为准。
 - **其余维持冻结**：O7-*/O9/O10-*/O11、删除动作、lnkreport 定价（挂起）。
+
+## 13. 状态更新（2026-10-05 O9 执行后追加）
+
+- **O9：frozen → decided-B / 定判（evidence 登记轮，status 值零变更）**。owner 决策
+  not-independently-customer-facing（`references/adapter-capability-owner-decision-o9-2026-10-04.md`，
+  OWNER SIGN-OFF: RECORDED (OPC)）：lnkgateway 暂不独立面客（平台基础设施 / 集成网关 /
+  内部能力），预改判转定判，可复议；两份 capability 文件（pricing-generator /
+  company-intro-generator）lnkgateway 条目 evidence/notes 登记定判依据，status 保持
+  not-applicable（O11 冻结线不受影响，钉线测试零改动即绿）。执行记录见
+  `references/adapter-capability-owner-decision-o9-execution-2026-10-04.md`。
+  §3.7 行「当前状态 frozen」为落盘时快照，以本注记为准。
+- **其余维持冻结**：O7-vision / O10-* / O11、删除动作、lnkreport 定价（挂起）。
