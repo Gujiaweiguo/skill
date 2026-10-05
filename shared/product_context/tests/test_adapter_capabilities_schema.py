@@ -84,6 +84,13 @@ AUDIT_DATE = "2026-10-04"
 
 # O2 批准的首版 48 格矩阵（含 3 处 ★ 改判：prd-gen×lnkwebsite、pricing×lnkgateway、
 # company-intro×lnkgateway → not-applicable）。统计必须等于 EXPECTED_DISTRIBUTION。
+# 修订（O5-Q5，2026-10-04）：strategy-brief-generator×lnkcrm partial→implemented
+# （owner decision references/adapter-capability-owner-decision-o5-q5-2026-10-04.md，
+# 盘点深度 unconfirmed→深盘点可用；evidence 同批更新）。
+# 修订（O8，2026-10-04）：pricing-generator×lnkchatbi partial→implemented
+# （owner decision references/adapter-capability-owner-decision-o8-2026-10-04.md，
+# rejected-registration：随单赠送/打包策略为设计语义，env 人工输入非缺口，
+# 不登记标准价；evidence 同批更新）。
 EXPECTED_MATRIX: dict[str, dict[str, str]] = {
     "product-prd-generator": {
         "lnkcre": "implemented",
@@ -109,7 +116,7 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
         "lnkcre": "implemented",
         "lnkcrm": "partial",
         "lnkchat": "unsupported",
-        "lnkchatbi": "partial",
+        "lnkchatbi": "implemented",
         "lnkreport": "onboarding",
         "lnkvision": "unsupported",
         "lnkgateway": "not-applicable",
@@ -137,7 +144,7 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
     },
     "strategy-brief-generator": {
         "lnkcre": "implemented",
-        "lnkcrm": "partial",
+        "lnkcrm": "implemented",
         "lnkchat": "implemented",
         "lnkchatbi": "implemented",
         "lnkreport": "implemented",
@@ -148,8 +155,8 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
 }
 
 EXPECTED_DISTRIBUTION = {
-    "implemented": 12,
-    "partial": 15,
+    "implemented": 14,
+    "partial": 13,
     "onboarding": 6,
     "unsupported": 5,
     "not-applicable": 7,

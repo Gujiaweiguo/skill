@@ -33,9 +33,10 @@ capabilities:
     evidence:
       - "references/product-registry-迁移审计-2026-10-04.md §3（registry 冻结快照 lnkcrm=onboarding ↔ capability 权威源一致）"
       - "30-products/lnkcrm prd/功能清单.md confirmed v1.0（2026-09-29 OPC 裁决，设计包 §3.3.B 勘误）"
+      - "O5-Q5 登记（2026-10-04）：--code-root 显式确认收敛为 configured（references/adapter-capability-owner-decision-o5-q5-2026-10-04.md）"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "code authority 未配置（present-unconfirmed）：resolve_code_root 一律报错需显式指定；升级条件见 O5（pending，冻结）。"
+    notes: "code root 已配置（O5-lnkcrm-code 后 resolve_code_root 免显式覆盖直接解析）；--code-root 显式确认收敛为 configured（O5-Q5 已解锁 2026-10-04，登记性措辞）。无运行先例（onboarding 语义不变）。"
   - consumer_id: product-prd-generator
     product_id: lnkchat
     status: partial

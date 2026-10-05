@@ -44,13 +44,14 @@ capabilities:
     notes: "缺定价资料（missing-pricing）；当前以「AI 岗位 Skill 服务」打包售卖，是否单列产品报价待 O7-chat（pending）。"
   - consumer_id: pricing-generator
     product_id: lnkchatbi
-    status: partial
+    status: implemented
     evidence:
-      - "generate_quote.py LNKCHATBI_DATA 结构 + LNKCHATBI_PRICE_Y1/Y2 环境变量"
-      - "设计包 §3.3.C"
+      - "generate_quote.py LNKCHATBI_DATA 结构 + LNKCHATBI_PRICE_Y1/Y2 环境变量（默认 0/0 = 随单赠送设计语义；打包/单独定价经 env 人工输入）"
+      - "O8 裁决 rejected-registration（references/adapter-capability-owner-decision-o8-2026-10-04.md）：不登记标准价，现状机制即设计语义非缺口"
+      - "云泰荔园报价单 LnkChatBI 首年/次年 0/0 战略赠送实证（lanlnk/out/proposals/广州云泰荔园/报价单_MI+LnkChatBI+接口_SAAS_云泰park荔园_20260806.xlsx）"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "结构在位、标准定价未登记（env 默认 0，每次人工输入；pricing-basis.yaml 只有费率无产品定价）；O8（pending）批准后可 partial→implemented。"
+    notes: "O8 已裁决（2026-10-04 rejected-registration）：随单赠送/打包策略，env 人工输入为设计语义非缺口；pricing-basis.yaml 不设 lnkchatbi 定价段（费率三键不动）。"
   - consumer_id: pricing-generator
     product_id: lnkreport
     status: onboarding

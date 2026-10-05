@@ -24,6 +24,13 @@ description: OpenSpec 实战工作流 Skill。用于用短口令处理真实项�
 `unresolved`、`not-found`、`planned`、`prd-only`、`inaccessible`、`unsupported`、
 `partial`、`not-applicable` 都是事实状态，不得被改写成“已解决”或静默降级。
 
+**lnkcrm scope 基线（O5-Q4，2026-10-04 owner include 裁决）**：lnkcrm 的 OpenSpec spec
+scope 集合（`/opt/code/lnkcrm/openspec/specs/`，实测非空、含 member-*/coupon-*/points-*/
+merchant-*/platform-*/tenancy 等 scope 族）已纳入产品实现基线——回写链路
+（`references/prd-writeback.md`）把它作为 lnkcrm 实现基线层对照输入；基线锚定 scope
+集合本身、不钉数量，对照时以实测 `ls` 为准。scope 基线已纳入；实现级评估 O5-Q5 已解锁
+（2026-10-04，解锁集 = 最小验证集三 skill——requirement-evaluator / strategy-brief-generator / product-prd-generator）。
+
 ## 目标
 
 把 OpenSpec 实战里的长提示词压缩成短口令：先识别任务意图和复杂度档位（L0-L3），再读取对应参考流程，必要时运行轻量扫描脚本，最后输出可执行的下一步建议或按用户确认落盘。

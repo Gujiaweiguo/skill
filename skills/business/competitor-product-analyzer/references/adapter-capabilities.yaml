@@ -29,9 +29,10 @@ capabilities:
     evidence:
       - "30-products/lnkcrm ontology accepted v1.0 + prd/竞品覆盖矩阵.md（S13-S17 五源竞品证据已入 PRD 包）"
       - "设计包 §3.3.D"
+      - "O5-Q4 include（2026-10-04）：status_vs_lanlnk 判定输入纳入 lnkcrm OpenSpec scope 集（references/adapter-capability-owner-decision-o5-q4-2026-10-04.md）"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "status_vs_lanlnk 的 existing/partial/missing 判定不可用（功能清单实现状态全 unknown，只能标 unknown）；evidence/competitors/<vendor>/ 分析结论树未建。间接联动 O5（pending）。"
+    notes: "status_vs_lanlnk 判定输入已纳入 lnkcrm OpenSpec scope 基线（O5-Q4，2026-10-04 include）：scope 命中可作基线层 existing/partial 证据并引用 scope 名，scope 未命中且清单无 existing 证据时维持 unknown。scope 基线已纳入；实现级评估 O5-Q5 已解锁（2026-10-04；deep 读码、implementation_status 收敛归解锁集三 skill——requirement-evaluator/strategy-brief-generator/product-prd-generator，本 skill 不在集内）。evidence/competitors/<vendor>/ 分析结论树未建。"
   - consumer_id: competitor-product-analyzer
     product_id: lnkchat
     status: onboarding

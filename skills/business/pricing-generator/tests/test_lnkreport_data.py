@@ -208,14 +208,18 @@ def test_capability_lnkreport_onboarding():
 
 
 def test_capability_other_products_untouched():
-    """禁改其他产品条目：八产品状态全景钉住（lnkreport 除外七项不变）。"""
+    """禁改其他产品条目：八产品状态全景钉住（lnkreport 除外七项不变）。
+
+    lnkchatbi partial→implemented 为 O8 同批修订（rejected-registration，
+    2026-10-04，references/adapter-capability-owner-decision-o8-2026-10-04.md）。
+    """
     caps = _capabilities()
     statuses = {c["product_id"]: c["status"] for c in caps["capabilities"]}
     assert statuses == {
         "lnkcre": "implemented",
         "lnkcrm": "partial",
         "lnkchat": "unsupported",
-        "lnkchatbi": "partial",
+        "lnkchatbi": "implemented",
         "lnkreport": "onboarding",
         "lnkvision": "unsupported",
         "lnkgateway": "not-applicable",

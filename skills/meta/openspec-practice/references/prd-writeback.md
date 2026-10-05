@@ -100,6 +100,11 @@ docs 侧必须记录：
 - 未实施、暂缓、排除项必须保留底稿原文带回并按原文登记，不得改写成已实施；项目仓不转述改写，docs 侧不替项目仓补口径。
 - 所有权边界：目标仓库拥有自己的 OpenSpec changes 和验证；回写只消费 archived change 证据，不替目标仓库 apply、verify，不写产品代码仓库。
 - 无强制顺序管道：回写与对账按短口令独立触发，不要求「消费 → 实施 → 回写」全链齐备才能执行。
+- lnkcrm scope 基线（O5-Q4，2026-10-04 owner include 裁决）：目标产品为 lnkcrm 时，PRD gap
+  状态判断（步骤 6）与「晋升后 pairwise 对账」的 `prd-code` 对照纳入 lnkcrm OpenSpec scope 集
+  （`/opt/code/lnkcrm/openspec/specs/`，实测非空、含 member-*/coupon-* 等 scope 族；锚定
+  scope 集合不钉数量，以实测 `ls` 为准）——scope 命中可作「实现基线层已覆盖」证据并引用
+  scope 名，不得据此宣称实现级验证通过。scope 基线已纳入；实现级评估 O5-Q5 已解锁（2026-10-04，解锁集 = 最小验证集三 skill）。
 
 ## 证据红线
 

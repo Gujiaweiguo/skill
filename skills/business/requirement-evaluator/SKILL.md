@@ -75,7 +75,8 @@ uv run python scripts/resolve_context.py <产品 ID> [--company-id <id> | --comp
 | 产品未注册 / 匹配不唯一 | **明确失败**（复述 resolver 错误），不回退 lnkcre 或其他产品 |
 | prd unresolved / not-found | 明确报错（列出产品 ID 与尝试路径），提示先运行 product-prd-generator |
 | ontology not-applicable（lnkwebsite）/ unresolved（lnkgateway） | 不消费 ontology 时不阻断评估；需要术语归一时在报告标注该状态 |
-| code present-unconfirmed（如 lnkcrm）或 code_root null | 代码验证（Step 0 / P2.5）不得自动采用观察到的 checkout；必须由用户显式提供 `--code-root /opt/code/<产品>` 等价确认 |
+| code present-unconfirmed 或 code_root null | 代码验证（Step 0 / P2.5）不得自动采用观察到的 checkout；必须由用户显式提供 `--code-root /opt/code/<产品>` 等价确认 |
+| code complete + OpenSpec scope 基线（lnkcrm，O5-Q4 后） | Step 0 的 grep 面纳入 `/opt/code/lnkcrm` 的 OpenSpec scope 集（`openspec/specs/` 下非空 scope 集合，含 member-*/coupon-* 等 scope 族；锚定 scope 集合不钉数量，以实测 `ls` 为准）——scope 命中可作「该域已在实现基线」的基线层证据（引用 scope 名）；实现级评估（deep 读码 / P2.5 全码验证）O5-Q5 已解锁（2026-10-04）：lnkcrm 用 company.yaml 配置的 code root（/opt/code/lnkcrm）做实现级验证，按 lnkcre 同等口径，「不得自动用观察 checkout」限制解除（该限制属 present-unconfirmed 时代语义，configured 即 authority），无需再要求显式 `--code-root` 确认；功能清单 implementation_status unknown 语义可开始收敛（承诺级→实现级）。反漂移约束：实现级结论必须记录评估时点 revision（`git -C /opt/code/lnkcrm rev-parse HEAD`）并注明漂移警示（活跃开发会让结论过时）；实现级评估适用面 = code authority complete 的产品（lnkcre、lnkcrm），其余产品维持上一行禁令。scope 基线已纳入 |
 | 多公司上下文无法唯一判定 | 按 COMPANIES.md §4 询问，绝不静默默认 lanlnk |
 
 **LnkCRE 功能基线**（canonical id `lnkcre`；MI / MI-CRE / LnkCRE / 商管系统 为历史别名，
@@ -282,7 +283,8 @@ Agent：好的，继续评估。报告头部会标注"基于过期快照"。
 ```
 Step 0: grep 代码库验证（防"功能清单漏抽"误判，必跑）
     └── 代码根 = resolver context 的 code_root（仅 code authority = complete 时直接使用）
-    └── code_root null / present-unconfirmed（如 lnkcrm）→ 必须用户显式确认 --code-root，不得自动采用 /opt/code/<产品> 观察 checkout
+    └── code_root null / present-unconfirmed → 必须用户显式确认 --code-root，不得自动采用 /opt/code/<产品> 观察 checkout
+    └── lnkcrm（O5-Q4 include + O5-Q5 解锁，2026-10-04）：grep 面纳入 /opt/code/lnkcrm 的 OpenSpec scope 集（openspec/specs/，实测非空、含 member-*/coupon-*/points-*/merchant-*/platform-*/tenancy 等 scope 族；锚定集合不钉数量，以实测 ls 为准）——scope 命中 = 基线层「该域已覆盖」证据（引用 scope 名），可救回误判的 🔨/🔗；实现级评估（deep 读码）O5-Q5 已解锁（2026-10-04）：代码根 = company.yaml 配置的 code root（/opt/code/lnkcrm），按 lnkcre 同等口径做实现级验证（P2.5 同理），不再要求显式 --code-root 确认；implementation_status unknown 可开始收敛（承诺级→实现级）；实现级结论必须钉评估时 revision（git -C /opt/code/lnkcrm rev-parse HEAD）+ 漂移警示（活跃开发会让结论过时）。scope 基线已纳入
     └── 命中代码（路由/模型/前端组件）→ 重新走 Step 1（很可能判 ✅ 而非 🔨/🔗）
     └── 无命中 → 进入 Step 1
     └── 必查项：所有 🔨 二开判定、所有 🔗 第三方判定

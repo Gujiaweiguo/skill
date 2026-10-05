@@ -251,7 +251,7 @@ uv run scripts/extract_images.py "$INCOMING_DIR"
 | 资产来源 | 判定 | 盘点内容 |
 |------|------|---------|
 | code authority complete（code_root 配置且存在） | 读源码（source-ref.md 指路） | 已有模块、能力成熟度、技术栈 |
-| code_root null / planned（如 lanlnk 的 lnkcrm） | 不猜 `/opt/code/<产品 id>`；降级走 materials 资料 | 产品功能、案例、行业覆盖 |
+| code_root null / planned | 不猜 `/opt/code/<产品 id>`；降级走 materials 资料 | 产品功能、案例、行业覆盖 |
 | code authority present-unconfirmed（配置 null 但观察到外部 checkout） | 观察 checkout 只作证据登记，不当作 configured authority；深度读码需 owner 确认 | 模块级浅盘点（标注 unconfirmed） |
 | code_root 空 + materials 有资料 | 引用 `$MATERIALS_DIR/03-products/` 等 | 产品功能、案例、行业覆盖 |
 | prd_ready: true | 复用 PRD/功能清单 | 权威能力基线 |
@@ -260,6 +260,13 @@ uv run scripts/extract_images.py "$INCOMING_DIR"
 > （`openspec-practice/scripts/resolve_context.py <产品 ID>`，输出 `authority.code.status`
 > 与 `layers.code_root`）；company.yaml 是产品台账，但状态语义（present-unconfirmed /
 > planned 等）以 resolver 输出为准，本 skill 不自行推断。
+
+> **lnkcrm 盘点深度已升级（O5-Q5 已解锁，2026-10-04）**：lnkcrm code authority=complete
+> （company.yaml 已配置 code root，O5-lnkcrm-code），盘点深度标注 unconfirmed → **深盘点
+> 可用**——按上表 complete 行读源码盘点（已有模块、能力成熟度、技术栈）。反漂移约束：
+> 深盘点结论必须记录评估时点 revision（`git -C /opt/code/lnkcrm rev-parse HEAD`）并注明
+> 漂移警示（活跃开发会让结论过时）；深盘点适用面 = code authority complete 的产品
+> （lnkcre、lnkcrm），其余产品维持上表各行降级规则。
 
 ### P5 市场信号整理（含政策升格）
 

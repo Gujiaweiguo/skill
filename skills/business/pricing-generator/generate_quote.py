@@ -618,8 +618,8 @@ def build_ai_data(positions: int) -> dict[str, Any]:
 def build_lnkchatbi_data() -> dict[str, Any]:
     """构造 LnkChatBI 智能问数平台报价数据。
 
-    定价：默认战略赠送（首年 0 / 次年 0，用于云泰等试水/赠送场景），
-    可通过环境变量覆盖：
+    定价：随单赠送策略（O8 裁决 2026-10-04 rejected-registration）——默认 0/0
+    为设计语义（非占位待定价）；打包/单独定价经环境变量人工输入：
       LNKCHATBI_PRICE_Y1 / LNKCHATBI_PRICE_Y2  首年/次年费用（整数元）
     模块源自 LnkChatBI 功能清单的功能域（原 out/prd/LnkChatBI/output/功能清单.md；
     2026-09-26 迁移后 canonical 在 30-products/lnkchatbi/prd/功能清单.md）。
@@ -711,7 +711,7 @@ def build_lnkchatbi_data() -> dict[str, Any]:
             "3. SAAS 服务范围：含平台运维、安全更新、版本升级；"
             "不含数据清洗/ETL/数仓建设（产品边界为只读问数）；",
             "4. 本产品为自然语言问数底座，不承载 langchat 工作流编排与托管复盘；",
-            "5. 定价：本次报价" + note + "，可通过环境变量 LNKCHATBI_PRICE_Y1/Y2 覆盖；",
+            "5. 定价：本次报价" + note + "（随单赠送策略，O8 裁决 2026-10-04）；打包/单独定价经环境变量 LNKCHATBI_PRICE_Y1/Y2 人工输入；",
             "6. 第三方大模型推理费用（token）由客户自购或蓝联代采，另计。",
         ],
         "standard_first_year_total": p1,

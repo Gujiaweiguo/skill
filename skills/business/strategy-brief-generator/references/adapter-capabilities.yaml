@@ -26,12 +26,13 @@ capabilities:
     notes: "盘点维度 implemented（深盘点可用）。"
   - consumer_id: strategy-brief-generator
     product_id: lnkcrm
-    status: partial
+    status: implemented
     evidence:
       - "SKILL.md P4 判定表 present-unconfirmed 行：浅盘点（标注 unconfirmed）（设计包 §3.3.F）"
+      - "O5-Q5 解锁（2026-10-04）：盘点深度 unconfirmed → 深盘点可用——code root 已配置，按 complete 行读源码盘点（references/adapter-capability-owner-decision-o5-q5-2026-10-04.md）"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "深读码需 owner 确认（O5 pending，冻结）；观察 checkout 仅作证据登记，不得作为 authority。"
+    notes: "盘点维度 implemented（深盘点可用，O5-Q5 已解锁 2026-10-04；深盘点结论钉评估时 revision + 漂移警示，适用面 = code authority complete 产品，其余产品维持 P4 判定表降级）。"
   - consumer_id: strategy-brief-generator
     product_id: lnkchat
     status: implemented

@@ -363,3 +363,41 @@ D2_adapter_status_deletion:   # pending | approved | rejected   # 文档表述�
    未回退/覆盖/清理既有未提交修改。
 4. **盘点完成不等于授权**：本报告不构成 D1/D2 或任何 O5/O6-O11 项的批准；全部
    上述动作维持冻结，各自需独立 owner 签署。
+
+## 9. 状态更新（2026-10-04 O5-Q4 执行后追加）
+
+- **O5-Q4：frozen → included/landed**。owner 决策 approved + include
+  （`references/adapter-capability-owner-decision-o5-q4-2026-10-04.md`，OWNER SIGN-OFF:
+  RECORDED (OPC)）；三消费面（requirement-evaluator / competitor-product-analyzer /
+  openspec-practice）措辞与 capability evidence 已接线，执行记录见
+  `references/adapter-capability-owner-decision-o5-q4-execution-2026-10-04.md`。
+  §3.1 行「当前状态 frozen」为落盘时快照，以本注记为准。
+- **O5-Q5 维持冻结**（Q4 纳入不自动解锁 Q5）：requirement-evaluator 实现级评估
+  （deep 读码）保持 blocked-by-code；strategy-brief-generator 不升深盘点；
+  prd-gen 行为层不动。
+
+## 10. 状态更新（2026-10-04 O5-Q5 执行后追加）
+
+- **O5-Q5：frozen → unlocked/landed**。owner 决策 approved + unlock
+  （`references/adapter-capability-owner-decision-o5-q5-2026-10-04.md`，OWNER SIGN-OFF:
+  RECORDED (OPC)）；三 skill（requirement-evaluator / strategy-brief-generator /
+  product-prd-generator）行为层解锁——lnkcrm 实现级评估可用（结论钉评估时 revision +
+  漂移警示；适用面 = code authority complete 产品），Q4「待 O5-Q5」边界注记已全部接续为
+  已解锁。执行记录见 `references/adapter-capability-owner-decision-o5-q5-execution-2026-10-04.md`。
+  §3.1 行与 §9 末条「O5-Q5 维持冻结」为落盘时快照，以本注记为准。
+- **O5 五问全部闭合**（Q1-Q3 随 O5-lnkcrm-code 落地，Q4 include，Q5 unlock）。
+- **其余维持冻结**：O6-O11、D1/D2 删除动作、O4⑤、lnkreport 定价（挂起）。
+
+## 11. 状态更新（2026-10-04 O8 执行后追加）
+
+- **O8：frozen → decided-rejected（rejected-registration 已落地）**。owner 决策驳回
+  标准价登记（`references/adapter-capability-owner-decision-o8-2026-10-04.md`，
+  OWNER SIGN-OFF: RECORDED (OPC)）：不写 pricing-basis.yaml 任何 lnkchatbi 定价段
+  （费率三键零改动）；LNKCHATBI_PRICE_Y1/Y2 默认 0 语义对齐为随单赠送策略
+  （仅注释/帮助/备注文案，env 读取逻辑与默认行为零改动）；pricing-generator
+  capability lnkchatbi 条目 partial→implemented（赠送策略为设计语义，env 人工输入
+  非缺口；shared 钉线与 pricing 本地八产品全景钉同批）。执行记录见
+  `references/adapter-capability-owner-decision-o8-execution-2026-10-04.md`。
+  §3.6 行「当前状态 frozen」与「O8（pending）批准后可 partial→implemented」为落盘时
+  快照，以本注记为准。
+- **其余维持冻结**：O6/O7-*/O9/O10-*/O11、删除动作、lnkreport 定价（挂起）。

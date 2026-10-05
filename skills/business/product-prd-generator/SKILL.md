@@ -11,7 +11,7 @@ description: |-
   "商管/会员/CRM/供应链产品规划"、"基于现有产品做版本规划"。
   仅面向内部产品规划与决策，不生成报价/方案/投标文件（那些交给 company-intro-generator / pricing-generator / bid-doc-master），
   不直接修改业务系统代码（业务系统自己基于本 skill 输出的交接文档拆 OpenSpec change）。
-compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to-md conversion and image extraction. Reads code from an explicit --code-root (LnkCRE retains its historical default; other products must provide an explicit code root). Default candidate artifacts go to $COMPANY_BASE/out/prd/<canonical_product_id>/output/; use --canonical-target with --output-kind for explicit canonical PRD output. $LANLNK_BASE remains a compatibility alias.
+compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to-md conversion and image extraction. Reads code from an explicit --code-root (LnkCRE retains its historical default; lnkcrm's code root is configured in company.yaml since O5-lnkcrm-code, so --code-root explicit confirmation has converged to configured — registered per O5-Q5, 2026-10-04; other products must provide an explicit code root). Default candidate artifacts go to $COMPANY_BASE/out/prd/<canonical_product_id>/output/; use --canonical-target with --output-kind for explicit canonical PRD output. $LANLNK_BASE remains a compatibility alias.
 ---
 
 # Product PRD Generator

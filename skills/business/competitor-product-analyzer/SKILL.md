@@ -221,8 +221,14 @@ OPC/产品 owner 的决策**不是竞品证据**。roadmap 方向、改进建议
   feature-baseline。
 - **authority 状态显式处理**：目标产品 ontology authority 为 not-applicable（lnkwebsite）
   或 unresolved（lnkgateway）时，术语归一明确降级标注、不回落商管 ontology；code authority
-  为 present-unconfirmed（如 lnkcrm）时，观察到的 checkout 只作只读证据定位，不当作
-  configured code authority。
+  为 present-unconfirmed 时，观察到的 checkout 只作只读证据定位，不当作
+  configured code authority。lnkcrm（code authority=complete，O5-lnkcrm-code 对账后）：
+  status_vs_lanlnk 判定输入纳入 lnkcrm OpenSpec scope 基线（`/opt/code/lnkcrm/openspec/specs/`
+  非空 scope 集，含 member-*/coupon-* 等 scope 族；锚定集合不钉数量，以实测 `ls` 为准）——
+  scope 命中可作「蓝联该域已有实现基线」的基线层证据（引用 scope 名）；实现级验证
+  （deep 读码、实现质量判定）保持 blocked（本 skill 未入 Q5 最小验证集）。scope 基线已
+  纳入；实现级评估 O5-Q5 已解锁（2026-10-04，解锁集 = requirement-evaluator /
+  strategy-brief-generator / product-prd-generator）。
 
 ### S0 采集入库：三层归属（遵循 lanlnk 统一素材库规范）
 
@@ -563,6 +569,14 @@ ontology authority 为 not-applicable（lnkwebsite）/ unresolved（lnkgateway�
 | AI Skills | `$LANLNK_BASE/materials/11-cre-ai-skills/02_机会与产品/岗位 AI Skills 增强性与摩擦消除分析矩阵.md` |
 
 逐条把竞品能力映射到蓝联功能清单的 `existing/partial/missing`，填 `status_vs_lanlnk`。
+
+**lnkcrm scope 基线输入（O5-Q4，2026-10-04 owner include）**：对照产品为 lnkcrm 时，
+status_vs_lanlnk 的判定输入额外纳入 lnkcrm OpenSpec scope 集
+（`/opt/code/lnkcrm/openspec/specs/`，实测非空、含 member-*/coupon-*/points-*/merchant-*/
+platform-*/tenancy 等 scope 族；锚定 scope 集合不钉数量，以实测 `ls` 为准）：竞品能力
+命中 scope → 蓝联基线层已有该域，可判 existing/partial 并引用 scope 名；scope 未命中且
+功能清单无 existing 证据 → 维持 unknown 进 review。scope 基线已纳入；实现级评估（deep
+读码）O5-Q5 已解锁（2026-10-04；解锁集 = 最小验证集三 skill，本 skill 不在集内）。
 
 功能清单不存在时提示：
 
