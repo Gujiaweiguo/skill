@@ -214,8 +214,8 @@ echo ""
 # （lnkcrm 实证）。WARN 而非 FAIL：docs 先行 / skill 跟进是合法节奏，但 drift
 # 必须每次审计可见，不靠人工复核发现。
 # B2 迁移（2026-10-04）：对账面自 product-registry.yaml 改为 company.yaml products
-# （唯一产品台账，COMPANIES.md §3）；registry 保留为迁移期兼容快照（迁移审计 §4-B2，
-# 用户会话授权，执行记录见 references/adapter-capability-owner-decision-b2-execution-2026-10-04.md）。
+# （唯一产品台账，COMPANIES.md §3）；registry 已于 2026-10-04 D1 退役删除（迁移审计 §4-B2
+# 与 D1 收官注记；执行记录见 references/adapter-capability-owner-decision-b2-execution-2026-10-04.md）。
 echo "--- Check 4: Product dir registration ---"
 PRODUCTS_DIR="$LANLNK_BASE/30-products"
 COMPANY_YAML="$LANLNK_BASE/config/company.yaml"

@@ -108,7 +108,8 @@ def test_layer_reference_rejects_cross_product_ontology_fallback() -> None:
 # 七软件产品 product_class / ontology_profile 的 baseline 契约映射（可执行形态）。
 # 语义权威源 = references/product-semantic-baseline.md §1 规则 2（业务系统 lnkcre/lnkcrm
 # ↔ business-ontology；平台/AI 产品 ↔ tool-ontology）。company.yaml 产品台账不携带
-# 这两个字段；product-registry.yaml 同名字段为冻结兼容快照（迁移审计
+# 这两个字段；product-registry.yaml 同名字段为历史冻结快照（该文件已退役，
+# D1 2026-10-04 删除；迁移审计
 # references/product-registry-迁移审计-2026-10-04.md §4-B1，B1 迁移 2026-10-04）。
 SOFTWARE_PRODUCT_PROFILES: dict[str, tuple[str, str]] = {
     "lnkcre": ("business", "business-ontology"),
@@ -127,7 +128,7 @@ def _capability_status(product_id: str) -> str:
     """读取本 skill 私有 capability 声明中某产品的 adapter 支持度。
 
     唯一权威源 = references/adapter-capabilities.yaml（方案 B，Batch 1，O1/O2 批准）；
-    product-registry.yaml 的同名字段自 2026-10-04 起冻结为迁移期兼容快照，
+    product-registry.yaml 的同名字段已随文件退役（D1，2026-10-04 删除），
     不再作为断言来源（lnkgateway=blocked / lnkwebsite=not-applicable 两格
     registry 枚举不可表达，以 capability 文件为准）。
     """
@@ -144,7 +145,8 @@ def _capability_status(product_id: str) -> str:
 
 
 def test_company_ledger_registers_seven_software_products_and_lnkwebsite_prd_only() -> None:
-    """B1 迁移（2026-10-04）：断言来源自 product-registry.yaml 改为 go-forward 权威源。
+    """B1 迁移（2026-10-04）：断言来源自 product-registry.yaml（已退役，D1 2026-10-04
+    删除）改为 go-forward 权威源。
 
     - 产品宇宙（7 软件 + lnkwebsite）→ company.yaml products（唯一产品台账，经 resolver）；
     - lnkwebsite prd-only / 无本体层 → resolver product_status + ontology authority

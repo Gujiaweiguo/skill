@@ -1,17 +1,20 @@
-"""O4 migration gate: adapter_status compatibility field, no-consumer convergence.
+"""D2 retirement gate: adapter_status 字段已退役，全仓零消费 + 三条 authority 冻结线。
 
-依据（owner decision O4，2026-10-04）：
-``references/adapter-capability-owner-decision-2026-10-04.md`` §D-O4 五步迁移——
-② 迁移实际读取方（盘点结论：程序化调用方 0）→ ③ 兼容告警/迁移提示 → ④ 禁止新增
-adapter_status 依赖 → ⑤ owner 确认无消费方后另行批准删除字段。
+依据（owner decision O4 → D2，2026-10-04）：
+- O4 五步迁移（``references/adapter-capability-owner-decision-2026-10-04.md`` §D-O4）
+  步骤 ⑤：字段删除需 owner 独立批准 + 门禁测试同批更新；
+- D2 批准记录：``references/adapter-capability-owner-decision-d2-adapter-status-retire-2026-10-04.md``
+  （status=approved，decision=delete-field，OWNER SIGN-OFF: RECORDED (OPC)）。
 
-本测试是 **O4 迁移门禁**（gate），不是业务功能测试：
-- 证明 resolver 仍输出 adapter_status 兼容字段（未被删除/重命名/语义变更）；
+本测试是 **退役后门禁**（gate），不是业务功能测试：
+- 证明 ProductContext 已无 adapter_status 字段、as_dict 不再输出该键
+  （含 company.yaml 显式携带该键时也不透传）；
 - 证明 resolver 不读取任何 capability 文件，capability 状态不进入 authority；
-- 钉死三条 authority 冻结线（lnkcrm / lnkgateway / lnkwebsite）；
-- 机械扫描整个 skill 仓的 .py/.sh 源码，禁止出现新的程序化 adapter_status 消费方。
+- 钉死三条 authority 冻结线（lnkcrm / lnkgateway / lnkwebsite）——D2 明令原样保留；
+- 机械扫描整个 skill 仓的 .py/.sh 源码：全仓零 adapter_status 消费
+  （唯一豁免 = 禁令执行文件自身）。
 
-放宽或移除本测试中的任何断言 = 违反 O4 禁令，必须先取得 owner 独立批准。
+恢复该字段或放宽本门禁任何断言 = 违反 D2 禁令，必须先取得 owner 独立批准。
 """
 
 from __future__ import annotations
@@ -29,23 +32,20 @@ if str(_REPOSITORY_ROOT) not in sys.path:
 from shared.product_context import ResolutionError, resolve_company, resolve_product
 from shared.product_context.models import ProductContext
 
-DECISION_RECORD = "references/adapter-capability-owner-decision-2026-10-04.md"
-CAPABILITY_FILENAME = "adapter-capabilities.yaml"
-COMPAT_DEFAULT = "unsupported"
+O4_DECISION_RECORD = "references/adapter-capability-owner-decision-2026-10-04.md"
+D2_DECISION_RECORD = (
+    "references/adapter-capability-owner-decision-d2-adapter-status-retire-2026-10-04.md"
+)
+RETIRED_FIELD = "adapter_status"
 
-# ── O4 步骤 4 静态禁令：仓内 .py/.sh 源码允许出现 adapter_status 字面量的位置白名单 ──
-# 白名单 = 2026-10-04 O4 盘点基线（类别 1/2/3/4/6：定义、赋值、序列化透传、测试自检、
-# registry 自有字段断言）。值 = 允许的命中行数上限（精确相等，防白名单文件内夹带新增消费）。
-# 新文件/新行数出现在白名单外 → 测试失败；扩充白名单或调整计数需 owner 批准的变更说明。
-ALLOWED_ADAPTER_STATUS_SOURCES: dict[str, int] = {
-    "shared/product_context/models.py": 2,  # 字段定义 + as_dict 序列化透传
-    "shared/product_context/resolver.py": 2,  # 赋值（company.yaml 原样透传+缺省回落）+ 构造传参
-    "shared/product_context/tests/test_adapter_capabilities_schema.py": 7,  # O4 键级禁令自检
-    "skills/business/product-prd-generator/tests/test_product_governance_contracts.py": 0,  # B1 迁移（2026-10-04）清零：adapter 支持度断言改读 skill 私有 capability 文件（references/adapter-capabilities.yaml，owner 批准执行 B1）；保留 0 基线防止 token 回流
-}
-# 自指豁免：本门禁测试自身是禁令执行者，token 出现在断言/fixture/说明中是执行机制的一部分；
-# 豁免不免除计数以外的义务——本文件内不得出现对业务代码 adapter_status 的真实读取。
+# ── D2 退役后静态禁令：仓内 .py/.sh 源码零 adapter_status 消费 ──
+# 唯一豁免 = 禁令执行文件自身（token 出现在断言/fixture/说明中是执行机制的一部分）。
+# 任何其他 .py/.sh 文件出现 ``adapter_status`` 字面量（键访问/属性访问/序列化键/断言）
+# 即违规；执行文件自身的命中数钉死基线（精确相等，防执行文件内夹带真实消费）。
 _GATE_TEST_PATH = "shared/product_context/tests/test_adapter_status_migration_gate.py"
+_KEY_BAN_TEST_PATH = "shared/product_context/tests/test_adapter_capabilities_schema.py"
+_KEY_BAN_TEST_BASELINE = 7  # O4 键级禁令自检（capability 文件不得携带该字段）的既有基线
+_ENFORCEMENT_FILES = frozenset({_GATE_TEST_PATH, _KEY_BAN_TEST_PATH})
 _SCAN_ROOTS = ("shared", "skills", "references/scripts")
 _SCAN_SUFFIXES = (".py", ".sh")
 _SKIP_DIR_SEGMENTS = {
@@ -98,26 +98,18 @@ def _live_lanlnk():
         return None
 
 
-class CompatFieldRetainedTest(unittest.TestCase):
-    """门禁 1：resolver 仍可输出 adapter_status 兼容字段（O4 保留兼容期）。"""
+class FieldRetiredTest(unittest.TestCase):
+    """门禁 1（D2 改写）：adapter_status 字段已退役（O4 步骤 ⑤ 落地，owner decision D2）。"""
 
-    def test_dataclass_field_not_removed_or_renamed(self) -> None:
-        self.assertIn(
-            "adapter_status",
+    def test_dataclass_field_removed(self) -> None:
+        self.assertNotIn(
+            RETIRED_FIELD,
             ProductContext.__dataclass_fields__,
-            "删除/重命名 adapter_status 字段需 owner 独立批准（O4 步骤 5）并同 commit 更新本门禁",
+            f"{RETIRED_FIELD} 已于 D2（2026-10-04）退役；恢复该字段需 owner 独立批准"
+            f"（依据 {O4_DECISION_RECORD} 步骤 5 → {D2_DECISION_RECORD}）并同 commit 更新本门禁",
         )
 
-    def test_compat_default_fallback_when_company_yaml_omits_key(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            base = Path(directory) / "acme"
-            _fixture_company(base, "  - id: demo\n    name: Demo\n    code_root: null\n")
-            _fixture_product(base, "demo")
-            payload = resolve_product("demo", resolve_company(company_base=base)).as_dict()
-            self.assertIn("adapter_status", payload["product"])
-            self.assertEqual(payload["product"]["adapter_status"], COMPAT_DEFAULT)
-
-    def test_company_yaml_value_passes_through_verbatim(self) -> None:
+    def test_as_dict_omits_key_even_when_company_yaml_sets_it(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory) / "acme"
             _fixture_company(
@@ -125,9 +117,13 @@ class CompatFieldRetainedTest(unittest.TestCase):
             )
             _fixture_product(base, "demo")
             payload = resolve_product("demo", resolve_company(company_base=base)).as_dict()
-            self.assertEqual(payload["product"]["adapter_status"], "partial")
+            self.assertNotIn(
+                RETIRED_FIELD,
+                payload["product"],
+                "company.yaml 残留的 adapter_status 键不得透传进 as_dict（D2 已退役）",
+            )
 
-    def test_all_live_products_output_compat_field(self) -> None:
+    def test_all_live_products_as_dict_without_retired_field(self) -> None:
         company = _live_lanlnk()
         if company is None:
             self.skipTest("live lanlnk company base 不可发现（需 /opt/code/docs/lanlnk）")
@@ -136,12 +132,11 @@ class CompatFieldRetainedTest(unittest.TestCase):
             if not pid:
                 continue
             payload = resolve_product(pid, company).as_dict()
-            self.assertIn(
-                "adapter_status",
+            self.assertNotIn(
+                RETIRED_FIELD,
                 payload["product"],
-                f"{pid}: 兼容字段必须仍在 resolver 输出中（O4 保留兼容期）",
+                f"{pid}: 退役字段不得出现在 resolver 输出中（D2，2026-10-04）",
             )
-            self.assertIsInstance(payload["product"]["adapter_status"], str, pid)
 
 
 class CapabilityLayeringTest(unittest.TestCase):
@@ -269,17 +264,18 @@ class AuthorityFreezeLineTest(unittest.TestCase):
         )
 
 
-class NoNewConsumerScanTest(unittest.TestCase):
-    """门禁 7：仓内 .py/.sh 源码不得出现白名单之外的 adapter_status 程序化消费。
+class ZeroConsumerScanTest(unittest.TestCase):
+    """门禁 7（D2 改写）：仓内 .py/.sh 源码 adapter_status 零消费。
 
-    覆盖所有访问形态（``adapter_status`` 字面量出现在源码行 = 键访问/属性访问/
-    序列化键/断言）。prose（.md/.yaml/.json）不在扫描范围——文档级迁移是 Batch 3
-    文档候选，且多处存在其他会话未提交修改。
+    字段已退役（D2，2026-10-04）——``adapter_status`` 字面量出现在任何源码行
+    （键访问/属性访问/序列化键/断言）均为违规，唯一豁免 = 禁令执行文件自身
+    （本门禁 + O4 键级禁令自检），其命中数钉死基线（精确相等，防夹带真实消费）。
+    prose（.md/.yaml/.json）不在扫描范围——baseline 契约自有字段与 README 已退役
+    登记文案属文档层，由各自 owner 决策管理。
     """
 
-    def test_no_programmatic_consumer_outside_allowlist(self) -> None:
-        offenders: dict[str, list[str]] = {}
-        counts: dict[str, int] = {}
+    def test_zero_programmatic_consumer_repo_wide(self) -> None:
+        hits_by_file: dict[str, list[str]] = {}
         for scan_root in _SCAN_ROOTS:
             root = _REPOSITORY_ROOT / scan_root
             if not root.is_dir():
@@ -295,25 +291,25 @@ class NoNewConsumerScanTest(unittest.TestCase):
                     for index, line in enumerate(
                         path.read_text(encoding="utf-8", errors="replace").splitlines(), 1
                     )
-                    if "adapter_status" in line
+                    if RETIRED_FIELD in line
                 ]
-                if not hits or relpath == _GATE_TEST_PATH:
-                    continue
-                counts[relpath] = len(hits)
-                if relpath not in ALLOWED_ADAPTER_STATUS_SOURCES:
-                    offenders[relpath] = hits
-        for relpath, expected in ALLOWED_ADAPTER_STATUS_SOURCES.items():
-            actual = counts.get(relpath, 0)
-            self.assertEqual(
-                actual,
-                expected,
-                f"{relpath}: adapter_status 命中行数 {actual} ≠ 基线 {expected}——"
-                "白名单文件内新增/删除消费需 owner 批准并更新本基线（O4 步骤 4 禁令）",
-            )
+                if hits:
+                    hits_by_file[relpath] = hits
+        self.assertEqual(
+            len(hits_by_file.get(_KEY_BAN_TEST_PATH, [])),
+            _KEY_BAN_TEST_BASELINE,
+            f"{_KEY_BAN_TEST_PATH}: adapter_status 命中行数偏离基线 "
+            f"{_KEY_BAN_TEST_BASELINE}——键级禁令自检内新增/删除引用需 owner 批准的变更说明",
+        )
+        offenders = {
+            relpath: hits
+            for relpath, hits in hits_by_file.items()
+            if relpath not in _ENFORCEMENT_FILES
+        }
         self.assertFalse(
             offenders,
-            "发现白名单外的 adapter_status 程序化消费（O4 步骤 4 禁止新增依赖；"
-            "业务支持度一律读各 skill 私有 references/adapter-capabilities.yaml）:\n"
+            "adapter_status 已退役（D2，2026-10-04），全仓 .py/.sh 源码零消费；"
+            "业务支持度一律读各 skill 私有 references/adapter-capabilities.yaml:\n"
             + "\n".join(
                 f"{relpath}: {lines}" for relpath, lines in sorted(offenders.items())
             ),

@@ -35,27 +35,32 @@ relative parent (for example `apps/backend/<scope>`). This is a discovery summar
 authoritative multi-scope audit with `inaccessible` handling stays with openspec-practice's
 `scan_openspec.py`.
 
-The resolver does not read or merge `product-registry.yaml`. During migration that file is
-adapter metadata only; conflicts with `company.yaml` must be reported by the consuming skill
-rather than resolved silently.
+The resolver never read or merged the retired `product-registry.yaml`; that file was deleted
+by owner decision D1 (2026-10-04, skill-repo
+`references/adapter-capability-owner-decision-d1-registry-retire-2026-10-04.md`). Product and
+path facts come exclusively from `company.yaml` + this resolver.
 
-`ProductContext.adapter_status` is a migration-period compatibility field only (owner decision
-O4, `references/adapter-capability-owner-decision-2026-10-04.md`): the resolver passes
-`company.yaml products[].adapter_status` through verbatim and falls back to `unsupported` when
-the key is absent — `company.yaml` does not define that key, so every product currently
-resolves to `unsupported`, which is not an adapter-capability statement. The authority for
+`ProductContext.adapter_status` is **retired** (owner decision D2 / O4 step 5, 2026-10-04,
+`references/adapter-capability-owner-decision-d2-adapter-status-retire-2026-10-04.md`).
+Historical context (owner decision O4,
+`references/adapter-capability-owner-decision-2026-10-04.md`): during the migration period the
+resolver passed `company.yaml products[].adapter_status` through verbatim and fell back to
+`unsupported` when the key was absent — `company.yaml` never defined that key, so every product
+resolved to `unsupported`, which carried no adapter-capability information. D2 removed the
+field and the fallback entirely: the dataclass has no `adapter_status` field and `as_dict()`
+never emits the key, even when `company.yaml` carries a stray value. The authority for
 per-skill adapter capability is each consuming skill's private
 `references/adapter-capabilities.yaml` (owner decisions O1/O2, Plan B). The resolver never
 reads capability files, and capability status never overrides product authority status.
-New business logic must not read or branch on `adapter_status`; the O4 step-4 prohibition is
-enforced mechanically by `tests/test_adapter_status_migration_gate.py`, which also pins the
+The prohibition on reintroducing `adapter_status` consumers is enforced mechanically by
+`tests/test_adapter_status_migration_gate.py`, which asserts the field's absence, pins the
 authority freeze lines (lnkcrm code `complete` — company.yaml `code_root=/opt/code/lnkcrm`,
 reconciled by the ratified O5-lnkcrm-code decision record
 `references/adapter-capability-owner-decision-lnkcrm-freeze-reconcile-2026-10-04.md`;
 lnkgateway ontology `unresolved` with `ontology_entry=null`, lnkwebsite `prd-only` /
-ontology `not-applicable`) and fails on any new programmatic `adapter_status` consumer
-outside the audited allowlist. Removing the field requires an independent owner approval
-(O4 step 5) plus a same-change update to that gate test.
+ontology `not-applicable`) and fails on any programmatic `adapter_status` occurrence in
+`.py`/`.sh` sources outside the enforcement tests themselves. Restoring the field requires
+an independent owner approval plus a same-change update to that gate test.
 
 When a skill uses its own uv environment, add the repository root to the process import path
 explicitly at its integration boundary, or invoke a small wrapper/CLI that serializes

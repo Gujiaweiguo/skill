@@ -45,8 +45,8 @@ def test_product_baseline_schema_supports_domain_and_platform_models() -> None:
 
 def test_resolver_paths_cover_registered_products() -> None:
     """B1 迁移（2026-10-04）：code_root / docs_root 断言来源自 product-registry.yaml
-    改为 company.yaml + shared.product_context resolver（resolver-first 唯一权威源；
-    registry 同名字段为冻结同步镜像，迁移审计 §4-B1）。
+    （已退役，D1 2026-10-04 删除）改为 company.yaml + shared.product_context resolver
+    （resolver-first 唯一权威源；registry 同名字段为历史冻结镜像，迁移审计 §4-B1）。
     """
     company = _paths.resolve_company(company_id="lanlnk")
     product_ids = {str(item["id"]) for item in company.products}

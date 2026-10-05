@@ -22,8 +22,8 @@ compatibility: >
    能力对齐参考目标产品的三层基线（本体层 ontology/aliases）；产品路径事实（产品 ID 归一、
    ontology/PRD/code 三层 authority、code_root 状态）来自公共 shared.product_context resolver
    （company.yaml 为唯一产品台账，2026-10 迁移），不得在非 CRE 产品上静默回退到商管 ontology。
-   product-prd-generator 的 references/product-registry.yaml 仅是迁移期 adapter 元数据
-   （其 adapter_status 描述该 skill 的 adapter 支持度），不是公司/产品事实台账，不得据此
+   product-prd-generator 的 references/product-registry.yaml 已退役（D1，2026-10-04
+   删除）；产品与路径事实 = company.yaml + shared.product_context resolver，不得据此
    解析路径或判定 authority 状态。
    商管域知识仅在目标产品为 LnkCRE/MI-CRE 时经 lnkcre ontology 入口解析（resolver 的
    ontology authority；mi-cre 目录已于 2026-09 合并删除）。

@@ -94,7 +94,7 @@ docs 侧必须记录：
 
 - 目标治理顺序：未来增量先做 ontology impact check（记录变更或有依据的无变更），再形成 PRD delta，最后交目标代码仓实施。已存在的代码领先场景可反向形成带 revision/coverage 的实现事实与 reconciliation/candidate，但不得将实现现状自动升级为产品意图。
 - OPC 为产品及 ontology 决策审核 owner。OPC 批准语义候选后才可晋升 ontology/PRD canonical；代码实现事实仍须记录目标仓、revision、扫描范围与验证证据，OPC 决策本身不构成技术验证。
-- origin flow 是单次 change/return 的字段，不是产品属性。产品完整状态、ontology/PRD 内容覆盖成熟度、adapter_status 分开记录。
+- origin flow 是单次 change/return 的字段，不是产品属性。产品完整状态、ontology/PRD 内容覆盖成熟度、adapter 支持度（capability 文件口径）分开记录。
 - 回写证据是 proposal：`proposed_updates[].status` 起始为 `proposed`；canonical 更新（PRD 资料库文件、ontology 基线）须经 destination owner 审核接受后执行。`review_status: accepted` 必须有 `verification_refs` 和 `review_owner`；证据不齐时保留 `incomplete`，不凑数接受。
 - ontology draft/delta 保持 review-gated：涉及 ontology 变更只产出 `ontology-change-set` 提案（draft / under-review），canonical 晋升前必须获得 approval；回写流程不得直接改写 ontology 权威文件。
 - 未实施、暂缓、排除项必须保留底稿原文带回并按原文登记，不得改写成已实施；项目仓不转述改写，docs 侧不替项目仓补口径。

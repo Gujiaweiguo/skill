@@ -37,15 +37,15 @@ LnkCRE / lnkcre。
 Canonical layout note (2026-09-26 方案 B 家族迁移): lnkreport / lnkchatbi /
 lnkvision 的 canonical PRD 家族与本体已迁入 30-products/<pid>/{prd,ontology}/，
 out/prd/ 降为纯生成区（skill 生成产物仍落 out/，经 owner 审后晋升并入
-canonical，双源不并存）。canonical 布局与路径事实以 company.yaml / resolver
+ canonical，双源不并存）。canonical 布局与路径事实以 company.yaml / resolver
 （本模块 resolve_product_paths，resolver-first）为准；references/product-registry.yaml
-为迁移期兼容元数据/历史镜像，不构成路径解析权威源或双源同步义务。
+已退役（D1，2026-10-04 删除；产品与路径事实 = company.yaml + resolver）。
 本模块的代码默认输出仍是生成区 out/prd/<project>/output/，不改行为。
 _PRODUCT_CANONICAL_DIR 已登记上述三个产品（2026-09-26 修复，回归闸在
 tests/test_paths.py）——该映射是代码侧目录别名/映射实现细节，非产品台账
 来源（产品台账 = company.yaml products）。lnkvision 无 ontology.yaml——
-canonical 本体为 ontology/域知识.md，路径事实以 company.yaml / resolver 为准
-（product-registry.yaml 仅存迁移期兼容快照）。未注册产品的 tier-4
+ canonical 本体为 ontology/域知识.md，路径事实以 company.yaml / resolver 为准
+ （product-registry.yaml 已退役，D1 2026-10-04）。未注册产品的 tier-4
 商管兜底带跨域污染闸门（_guard_unregistered_fallback）：非 lanlnk 公司
 直接报错引导注册，lanlnk 公司警告后兜底。
 """
@@ -161,9 +161,10 @@ def product_dir_aliases(project: str) -> tuple[str, ...]:
 def _legacy_fallback_enabled() -> bool:
     """迁移期兼容开关。docs 仓 mi-cre → lnkcre 合并已于 2026-09 完成（三层整理，
     历史证据：docs 仓 30-products/product-registry-feedback.yaml——回填反馈文件，
-    非 skill 侧 references/product-registry.yaml）。当前产品与路径事实来源 =
-    company.yaml / resolver（本模块 resolve_product_paths，resolver-first）；skill 侧
-    product-registry.yaml 仅为迁移期兼容元数据/历史镜像。fallback 关闭。"""
+    与 skill 侧已退役的 product-registry.yaml 是两个文件；后者已于 D1 2026-10-04
+    删除）。当前产品与路径事实来源 =
+    company.yaml / resolver（本模块 resolve_product_paths，resolver-first）。
+    fallback 关闭。"""
     return False
 
 
@@ -324,7 +325,7 @@ _PRODUCT_CANONICAL_DIR: dict[str, str] = {
     # lnkreport / lnkchatbi / lnkvision 的 canonical ontology 双件已在
     # 30-products/<pid>/ontology/。lnkvision 无 ontology.yaml/term-aliases.yaml
     # （canonical 本体为 ontology/域知识.md，路径事实以 company.yaml / resolver
-    # 为准，product-registry.yaml 仅存迁移期兼容快照；
+    # 为准；product-registry.yaml 已退役，D1 2026-10-04；
     # 本映射仅供 tier-1 探测，不会误命中其他产品）。
     "lnkreport": "lnkreport",
     "lnkchatbi": "lnkchatbi",

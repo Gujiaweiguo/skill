@@ -42,7 +42,6 @@ class ProductContext:
     id: str
     name: str
     product_status: str
-    adapter_status: str
     layers: dict[str, Path | None]
     authority: dict[str, Authority]
     resolution_status: dict[str, str]
@@ -66,7 +65,6 @@ class ProductContext:
                 "id": self.id,
                 "name": self.name,
                 "product_status": self.product_status,
-                "adapter_status": self.adapter_status,
             },
             "layers": {
                 key: str(value) if value else None for key, value in self.layers.items()

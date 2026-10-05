@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "product-semantic-baseline.schema.json",
   "title": "Product Baseline (three layers: ontology / prd / codebase)",
-  "description": "User-facing layering is always ontology/prd/code. model_kind is an optional internal hint; legacy values remain accepted for backward compatibility. Migration-period note (2026-10-04): adapter_status here is the frozen registry compatibility vocabulary (it cannot express blocked / not-applicable); the per-consumer adapter capability authority is each consuming skill's references/adapter-capabilities.yaml. Registry consumers and deletion blockers are audited in skill-repo references/product-registry-迁移审计-2026-10-04.md.",
+  "description": "User-facing layering is always ontology/prd/code. model_kind is an optional internal hint; legacy values remain accepted for backward compatibility. Migration-period note (2026-10-04, closed by D1/D2): adapter_status here follows the frozen registry compatibility vocabulary (the retired product-registry.yaml was deleted by owner decision D1, 2026-10-04); the per-consumer adapter capability authority is each consuming skill's references/adapter-capabilities.yaml. Registry consumers and retirement closure are audited in skill-repo references/product-registry-迁移审计-2026-10-04.md.",
   "type": "object",
   "required": ["project", "docs_root", "code_root", "adapter_status"],
   "properties": {

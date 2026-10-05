@@ -82,12 +82,10 @@ uv run python scripts/resolve_context.py <产品 ID> [--company-base $COMPANY_BA
   canonical 候选 `30-products/lnkcre/prd/baseline/feature-baseline.yaml`，绝不跨产品回退）。
 - 产品未注册 / 匹配不唯一 → 明确失败，不回退 lnkcre 或其他产品。
 - 多公司上下文无法唯一判定 → 按 COMPANIES.md §4 询问，绝不静默默认 lanlnk。
-- resolver 输出的 `adapter_status` 是 adapter capability 元数据，不是 PRD/ontology/code
-  authority 状态，不得据此判定清单可用性；adapter 支持度的权威来源是本 skill 的
-  `references/adapter-capabilities.yaml`，capability 状态不得覆盖 product authority
-  （产品台账以 company.yaml products 为准）；`product-registry.yaml` 的 `adapter_status`
-  仅为迁移期冻结兼容元数据，registry 不再是 adapter 支持度的权威来源；
-  `product-registry.yaml` 保留，删除仍需独立 owner 批准。
+- resolver 不再输出 `adapter_status`（字段已退役，D2 2026-10-04 删除）；adapter 支持度
+  的权威来源是本 skill 的 `references/adapter-capabilities.yaml`，capability 状态不得
+  覆盖 product authority（产品台账以 company.yaml products 为准）；`product-registry.yaml`
+  已退役（D1，2026-10-04 删除），产品与路径事实 = company.yaml + resolver。
 
 **canonical-first 解析顺序**（2026-09-26 方案 B 家族迁移后）：优先 `$COMPANY_BASE/30-products/<产品>/prd/功能清单.md`，回退 `$COMPANY_BASE/out/prd/<项目>/output/功能清单.md`（生成区，历史目录名）。
 

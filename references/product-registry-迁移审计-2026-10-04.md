@@ -390,6 +390,17 @@ registry `adapter_status` 仅作历史兼容快照（其 lnkgateway / lnkwebsite
 > `references/adapter-capability-owner-decision-residual-cleanup-r4-2026-10-04.md`。
 > 本回写不改变 registry 数据区、authority 或产品事实。
 
+> **收官注记（D1，2026-10-04）——B 系列审计闭卷**：owner（OPC）批准独立删除动作
+> （决策记录 `references/adapter-capability-owner-decision-d1-registry-retire-2026-10-04.md`，
+> status=approved，OWNER SIGN-OFF: RECORDED (OPC)），本审计对象
+> `skills/business/product-prd-generator/references/product-registry.yaml` 已物理退役
+> （git rm，2026-10-04）。B1-B7 删除阻塞项此前已全部解除并落库（b171b28），本轮起
+> B 系列审计闭卷；§1-§3 的消费方/字段/对齐矩阵自此为**历史快照**（对账退役前状态，
+> 不再更新）。产品与路径事实 = company.yaml + shared.product_context resolver；
+> adapter capability 权威源 = 各消费 skill 的 references/adapter-capabilities.yaml。
+> 执行记录见 `references/adapter-capability-owner-decision-d1-execution-2026-10-04.md`。
+> adapter_status 字段退役为 D2 独立动作（另见 D2 决策/执行记录），不在本注记范围内。
+
 ## 5. 本轮已落的迁移兼容说明（approved_changes 3）
 
 | 文件 | 更新内容 |

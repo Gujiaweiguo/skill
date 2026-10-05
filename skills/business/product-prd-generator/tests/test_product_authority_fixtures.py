@@ -101,7 +101,8 @@ def _layer_fixtures() -> dict[str, dict[str, dict[str, JsonValue]]]:
 
     Profile 对账面 = baseline 契约（product-semantic-baseline.md §1 规则 2 的
     可执行形态见 tests.test_product_governance_contracts.SOFTWARE_PRODUCT_PROFILES）；
-    product-registry.yaml 同名字段为冻结迁移快照（B1 迁移 2026-10-04）。
+    product-registry.yaml 同名字段为历史冻结快照（B1 迁移 2026-10-04；该文件已随
+    D1 2026-10-04 退役删除）。
     """
     business, tool = "business-ontology", "tool-ontology"
     return {
@@ -171,7 +172,8 @@ def test_all_seven_products_declare_three_layers_with_valid_contracts() -> None:
 
 
 def test_fixture_profiles_match_baseline_contract_and_business_tool_split() -> None:
-    """B1 迁移（2026-10-04）：镜像对账面自 product-registry.yaml 改为 baseline 契约。
+    """B1 迁移（2026-10-04）：镜像对账面自 product-registry.yaml（已退役，D1
+    2026-10-04 删除）改为 baseline 契约。
 
     product_class / ontology_profile 的语义权威源 = product-semantic-baseline.md
     §1 规则 2（业务系统 lnkcre/lnkcrm ↔ business-ontology；平台/AI 产品 ↔

@@ -431,7 +431,6 @@ def resolve_product(product_id: str, company_context: CompanyContext) -> Product
         code_status = "complete"
         code_path = code_root
     product_status = "prd-only" if "prd-only" in (index_text or "").lower() or "prd-only" in (ontology_text or "").lower() else str(item.get("product_status") or ("complete" if item.get("prd_ready") else "partial"))
-    adapter_status = str(item.get("adapter_status") or "unsupported")
     code_revision = _git_revision(code_path) if code_path else None
     authorities = {
         "ontology": _authority(ontology_status, ontology_entry, [str(ontology_readme), str(index)]),
@@ -453,7 +452,6 @@ def resolve_product(product_id: str, company_context: CompanyContext) -> Product
         pid,
         str(item.get("name", pid)),
         product_status,
-        adapter_status,
         {
             "docs_root": root if root.exists() else None,
             "index_path": index if index.exists() else None,
