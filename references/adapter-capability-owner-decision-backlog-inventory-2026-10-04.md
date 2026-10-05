@@ -460,3 +460,19 @@ D2_adapter_status_deletion:   # pending | approved | rejected   # 文档表述�
   提供前另开授权填数并升级 implemented）；「面客」定判同时构成 O10-vision 叙事面的定位
   依据，但 O10-vision 启动仍为独立签署项。
 - **其余维持冻结**：O10-* / O11、删除动作、lnkreport / lnkvision 定价（挂起）。
+
+## 16. 状态更新（2026-10-05 O11 执行后追加）
+
+- **O11：frozen → decided-③ / Batch-1 landed（2026-10-05）**。owner 决策 no-standalone-ontology
+  （`references/adapter-capability-owner-decision-o11-2026-10-04.md`，OWNER SIGN-OFF: RECORDED (OPC)）：
+  lnkgateway 定位集成层能力/平台基础设施，不建独立 ontology；prd-gen/competitor 两格 capability
+  blocked→not-applicable（evidence/notes 同批更新；shared 钉线 EXPECTED_MATRIX 两格 +
+  EXPECTED_DISTRIBUTION（blocked 3→1 / not-applicable 8→10）同批）；resolver/门禁/registry/
+  company.yaml 零触碰；requirement-evaluator×lnkgateway 维持 blocked（阻塞根因=产品层 PRD
+  unresolved，O11 不处置 PRD 层）。机制取证结论：resolver 的 ontology not-applicable 文本触发词
+  = **prd-only 子串**（INDEX.md 或 ontology/README.md 任一全文命中、最高优先级），「不建」类措辞
+  不进入解析面（探针实证 V1/V1b 不翻、V2 prd-only / V3 本目录 两负对照翻转）；docs 措辞提案已备
+  （待 orchestrator 会话在 docs 仓落盘，见执行记录 §3.3）。执行记录见
+  `references/adapter-capability-owner-decision-o11-execution-2026-10-04.md`。
+  §3.10 行「当前状态 frozen」为落盘时快照，以本注记为准。
+- **其余维持冻结**：O10-*、删除动作、lnkreport / lnkvision 定价（挂起）。

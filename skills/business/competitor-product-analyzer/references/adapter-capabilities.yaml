@@ -67,12 +67,14 @@ capabilities:
     notes: "域知识非机器本体，术语归一走域知识入口；无对照先例。"
   - consumer_id: competitor-product-analyzer
     product_id: lnkgateway
-    status: blocked
+    status: not-applicable
     evidence:
-      - "SKILL.md S1.2/S1.3 降级契约（unresolved 时显式标注，不回落商管）（设计包 §3.3.D）"
+      - "O11 decided-③（2026-10-04）：lnkgateway 定位集成层能力/平台基础设施，不建独立 ontology，无竞品本体对照目标；blocked 经 not-applicable 替代路径解除；引 references/adapter-capability-owner-decision-o11-2026-10-04.md"
+      - "O9 同口径（2026-10-04 暂不独立面客，可复议）：references/adapter-capability-owner-decision-o9-2026-10-04.md"
+      - "SKILL.md S1.2/S1.3 降级契约保留为防御性约束（unresolved 时显式标注，不回落商管）（设计包 §3.3.D）"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "被 authority 阻塞：ontology unresolved → 术语归一不可进行（owner-confirmed 不从网关代码反推本体）；解除=O11（pending）。"
+    notes: "★ 改判 blocked→not-applicable（O11-③ 定判 2026-10-04，与 O9 暂不独立面客同口径）：不建独立 ontology → 术语归一无对照目标（owner-confirmed 不从网关代码反推本体维持）；非 ontology authority 翻转，docs 侧登记维持 unresolved 冻结；resolver/门禁零改动；若 owner 改裁 ①/② 建路线，须重评另落记录。"
   - consumer_id: competitor-product-analyzer
     product_id: lnkwebsite
     status: not-applicable

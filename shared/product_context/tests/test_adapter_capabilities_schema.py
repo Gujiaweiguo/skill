@@ -99,6 +99,11 @@ AUDIT_DATE = "2026-10-04"
 # （owner decision references/adapter-capability-owner-decision-o7-vision-2026-10-04.md，
 # customer-facing：lnkvision 为独立面客产品，报价基线结构落地（LNKVISION_DATA
 # 四段八列、金额留空待定价）；evidence 同批更新；pricing 本地八产品全景钉同批）。
+# 修订（O11，2026-10-04）：product-prd-generator×lnkgateway、competitor-product-analyzer×
+# lnkgateway blocked→not-applicable（owner decision
+# references/adapter-capability-owner-decision-o11-2026-10-04.md，decided-③ 集成层
+# 能力不建独立 ontology，blocked 经 not-applicable 替代路径解除；requirement-evaluator×
+# lnkgateway 维持 blocked——产品层 PRD unresolved 未处置；evidence 同批更新）。
 EXPECTED_MATRIX: dict[str, dict[str, str]] = {
     "product-prd-generator": {
         "lnkcre": "implemented",
@@ -107,7 +112,7 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
         "lnkchatbi": "partial",
         "lnkreport": "partial",
         "lnkvision": "unsupported",
-        "lnkgateway": "blocked",
+        "lnkgateway": "not-applicable",
         "lnkwebsite": "not-applicable",
     },
     "requirement-evaluator": {
@@ -137,7 +142,7 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
         "lnkchatbi": "onboarding",
         "lnkreport": "onboarding",
         "lnkvision": "onboarding",
-        "lnkgateway": "blocked",
+        "lnkgateway": "not-applicable",
         "lnkwebsite": "not-applicable",
     },
     "company-intro-generator": {
@@ -167,8 +172,8 @@ EXPECTED_DISTRIBUTION = {
     "partial": 13,
     "onboarding": 7,
     "unsupported": 3,
-    "not-applicable": 8,
-    "blocked": 3,
+    "not-applicable": 10,
+    "blocked": 1,
 }
 
 _HEX_REVISION_RE = re.compile(r"\b[0-9a-f]{7,40}\b")

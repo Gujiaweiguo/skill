@@ -75,13 +75,14 @@ capabilities:
     notes: "缺 yaml 机器本体（capability schema 链路）；升 partial 需一次验证 run + registry 登记，属 skill 自治，不依赖 owner 决策。"
   - consumer_id: product-prd-generator
     product_id: lnkgateway
-    status: blocked
+    status: not-applicable
     evidence:
-      - "references/product-registry-迁移审计-2026-10-04.md §3（lnkgateway：ontology+prd unresolved owner-confirmed、O11 pending 阻塞；registry 枚举不可表达 blocked，以本文件为权威）"
-      - "product_prd_generator/_paths.py 显式拒绝回落（设计包 §3.3.A）"
+      - "O11 decided-③（2026-10-04）：lnkgateway 定位集成层能力/平台基础设施，不建独立 ontology，无 PRD 生成场景；blocked 经 not-applicable 替代路径解除；引 references/adapter-capability-owner-decision-o11-2026-10-04.md"
+      - "O9 同口径（2026-10-04 暂不独立面客，可复议）：references/adapter-capability-owner-decision-o9-2026-10-04.md"
+      - "product_prd_generator/_paths.py 显式拒绝回落保持不变（设计包 §3.3.A）"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "被 authority 阻塞：ontology+prd unresolved（O11 pending）；解除阻塞=产品层 owner 决策，非 skill 侧。"
+    notes: "★ 改判 blocked→not-applicable（O11-③ 定判 2026-10-04）：替代路径=本 not-applicable 登记（非 ontology authority 翻转，docs 侧 ontology 登记维持 unresolved 冻结）；PRD 层不处置（仍 unresolved）；resolver/门禁零改动；若 owner 改裁 ① 独立产品 / ② 平台基础能力 ontology，须按建路线重评另落记录。"
   - consumer_id: product-prd-generator
     product_id: lnkwebsite
     status: not-applicable
