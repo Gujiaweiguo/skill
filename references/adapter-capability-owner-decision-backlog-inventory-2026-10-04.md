@@ -401,3 +401,17 @@ D2_adapter_status_deletion:   # pending | approved | rejected   # 文档表述�
   §3.6 行「当前状态 frozen」与「O8（pending）批准后可 partial→implemented」为落盘时
   快照，以本注记为准。
 - **其余维持冻结**：O6/O7-*/O9/O10-*/O11、删除动作、lnkreport 定价（挂起）。
+
+## 12. 状态更新（2026-10-04 O6 执行后追加）
+
+- **O6：frozen → decided-A / evidence-registered（historical evidence 已登记）**。owner
+  决策 register-as-historical-evidence 方案 A
+  （`references/adapter-capability-owner-decision-o6-2026-10-04.md`，OWNER SIGN-OFF:
+  RECORDED (OPC)）：不追认 lnkcrm 正式报价基线——generate_quote.py CRM_DATA（:280 附近）
+  归属注释登记（正祥单一客户历史成交证据，仅注释，数据结构/数值/env 逻辑/生成行为零改动）；
+  pricing capability lnkcrm 条目 evidence/notes 更新（历史无主使用 → 已登记归属），
+  status 保持 partial（正式基线未建，partial 语义准确）；B 路线六要素留档另案（决策记录
+  route_B_prerequisites）。执行记录见
+  `references/adapter-capability-owner-decision-o6-execution-2026-10-04.md`。
+  §3.2 行「当前状态 frozen」为落盘时快照，以本注记为准。
+- **其余维持冻结**：O7-*/O9/O10-*/O11、删除动作、lnkreport 定价（挂起）。

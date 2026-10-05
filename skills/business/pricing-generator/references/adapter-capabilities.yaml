@@ -31,9 +31,10 @@ capabilities:
     evidence:
       - "generate_quote.py CRM_DATA（正祥交付物受管副本 materials/03-products/CRM功能清单.xlsx）"
       - "设计包 §3.3.C：历史 CRM 报价可出"
+      - "O6 裁决 register-as-historical-evidence（references/adapter-capability-owner-decision-o6-2026-10-04.md，2026-10-04 decided-A / evidence-registered）：CRM_DATA 已登记归属为正祥单一客户历史成交证据（customer-specific / historical pricing evidence），generate_quote.py CRM_DATA 定义处归属注释同批落地"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "历史「CRM 会员营销系统」定价与 lnkcrm 产品实体的对应关系未登记（O6 pending：是否追认为 lnkcrm 报价基线）；lnkcrm 功能清单未接入报价链。不得从 lnkcre 复制价格顶替。"
+    notes: "O6 已裁决（2026-10-04 decided-A / evidence-registered）：CRM_DATA 归属已登记为正祥单一客户历史成交证据（customer-specific / historical），可作参考 / 客户特定报价生成依据，不是 lnkcrm 标准价；正式报价基线未建，未来若建走 B 路线六要素另案；lnkcrm 功能清单未接入报价链。不得从 lnkcre 复制价格顶替。"
   - consumer_id: pricing-generator
     product_id: lnkchat
     status: unsupported

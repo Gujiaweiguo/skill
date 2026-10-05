@@ -277,6 +277,15 @@ MI_DATA: dict[str, Any] = {
 }
 
 
+# === CRM 会员营销系统数据归属登记（O6，2026-10-04）===
+# 依据（owner 决策，decision: register-as-historical-evidence，方案 A）：
+# - references/adapter-capability-owner-decision-o6-2026-10-04.md
+# 归属：CRM_DATA = 正祥单一客户历史成交证据（customer-specific / historical pricing
+# evidence）——materials/03-products/CRM功能清单.xlsx（正祥交付物受管副本，相对路径按
+# 公司基座解析）的结构化数据；可作参考 / 客户特定报价生成依据。
+# 边界：不是 lnkcrm 标准价——lnkcrm 正式报价基线未建，未来若建走 B 路线六要素另案
+# （适用产品 / 适用版本 / 价格有效期 / 标准与定制边界 / owner / 对外性）；
+# 不得从 lnkcre 复制价格顶替。本登记仅注释，数据结构 / 数值 / env 逻辑 / 生成行为零改动。
 CRM_DATA: dict[str, Any] = {
     "product_name": "CRM 会员营销系统",
     "product_label": "CRM",
