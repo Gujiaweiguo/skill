@@ -476,3 +476,48 @@ D2_adapter_status_deletion:   # pending | approved | rejected   # 文档表述�
   `references/adapter-capability-owner-decision-o11-execution-2026-10-04.md`。
   §3.10 行「当前状态 frozen」为落盘时快照，以本注记为准。
 - **其余维持冻结**：O10-*、删除动作、lnkreport / lnkvision 定价（挂起）。
+
+## 17. 状态更新（2026-10-05 O10 Stage-1 执行后追加）
+
+- **O10（report + vision）：frozen → Stage-1 drafting（2026-10-05）**。owner 决策
+  start-with-draft-review（`references/adapter-capability-owner-decision-o10-2026-10-04.md`，
+  OWNER SIGN-OFF: RECORDED (OPC)）：两份叙事草稿由 skill 基于 canonical PRD 证据起草并落
+  skill 仓——`references/o10-narrative-draft-lnkreport-2026-10-04.md`（卖点 8 条逐条挂
+  30-products/lnkreport/prd/ 出处；待批 8 项）与
+  `references/o10-narrative-draft-lnkvision-2026-10-04.md`（含「定位假设（待 OPC 批注）」
+  专节 H1-H4：目标客户/交付形态/与 lnkreport 边界/与 MI 封闭边界；卖点 8 条；待批 11 项）；
+  无出处且未标「推断，待批」的表述 = 0。capability company-intro×lnkreport、×lnkvision
+  unsupported→onboarding（evidence/notes 同批更新；shared 钉线 EXPECTED_MATRIX 两格 +
+  EXPECTED_DISTRIBUTION（unsupported 3→1 / onboarding 7→9）同批）。**Stage-2 待 OPC 批注后
+  另批执行**（docs materials 入库 → capability onboarding→implemented，以入库事实为 evidence）；
+  批注前两格保持 onboarding、不得写 docs materials。执行记录见
+  `references/adapter-capability-owner-decision-o10-execution-2026-10-04.md`。
+  §3.8/§3.9 行「当前状态 frozen」为落盘时快照，以本注记为准。
+- **删除动作（D1/D2）**：已于 2026-10-05 执行完毕并随 BATCH-8 提交（043b306）落地，见各自
+  执行记录；§16 末行「删除动作维持冻结」为落盘时快照，以本注记为准。
+- **其余维持冻结**：lnkreport / lnkvision 定价（挂起，待 OPC 提供数值）。
+
+## 18. 状态更新（2026-10-05 O10 Stage-2 收口 + PRICING-FINAL 终裁后追加）
+
+- **O10（report + vision）：Stage-1 drafting → Stage-2 收口（2026-10-05）**。OPC 批注 19 项决议
+  全生效（客户名不披露、私有化一词禁用、分级术语不面客、目标客户不扩展），叙事资产入
+  docs materials/03-products/（LnkReport统一报表与文档输出平台.md、LnkVision AI视觉巡检告警平台.md，
+  material-importer 校验通过，docs 仓 e15274e）；capability company-intro×lnkreport、×lnkvision
+  onboarding→implemented（以入库事实为 evidence；shared 钉线 EXPECTED_MATRIX 两格 +
+  EXPECTED_DISTRIBUTION（implemented 14→16 / onboarding −2）同批）。§17「Stage-2 待 OPC 批注后
+  另批执行」为落盘时快照，以本注记为准；执行记录见
+  references/adapter-capability-owner-decision-o10-execution-2026-10-04.md §8。
+- **lnkreport / lnkvision 定价（挂起）→ decided-not-sold-independently（关闭，2026-10-05）**。
+  owner 终裁 PRICING-FINAL（references/adapter-capability-owner-decision-pricing-final-2026-10-05.md，
+  status=decided，OWNER SIGN-OFF: RECORDED (OPC)）：两产品不单独售卖、不设独立标准价，
+  对外输出仅随组合/打包方案出现（金额由商务在主产品报价内处理；组合内独立行项定价如需
+  env 人工输入机制另行授权，沿 LnkChatBI 先例）。capability pricing×lnkreport、×lnkvision
+  onboarding→not-applicable（沿 O7-chat「打包售卖不单列 → not-applicable」权威先例；shared 钉线
+  EXPECTED_MATRIX 两格 + EXPECTED_DISTRIBUTION（onboarding −2 / not-applicable +2）同批）；
+  LNKREPORT_DATA / LNKVISION_DATA 结构保留、无价拒单行为即策略执行（单卖与组合均写盘前拒绝，
+  5 场景复测见执行记录 §4）；generate_quote.py 与两测试文件「待定价」措辞注释性更新
+  （行为零改动，build_* 函数体零 hunk）。O7-report / O7-vision 决策记录 deferred「定价数值」项
+  由本终裁终结。执行记录见
+  references/adapter-capability-owner-decision-pricing-final-execution-2026-10-05.md。
+  §3.4 行「当前状态 phase3-landed（金额待定价）」、§3.5 行定价挂起表述为落盘时快照，以本注记为准。
+- **其余维持冻结：无**——治理主线全部事项已收口；唯一剩余动作 = 终推（OPC 批准后执行 git push）。

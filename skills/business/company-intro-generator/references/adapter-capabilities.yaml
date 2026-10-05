@@ -50,20 +50,24 @@ capabilities:
     notes: "叙事资产在位；产品特定架构包无。"
   - consumer_id: company-intro-generator
     product_id: lnkreport
-    status: unsupported
+    status: implemented
     evidence:
-      - "设计包 §3.3.E：materials/03-products/ grep 无 lnkreport 专属叙事命中（missing-narrative）"
+      - "O10 启动（owner decision references/adapter-capability-owner-decision-o10-2026-10-04.md，start-with-draft-review）"
+      - "叙事草稿 references/o10-narrative-draft-lnkreport-2026-10-04.md（skill 仓生成区，卖点逐条挂 canonical PRD 出处）"
+      - "O10 Stage-2 叙事资产入库 materials/03-products/LnkReport统一报表与文档输出平台.md（2026-10-05，OPC 19 项批注决议全生效：客户名不披露、私有化一词禁用、分级术语不面客、目标客户不扩展；material-importer 校验通过）——两阶段制完成，capability 以入库事实升 implemented"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "缺产品叙事资产；O10-report（pending）可启动建设，未批准前不得用其他产品叙事顶替。"
+    notes: "O10 两阶段收口（2026-10-05）：Stage-1 草稿经 OPC 19 项批注定稿，Stage-2 已入 docs materials；不得用其他产品叙事顶替。"
   - consumer_id: company-intro-generator
     product_id: lnkvision
-    status: unsupported
+    status: implemented
     evidence:
-      - "设计包 §3.3.E：materials grep 无 MallSenseAI/LnkVision 命中（更名前后均无，missing-narrative）"
+      - "O10 启动（owner decision references/adapter-capability-owner-decision-o10-2026-10-04.md，start-with-draft-review）"
+      - "叙事草稿 references/o10-narrative-draft-lnkvision-2026-10-04.md（skill 仓生成区，含定位假设专节，经 OPC 批注定稿）"
+      - "O10 Stage-2 叙事资产入库 materials/03-products/LnkVision AI视觉巡检告警平台.md（2026-10-05，OPC 19 项批注决议全生效：客户名不披露、私有化一词禁用、分级术语不面客、目标客户不扩展；material-importer 校验通过）——两阶段制完成，capability 以入库事实升 implemented"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "缺叙事资产；O10-vision（pending）先确认定位、目标客户与 lnkreport 边界。"
+    notes: "O10 两阶段收口（2026-10-05）：Stage-1 草稿（含定位假设专节 H1-H4）经 OPC 批注定稿，Stage-2 已入 docs materials；定位以批注后叙事资产为准。"
   - consumer_id: company-intro-generator
     product_id: lnkgateway
     status: not-applicable

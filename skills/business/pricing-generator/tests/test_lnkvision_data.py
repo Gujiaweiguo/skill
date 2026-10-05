@@ -1,4 +1,4 @@
-"""O7-vision 落地校验：LNKVISION_DATA 结构 + 金额留空 + capability onboarding。
+"""O7-vision 落地校验：LNKVISION_DATA 结构 + 金额留空 + capability not-applicable。
 
 依据：references/adapter-capability-owner-decision-o7-vision-2026-10-04.md
 （decision: customer-facing——独立面客产品；结构先行、金额留空、定价数值挂起，
@@ -7,6 +7,9 @@ references/adapter-capability-owner-decision-o7-vision-execution-2026-10-04.md
 §3（模块分组草案 + 功能清单行数审计：existing 18 = 5+5+5+2+1，全 31 行闭合）。
 金额纪律：不填任何单价/金额/人天数；例外仅已核定结构性 0（3.1 新增项目、
 4.1 首年赠送）与费率引用（二开 DEVKIT_RATE 元/人天、含税 6%）。
+PRICING-FINAL（2026-10-05 decided / not-sold-independently，
+references/adapter-capability-owner-decision-pricing-final-2026-10-05.md）：不单独售卖、
+无独立标准价；结构保留，无价拒单行为即策略执行，capability onboarding→not-applicable。
 """
 
 from __future__ import annotations
@@ -74,7 +77,7 @@ def _gq():
 def test_lnkvision_segments_and_seq():
     data = _gq().LNKVISION_DATA
     assert data["product_label"] == "LnkVision"
-    assert "待定价" in data["pricing_status"]
+    assert "不单独售卖" in data["pricing_status"]
     assert [r[0] for r in data["core_modules"]] == [f"1.{i}" for i in range(1, 6)]
     assert [r[0] for r in data["integration_items"]] == ["2.1"]
     assert [r[0] for r in data["implementation_items"]] == [f"3.{i}" for i in range(1, 5)]
@@ -116,7 +119,7 @@ def test_lnkvision_summary_service_notes_saas_private():
     ]
     notes = "\n".join(data["service_notes"])
     assert "6%" in notes  # 税率引用（pricing-basis.yaml tax_rate_default）
-    assert "待定价" in notes
+    assert "不单独售卖" in notes
     # 产品边界诚实声明（explicitly-not-do 4 项）与隐私缺口披露
     assert "客流" in notes and "人脸识别" in notes
     assert "DPIA" in notes
@@ -129,7 +132,7 @@ def test_lnkvision_summary_service_notes_saas_private():
 
 
 def test_lnkvision_amounts_left_blank():
-    """金额一律留空/None（待定价）；"—"=结构性不适用；0 仅限已核定两处。"""
+    """金额一律留空/None（不单独售卖，无独立标准价）；"—"=结构性不适用；0 仅限已核定两处。"""
     data = _gq().LNKVISION_DATA
     for seg in AMOUNT_SEGS:
         for row in data[seg]:
@@ -143,14 +146,14 @@ def test_lnkvision_amounts_left_blank():
         assert row[1] is None and row[2] is None, row[0]
 
 
-def test_lnkvision_pricing_rows_marked_pending():
-    """每个定价行的备注携带「待定价」标记（费率通道 2.1 与含在 3.1 的行除外）。"""
+def test_lnkvision_pricing_rows_marked_not_sold():
+    """每个定价行的备注携带「不单独售卖（终裁 2026-10-05），无独立标准价」标记（费率通道 2.1 与含在 3.1 的行除外）。"""
     data = _gq().LNKVISION_DATA
     for seg in AMOUNT_SEGS:
         for row in data[seg]:
             if row[0] == "2.1":
                 continue
-            assert "待定价" in row[7] or "含在 3.1" in row[7], (seg, row[0])
+            assert "不单独售卖" in row[7] or "含在 3.1" in row[7], (seg, row[0])
 
 
 def test_lnkvision_no_cross_product_price_copy():
@@ -197,10 +200,10 @@ def _capabilities() -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
-def test_capability_lnkvision_onboarding():
+def test_capability_lnkvision_not_applicable():
     caps = _capabilities()
     entry = next(c for c in caps["capabilities"] if c["product_id"] == "lnkvision")
-    assert entry["status"] == "onboarding"
+    assert entry["status"] == "not-applicable"
     assert entry["verified_at"] == "2026-10-04"
     assert entry["owner"] == "opc"
     evidence = " ".join(entry["evidence"])
@@ -210,3 +213,8 @@ def test_capability_lnkvision_onboarding():
     )
     assert re.search(r"o7-vision-2026-10-04\.md:\d+", evidence)
     assert "customer-facing" in evidence
+    # PRICING-FINAL 终裁（2026-10-05）：不单独售卖 → not-applicable
+    assert (
+        "adapter-capability-owner-decision-pricing-final-2026-10-05.md" in evidence
+        and "not-sold-independently" in evidence
+    )

@@ -104,6 +104,17 @@ AUDIT_DATE = "2026-10-04"
 # references/adapter-capability-owner-decision-o11-2026-10-04.md，decided-③ 集成层
 # 能力不建独立 ontology，blocked 经 not-applicable 替代路径解除；requirement-evaluator×
 # lnkgateway 维持 blocked——产品层 PRD unresolved 未处置；evidence 同批更新）。
+# 修订（O10，2026-10-04 Stage-1 / 2026-10-05 Stage-2b 收口）：company-intro-generator×
+# lnkreport、×lnkvision unsupported→onboarding→implemented（owner decision
+# references/adapter-capability-owner-decision-o10-2026-10-04.md，start-with-draft-review：
+# Stage-1 叙事草稿落 skill 仓 references/o10-narrative-draft-*.md；Stage-2 docs materials
+# 入库（materials/03-products/LnkReport*、LnkVision*，OPC 19 项批注决议全生效，
+# material-importer 校验通过）后以入库事实升 implemented；evidence 同批更新）。
+# 修订（PRICING-FINAL，2026-10-05）：pricing-generator×lnkreport、×lnkvision
+# onboarding→not-applicable（owner decision
+# references/adapter-capability-owner-decision-pricing-final-2026-10-05.md，
+# not-sold-independently：两产品不单独售卖、无独立标准价，沿 O7-chat 权威先例；
+# DATA 结构保留、无价拒单行为即策略执行；evidence 同批更新；pricing 本地全景钉同批）。
 EXPECTED_MATRIX: dict[str, dict[str, str]] = {
     "product-prd-generator": {
         "lnkcre": "implemented",
@@ -130,8 +141,8 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
         "lnkcrm": "partial",
         "lnkchat": "not-applicable",
         "lnkchatbi": "implemented",
-        "lnkreport": "onboarding",
-        "lnkvision": "onboarding",
+        "lnkreport": "not-applicable",
+        "lnkvision": "not-applicable",
         "lnkgateway": "not-applicable",
         "lnkwebsite": "not-applicable",
     },
@@ -150,8 +161,8 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
         "lnkcrm": "partial",
         "lnkchat": "partial",
         "lnkchatbi": "partial",
-        "lnkreport": "unsupported",
-        "lnkvision": "unsupported",
+        "lnkreport": "implemented",
+        "lnkvision": "implemented",
         "lnkgateway": "not-applicable",
         "lnkwebsite": "not-applicable",
     },
@@ -168,11 +179,11 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
 }
 
 EXPECTED_DISTRIBUTION = {
-    "implemented": 14,
+    "implemented": 16,
     "partial": 13,
-    "onboarding": 7,
-    "unsupported": 3,
-    "not-applicable": 10,
+    "onboarding": 5,
+    "unsupported": 1,
+    "not-applicable": 12,
     "blocked": 1,
 }
 

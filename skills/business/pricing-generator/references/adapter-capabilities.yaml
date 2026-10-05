@@ -57,23 +57,25 @@ capabilities:
     notes: "O8 已裁决（2026-10-04 rejected-registration）：随单赠送/打包策略，env 人工输入为设计语义非缺口；pricing-basis.yaml 不设 lnkchatbi 定价段（费率三键不动）。"
   - consumer_id: pricing-generator
     product_id: lnkreport
-    status: onboarding
+    status: not-applicable
     evidence:
-      - "generate_quote.py LNKREPORT_DATA 结构落地（G4 模块分组 + Phase 2 §4 八列四段；金额留空/待定价，build_lnkreport_data 无数值时显式拒绝生成，tests/test_lnkreport_data.py 同批原子化校验）"
+      - "generate_quote.py LNKREPORT_DATA 结构落地（G4 模块分组 + Phase 2 §4 八列四段；金额留空，build_lnkreport_data 无数值时显式拒绝生成，tests/test_lnkreport_data.py 同批原子化校验）"
       - "references/adapter-capability-owner-decision-o7-report-phase2-report-2026-10-04.md:70-83（§3.2 G4 模块分组总表）、:111-157（§4 报价基线结构，金额全留空）"
+      - "PRICING-FINAL 终裁 not-sold-independently（references/adapter-capability-owner-decision-pricing-final-2026-10-05.md，2026-10-05 decided）：不单独售卖、无独立标准价，沿 O7-chat「打包售卖不单列 → not-applicable」权威先例；LNKREPORT_DATA 结构保留，无价拒单行为即本策略的机械执行（单产品与组合报价均写盘前拒绝，复测见执行记录）"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "O7-report Phase 3 已落地（结构 + pytest；执行记录 references/adapter-capability-owner-decision-o7-report-phase3-execution-2026-10-04.md）；定价数值待 OPC 提供后另开授权填数并升级 implemented；不得从 lnkcre 复制价格。"
+    notes: "PRICING-FINAL 已终裁（2026-10-05 decided / not-sold-independently）：不单独售卖、不设独立标准价，对外输出仅随组合/打包方案出现（金额由商务在主产品报价内处理；组合内独立行项定价如需 env 人工输入机制另行授权，沿 LnkChatBI 先例）。LNKREPORT_DATA 结构保留，无价拒单行为即策略执行；不得从 lnkcre 复制价格。OPC 可改裁独立售卖路线（届时另落记录，走 O7-report Phase 2/3 登记流程）。"
   - consumer_id: pricing-generator
     product_id: lnkvision
-    status: onboarding
+    status: not-applicable
     evidence:
       - "设计包 §3.3.C：无报价数据（missing-pricing）"
       - "O7-vision 裁决 customer-facing（references/adapter-capability-owner-decision-o7-vision-2026-10-04.md:9，2026-10-04 decided）：lnkvision 为独立面客产品，启动报价基线建设（结构先行、金额留空、定价数值挂起，完全复用 LNKREPORT_DATA 已核定模式）"
-      - "generate_quote.py LNKVISION_DATA 结构落地（模块分组草案 + 八列四段；金额留空/待定价，build_lnkvision_data 无数值时显式拒绝生成，tests/test_lnkvision_data.py 同批原子化校验；模块分组草案与功能清单行数审计见 references/adapter-capability-owner-decision-o7-vision-execution-2026-10-04.md §3）"
+      - "generate_quote.py LNKVISION_DATA 结构落地（模块分组草案 + 八列四段；金额留空，build_lnkvision_data 无数值时显式拒绝生成，tests/test_lnkvision_data.py 同批原子化校验；模块分组草案与功能清单行数审计见 references/adapter-capability-owner-decision-o7-vision-execution-2026-10-04.md §3）"
+      - "PRICING-FINAL 终裁 not-sold-independently（references/adapter-capability-owner-decision-pricing-final-2026-10-05.md，2026-10-05 decided）：不单独售卖、无独立标准价，沿 O7-chat「打包售卖不单列 → not-applicable」权威先例；LNKVISION_DATA 结构保留，无价拒单行为即本策略的机械执行（单产品与组合报价均写盘前拒绝，复测见执行记录）"
     verified_at: "2026-10-04"
     owner: opc
-    notes: "O7-vision 已定判（2026-10-04 decided / customer-facing）：独立面客产品；报价基线结构在位（LNKVISION_DATA 四段八列，金额一律留空），定价数值待 OPC 提供后另开授权填数并升级 implemented；不得从 lnkcre 或其他产品复制价格。"
+    notes: "PRICING-FINAL 已终裁（2026-10-05 decided / not-sold-independently）：不单独售卖、不设独立标准价，对外输出仅随组合/打包方案出现（金额由商务在主产品报价内处理；组合内独立行项定价如需 env 人工输入机制另行授权，沿 LnkChatBI 先例）。LNKVISION_DATA 结构保留，无价拒单行为即策略执行；不得从 lnkcre 或其他产品复制价格。OPC 可改裁独立售卖路线（届时另落记录，走 O7-report Phase 2/3 式登记流程）。"
   - consumer_id: pricing-generator
     product_id: lnkgateway
     status: not-applicable

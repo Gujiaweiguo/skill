@@ -1,4 +1,4 @@
-"""O7-report Phase 3 落地校验：LNKREPORT_DATA 结构 + 金额留空 + capability onboarding。
+"""O7-report Phase 3 落地校验：LNKREPORT_DATA 结构 + 金额留空 + capability not-applicable。
 
 依据：references/adapter-capability-owner-decision-o7-report-phase1-2026-10-04.md
 （decision: approved-phase1-3；phase3_ratification）+ Phase 2 报告
@@ -6,6 +6,9 @@ references/adapter-capability-owner-decision-o7-report-phase2-report-2026-10-04.
 §3.2（G4 模块分组）/ §4（八列四段，金额全留空）。
 金额纪律：不填任何单价/金额/人天数；例外仅已核定结构性 0（3.1 新增项目、
 4.1 首年赠送）与费率引用（二开 DEVKIT_RATE 元/人天、含税 6%）。
+PRICING-FINAL（2026-10-05 decided / not-sold-independently，
+references/adapter-capability-owner-decision-pricing-final-2026-10-05.md）：不单独售卖、
+无独立标准价；结构保留，无价拒单行为即策略执行，capability onboarding→not-applicable。
 """
 
 from __future__ import annotations
@@ -73,7 +76,7 @@ def _gq():
 def test_lnkreport_segments_and_seq():
     data = _gq().LNKREPORT_DATA
     assert data["product_label"] == "LnkReport"
-    assert "待定价" in data["pricing_status"]
+    assert "不单独售卖" in data["pricing_status"]
     assert [r[0] for r in data["core_modules"]] == [f"1.{i}" for i in range(1, 7)]
     assert [r[0] for r in data["integration_items"]] == ["2.1", "2.2", "2.3"]
     assert [r[0] for r in data["implementation_items"]] == [f"3.{i}" for i in range(1, 5)]
@@ -115,7 +118,7 @@ def test_lnkreport_summary_service_notes_saas_private():
     ]
     notes = "\n".join(data["service_notes"])
     assert "6%" in notes  # 税率引用（pricing-basis.yaml tax_rate_default）
-    assert "待定价" in notes
+    assert "不单独售卖" in notes
     assert [r[0] for r in data["saas_vs_private"]] == [
         "软件授权性质", "数据归属", "次年费用", "适合场景", "实施差异",
     ]
@@ -125,7 +128,7 @@ def test_lnkreport_summary_service_notes_saas_private():
 
 
 def test_lnkreport_amounts_left_blank():
-    """金额一律留空/None（待定价）；"—"=结构性不适用；0 仅限已核定两处。"""
+    """金额一律留空/None（不单独售卖，无独立标准价）；"—"=结构性不适用；0 仅限已核定两处。"""
     data = _gq().LNKREPORT_DATA
     for seg in AMOUNT_SEGS:
         for row in data[seg]:
@@ -139,14 +142,14 @@ def test_lnkreport_amounts_left_blank():
         assert row[1] is None and row[2] is None, row[0]
 
 
-def test_lnkreport_pricing_rows_marked_pending():
-    """每个定价行的备注携带「待定价」标记（费率通道 2.3 与含在 3.1 的行除外）。"""
+def test_lnkreport_pricing_rows_marked_not_sold():
+    """每个定价行的备注携带「不单独售卖（终裁 2026-10-05），无独立标准价」标记（费率通道 2.3 与含在 3.1 的行除外）。"""
     data = _gq().LNKREPORT_DATA
     for seg in AMOUNT_SEGS:
         for row in data[seg]:
             if row[0] == "2.3":
                 continue
-            assert "待定价" in row[7] or "含在 3.1" in row[7], (seg, row[0])
+            assert "不单独售卖" in row[7] or "含在 3.1" in row[7], (seg, row[0])
 
 
 def test_lnkreport_no_cross_product_price_copy():
@@ -193,10 +196,10 @@ def _capabilities() -> dict[str, Any]:
         return yaml.safe_load(f)
 
 
-def test_capability_lnkreport_onboarding():
+def test_capability_lnkreport_not_applicable():
     caps = _capabilities()
     entry = next(c for c in caps["capabilities"] if c["product_id"] == "lnkreport")
-    assert entry["status"] == "onboarding"
+    assert entry["status"] == "not-applicable"
     assert entry["verified_at"] == "2026-10-04"
     assert entry["owner"] == "opc"
     evidence = " ".join(entry["evidence"])
@@ -205,6 +208,11 @@ def test_capability_lnkreport_onboarding():
         "adapter-capability-owner-decision-o7-report-phase2-report-2026-10-04.md" in evidence
     )
     assert re.search(r"phase2-report-2026-10-04\.md:\d+", evidence)
+    # PRICING-FINAL 终裁（2026-10-05）：不单独售卖 → not-applicable
+    assert (
+        "adapter-capability-owner-decision-pricing-final-2026-10-05.md" in evidence
+        and "not-sold-independently" in evidence
+    )
 
 
 def test_capability_other_products_untouched():
@@ -217,6 +225,9 @@ def test_capability_other_products_untouched():
     shared 钉线 EXPECTED_MATRIX/EXPECTED_DISTRIBUTION 同 commit）。
     lnkvision unsupported→onboarding 为 O7-vision 同批修订（customer-facing，
     2026-10-04，references/adapter-capability-owner-decision-o7-vision-2026-10-04.md；
+    shared 钉线同 commit）；lnkreport/lnkvision onboarding→not-applicable 为
+    PRICING-FINAL 终裁同批修订（not-sold-independently，2026-10-05，
+    references/adapter-capability-owner-decision-pricing-final-2026-10-05.md；
     shared 钉线同 commit）。
     """
     caps = _capabilities()
@@ -226,8 +237,8 @@ def test_capability_other_products_untouched():
         "lnkcrm": "partial",
         "lnkchat": "not-applicable",
         "lnkchatbi": "implemented",
-        "lnkreport": "onboarding",
-        "lnkvision": "onboarding",
+        "lnkreport": "not-applicable",
+        "lnkvision": "not-applicable",
         "lnkgateway": "not-applicable",
         "lnkwebsite": "not-applicable",
     }
