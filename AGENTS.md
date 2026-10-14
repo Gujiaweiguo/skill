@@ -361,7 +361,7 @@ product-prd-generator ─→ word-master + material-importer + config/ontology/b
 ═══════════════════════════════════════════════════════════════════
 
 config/ontology ────────← product-prd-generator            (business-ontology.yaml: 8 modules, 482 terms)
-                         ← company-intro-generator, bid-doc-master (read-only 消费 ontology)
+                         ← competitor-product-analyzer      (read-only 消费 ontology)
 
 $LANLNK_BASE/materials/ ← material-importer                (写入)
                          ← 所有 business skill              (读取)
@@ -374,6 +374,8 @@ compound-learning ──→ AGENTS.md / SKILL.md / references/troubleshooting.md
                       (经验回灌到任意 skill 或 /opt/code/docs/opencode 手册)
 openspec-practice ──→ 项目 OpenSpec (mi / langchat 等目标项目)
                       (短口令路由到目标项目的 OpenSpec change 工作流)
+implementation-package-execution ─→ 项目仓侧消费 released 实施包的标准执行入口
+                       (被 openspec-practice 出包流程衔接；校验/preflight/权限宣告/波次执行/return 回执)
 docs-archive-manager  独立 (rsync/sha256sum 操作 /opt/code/docs 备份策略)
 ```
 
@@ -406,6 +408,7 @@ subprocess.run(
 | `product-prd-generator/references/product-governance/ontology-change-set.schema.json` | product-prd-generator (owner), competitor-product-analyzer, openspec-practice |
 | `product-prd-generator/references/product-governance/reconciliation-record.schema.json` | product-prd-generator (owner), openspec-practice |
 | `product-prd-generator/references/product-governance/implementation-return.schema.json` | product-prd-generator (owner), openspec-practice |
+| `meta/openspec-practice/references/implementation-package.md` | openspec-practice (owner), implementation-package-execution |
 | `$LANLNK_BASE/30-products/lnkcre/ontology/domain-knowledge.md` | product-prd-generator (商管 project only; 域知识跟着项目走，不放 skill 目录), competitor-product-analyzer |
 | `$LANLNK_BASE/config/ontology/business-ontology.yaml` | product-prd-generator (runtime dependency), competitor-product-analyzer |
 

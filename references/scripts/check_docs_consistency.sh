@@ -70,6 +70,7 @@ SHARED_FILES=(
   "skills/business/product-prd-generator/references/product-governance/ontology-change-set.schema.json|product-prd-generator,competitor-product-analyzer,openspec-practice"
   "skills/business/product-prd-generator/references/product-governance/reconciliation-record.schema.json|product-prd-generator,openspec-practice"
   "skills/business/product-prd-generator/references/product-governance/implementation-return.schema.json|product-prd-generator,openspec-practice"
+  "skills/meta/openspec-practice/references/implementation-package.md|openspec-practice,implementation-package-execution"
   "$LANLNK_BASE/30-products/lnkcre/ontology/domain-knowledge.md|product-prd-generator,competitor-product-analyzer"
   "$LANLNK_BASE/config/ontology/business-ontology.yaml|product-prd-generator,competitor-product-analyzer"
 )
