@@ -1,0 +1,29 @@
+{
+  "comment": "Golden fixtures that drove the 2026-10 fix wave (column-aware date coerce / header-scan width basis / pptx merged-table guard). Referenced by absolute path + sha256 only — binaries stay in the external docs repo and are NEVER copied into this skill repo.",
+  "fixtures": [
+    {
+      "name": "福州香格里拉中心_输出凭证_20231121",
+      "kind": "xlsx",
+      "path": "/opt/code/docs/lanlnk/incoming/商管客户需求/福州香格里拉/福州香格里拉中心_输出凭证_20231121.xlsx",
+      "sha256": "8fec6cdb90a0eb560a6bfc1350c863f1831d1c5df14cd0f4a622da73bd0c198c",
+      "expectations": {
+        "format": "CSV",
+        "qa_csv_header_starts_with": ",编号,状态,类型",
+        "qa_notes_contains": ["## 前言区", "■QA管理表"],
+        "voucher_notes_contains": ["## 批注"],
+        "voucher_csv_percent_strings": ["13%", "9%"],
+        "manifest_extractor_version": 3
+      }
+    },
+    {
+      "name": "产品拆分20210629",
+      "kind": "pptx",
+      "path": "/opt/code/docs/lanlnk/incoming/商管系统竞对/明源/明源战略模板/产品拆分20210629.pptx",
+      "sha256": "acddfbdf09ea4691ea2728c722ee1bf9cb98b916f968accb4044cf30fecc6890",
+      "expectations": {
+        "suspect_slides": [1, 2],
+        "reasons_include": "merged-cells"
+      }
+    }
+  ]
+}

@@ -417,3 +417,29 @@ Agent:
       → consumed_by: 系统实施与服务体系.md
       → unconsumed_sections: [公司简介, 客户案例] 建议进一步提取
 ```
+
+## 已知限制
+
+- Excel 列级日期投票对整体落在 30000~100000 的非日期数字列（如月租金 45000）仍会误转 → `--no-date-coerce` 兜底
+- `scan_raw_index.py` 的 `imported_from` 是推断值，跨主题目录结构时可能推错；`needs_review` 不会自动翻转（详见上文 2026-08-19 实测注记）
+- `.ppt`（旧二进制）python-pptx 不支持 → pptx_table_guard 报 skipped；`.doc/.xls` 需 libreoffice 预转换
+- markitdown 对损坏 OOXML 会静默当纯文本转换 → convert_doc 有魔数守卫（PK / %PDF-），但裸 `uv run markitdown` 回退路径无守卫
+- OCR（DeepSeek-OCR-2）依赖用户级 GPU 环境，不在 skill venv 内；缺 GPU 时 ocr_extract.py 不可用
+- 更多坑位与修复规则见 `references/troubleshooting.md`
+
+## 设计决策
+
+- **原件为源契约（P0）**：见上文「原件为源契约」专节——source 永指 incoming 原件，raw/materials 只是投影
+- **列级日期投票 vs 逐格**：列内 ≥2 数值且全部 30000<val<100000 才整列转，一票反例否决；数字分支历史上只有误报没有漏报（真日期走 datetime 分支），故宁可漏转不可误转
+- **CSV vs MD 路由**：文件级判定（单 visible sheet + ≤8 列 + 无合并 → MD，否则 CSV）；MD 宽表在渲染器里不可读，CSV 可被 DictReader 直接消费；一个源文件只产出一种格式
+- **表头扫描默认开启**：真实凭证表普遍带标题前言区，默认开避免人工指定 `--header-row`；前言进 `.notes.md` 顶部，永不丢弃
+- **pptx guard 只升级不预跑 OCR**：convert_doc 对 pptx 自动跑 detect（轻量、纯 python-pptx），命中才 escalate 渲染 PNG + OCR（重、需 GPU）——按需付费
+- **扫描行宽基准**：表头占比用尾部裁剪后的行宽计算（香格里拉 257 列事故），`_trim_trailing` 必须先于 `_detect_preface`
+
+## 维护规则
+
+- 任何写 `$COMPANY_BASE` 的脚本必须过五道闸门：dry-run 先行 / 唯一匹配才写 / 分桶上限 / validator 前后基线 diff 零新增错误 / has-source 绝不重写
+- 改 SKILL.md / AGENTS.md 触发 pre-commit 的 `check_skill_ecosystem.sh --ci`——提交前本地先跑
+- 共享文件 `references/domain-tags.md` 被 product-prd-generator / compound-learning 读取，改动需同步 AGENTS.md「Shared files」表和 `check_docs_consistency.sh` 的 `SHARED_FILES` 数组
+- 修复新坑 → 先加回归测试再修代码；驱动修复的金样例登记在 `tests/fixtures_registry.json`（引用外部仓路径+sha，不复制二进制）
+- convert_excel 逻辑变更须 bump `EXTRACTOR_VERSION`（manifest 溯源依赖它区分产物代际）
