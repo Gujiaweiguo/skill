@@ -214,5 +214,26 @@ class MappingTest(unittest.TestCase):
             self.assertIn('source: "keep"', md.read_text(encoding="utf-8"))
 
 
+class LegacyFilterTest(unittest.TestCase):
+    def test_filter_selects_only_high_ratio_legacy_materials(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            base = Path(tmp)
+            cj = base / "cand.json"
+            cj.write_text(json.dumps({"results": [
+                {"file": "materials/a.md", "best": {"path": "90-legacy/x/a.md", "ratio": 1.0, "legacy": True}},
+                {"file": "materials/b.md", "best": {"path": "incoming/b.docx", "ratio": 0.99, "legacy": False}},
+                {"file": "materials/c.md", "best": {"path": "90-legacy/x/c.md", "ratio": 0.6, "legacy": True}},
+                {"file": "raw/d.md", "best": {"path": "90-legacy/x/d.md", "ratio": 1.0, "legacy": True}},
+                {"file": "materials/e.md", "best": None},
+            ]}), encoding="utf-8")
+            tsv = base / "p3.tsv"
+            rows = bs.filter_legacy_accepts(cj, tsv)
+            self.assertEqual(rows, [("materials/a.md", "90-legacy/x/a.md")])
+            self.assertEqual(
+                tsv.read_text(encoding="utf-8"),
+                "file\tproposed_source\tbucket\n"
+                "materials/a.md\t90-legacy/x/a.md\taccept\n")
+
+
 if __name__ == "__main__":
     unittest.main()

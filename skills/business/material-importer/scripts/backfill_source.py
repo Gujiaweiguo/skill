@@ -251,6 +251,27 @@ def load_mapping(tsv_path: Path):
     return mapping
 
 
+def filter_legacy_accepts(candidates_json: Path, tsv_out: Path,
+                          ratio_min: float = 0.75):
+    """Phase-3: turn the phase-1 candidates JSON into a --mapping TSV holding
+    exactly the user-approved legacy anchors — materials/ files whose best
+    candidate ratio >= ratio_min AND whose best (only) copy lives under
+    90-legacy/. Returns the selected rows."""
+    data = json.loads(candidates_json.read_text(encoding="utf-8"))
+    rows = []
+    for x in data.get("results", []):
+        best = x.get("best")
+        if not best or not x["file"].startswith("materials/"):
+            continue
+        if best["ratio"] >= ratio_min and best.get("legacy"):
+            rows.append((x["file"], best["path"]))
+    tsv_out.parent.mkdir(parents=True, exist_ok=True)
+    tsv_out.write_text(
+        "file\tproposed_source\tbucket\n" +
+        "".join(f"{f}\t{p}\taccept\n" for f, p in rows), encoding="utf-8")
+    return rows
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("base")
