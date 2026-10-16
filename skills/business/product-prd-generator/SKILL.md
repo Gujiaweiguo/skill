@@ -18,7 +18,7 @@ compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to
 
 ## DocSpec 质量基线
 
-本 skill 生成的 PRD、功能清单、差距分析、需求证据表和 review 清单必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md`、`PRD质量规范.md` 和 `文档验收清单.md`。跨 PRD/方案/投标等多个文档类 skill 的质量经验，通过 `compound-learning` 回流到 DocSpec；只影响本 skill 的限制写入本 skill references。
+本 skill 生成的 PRD、功能清单、差距分析、需求证据表和 review 清单必须遵守 `/opt/code/skill/references/docspec/`，重点执行 `DocSpec-通用文档质量规范.md`、`PRD质量规范.md` 和 `文档验收清单.md`。跨 PRD/方案/投标等多个文档类 skill 的质量经验，通过 `compound-learning` 回流到 DocSpec；只影响本 skill 的限制写入本 skill references。引用 `$COMPANY_BASE` 素材时必须带**源锚点**（sheet/幻灯片/单元格/页码）和 source 路径（materials frontmatter `source:`，incoming 原件优先；`source: "none"` 为人工撰写件，不得当投影证据引用），不能只给 md 行号——行号随投影重生成漂移（素材投影契约，见 material-importer SKILL.md）。
 
 ## References 索引（按需读，不要全读）
 

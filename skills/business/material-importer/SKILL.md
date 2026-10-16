@@ -130,7 +130,8 @@ incoming/ 里的原始文件（PPTX/DOCX/XLSX/图片）
 P0: 环境检测 + 素材盘点（检查依赖 + 扫描已有素材）
     ↓
 P1: 文档转换（按格式分流）
-    ├── PPTX/DOCX → markitdown 提取文本 → raw/*.md
+    ├── PPTX/DOCX/PDF → convert_doc.py（markitdown + 溯源头；pptx 自动跑 guard 检测）→ raw/*.md
+    │     └── pptx 可疑表格（合并/超宽/表头空置）→ pptx_table_guard.py escalate 定向渲染 + OCR 重读原件
     ├── XLSX/XLS  → convert_excel.py 按复杂度分流 → raw/*.md | raw/csv/*.csv
     └── 图片      → extract_images.py 提取图片 → raw/*_media/
     ↓
@@ -176,7 +177,8 @@ uv run {baseDir}/scripts/validate_material.py $MATERIALS_DIR  # 校验已有素�
 
 ```bash
 # 文本转换（Markdown）——PDF 必须用 skill venv 内的 markitdown（见下方陷阱）
-uv run markitdown "incoming/原始文件.pptx" > "raw/原始文件.pptx.md"
+uv run {baseDir}/scripts/convert_doc.py "incoming/原始文件.pptx" "raw/原始文件.pptx.md"  # 推荐：自动带溯源头 + pptx 可疑表格检测
+uv run markitdown "incoming/原始文件.pptx" > "raw/原始文件.pptx.md"  # 回退：裸转换，无溯源（违反 P0 契约，仅应急）
 
 # 图片提取（支持 PPTX/DOCX，自动修正 Markdown 图片路径）
 uv run {baseDir}/scripts/extract_images.py incoming/   # 批量处理
@@ -197,7 +199,8 @@ uv run {baseDir}/scripts/extract_images.py incoming/ --json  # Agent 程序化�
 > Markdown table 不适合宽表格（42 列在渲染器里没法看），CSV 可被脚本直接 `csv.DictReader` 加载。
 
 ```bash
-uv run {baseDir}/scripts/convert_excel.py <input_dir> <output_dir>
+uv run {baseDir}/scripts/convert_excel.py <input_dir> <output_dir> \
+    [--no-date-coerce] [--header-row N] [--no-header-scan]
 ```
 
 路由规则（文件级判定）：
@@ -210,6 +213,7 @@ uv run {baseDir}/scripts/convert_excel.py <input_dir> <output_dir>
 脚本内置处理：
 - **合并单元格值传播**：openpyxl 只有左上角有值，传播到全部覆盖区域
 - **双行表头展平**：R1 分组合并 + R2 字段名 → 单行真实字段名
+- **表头错位自动扫描**（默认开）：row1 稀疏（标题行）时在前 5 行内找首个占比 >0.6 且提升 ≥0.2 的行作真实表头；之前的行进「前言区」（CSV → `.notes.md` 顶部 / MD → 引用块），永不丢弃；`--header-row N` 显式指定、`--no-header-scan` 关闭
 - **Excel 序列号日期 → ISO（列级判定）**：仅当该列 ≥2 个数值且全部落在 `30000<val<100000`（约 1982–2173 年）时整列转换（`42404` → `2016-04-01`）；年份/编码等小数值不再误转，`--no-date-coerce` 可完全关闭
 - **百分比显示**：number_format 含 `%` 的数值按 Excel 显示语义渲染（`0.15` → `15%`），其他格式不变
 - **批注/数据验证导出**：cell 批注 + list 类数据验证；CSV 路径写同名边车 `<name>.csv.notes.md`，MD 路径追加文末

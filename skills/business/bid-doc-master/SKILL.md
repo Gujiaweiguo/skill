@@ -330,6 +330,7 @@ uv run python -m src.main generate tender_info.json \
 > - **项目背景与需求理解**：可引用 `$LANLNK_BASE/materials/10-methodology/methodology/15-商业地产岗位病药矩阵.md`，按岗位（招商总/财务总/营运总/企划总/物业总/IT总）拆需求理解，比泛泛的功能需求清单更有针对性。
 > - **功能需求响应方案**：功能矩阵表可用"岗位 × 病点 × 功能响应"组织，而非纯功能点逐条响应。
 > - **业绩/案例证明**：遵循证明口径分级（Z1 实证/Z2 竞品行业对标/Z3 蓝联产品状态/Z4 待试点验证）。开发中产品不把关联产品（如会员 CRM）的客户案例冒充本产品（如商管 ERP）实证。案例引用前必须确认产品边界。
+> - **素材源锚点**：引用 `$COMPANY_BASE` 素材必须带源锚点（sheet/幻灯片/单元格/页码）和 materials frontmatter `source:` 路径（incoming 原件优先；`source: "none"` 为人工撰写件，不得当投影证据引用），不能只给 md 行号（素材投影契约，见 material-importer SKILL.md）。
 
 ### 3.3 述标PPT → proposal-pptx YAML 内容包
 

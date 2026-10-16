@@ -19,6 +19,9 @@
 技术处理：
   - 合并单元格值传播（openpyxl 只有左上角有值，number_format 一并传播）
   - 双行表头展平（R1 分组合并 + R2 字段名 → 单行）
+  - 表头错位自动扫描（默认开）：row1 稀疏(<0.4)时在前 ≤5 行找首个占比 >0.6 且
+    提升 ≥0.2 的行作真实表头；之前行进「前言区」（CSV → .notes.md 顶部，MD →
+    引用块），永不丢弃。`--header-row N` 显式指定，`--no-header-scan` 关闭
   - Excel 序列号日期 → ISO 字符串（列级判定：仅当该列 ≥2 个数值单元格且全部
     落在 30000<val<100000（约 1982–2173 年）时才整列转换；单个数值/年份/编码
     不再被误转。可用 --no-date-coerce 完全关闭数值转换）
@@ -48,7 +51,7 @@ from openpyxl import load_workbook
 SIMPLE_MAX_COLS = 8
 EXCEL_EPOCH = datetime(1899, 12, 30)
 TEMP_CONVERT = Path("/tmp/opencode/excel-convert")
-EXTRACTOR_VERSION = 2
+EXTRACTOR_VERSION = 3
 MANIFEST_NAME = "_manifest.json"
 # 静态保真度说明（extractor 级预期，非逐文件分析）
 FIDELITY = {
@@ -57,7 +60,10 @@ FIDELITY = {
         "high (grid preserved; comments/validations exported to "
         ".notes.md sidecars; percent rendered display-style)"
     ),
-    "notes": "date coercion is column-voted; --no-date-coerce to disable",
+    "notes": (
+        "date coercion is column-voted; --no-date-coerce to disable; "
+        "header misalignment auto-scan (--header-row/--no-header-scan)"
+    ),
 }
 
 
@@ -134,11 +140,68 @@ def _coerced_columns(all_rows: list[list[object]]) -> set[int]:
     }
 
 
-def read_sheet_data(ws, max_rows: int = 20000, date_coerce: bool = True):
-    """读取 sheet，传播合并值，展平双行表头。返回 (headers, rows)。
+def _row_ratio(r: list[object]) -> float:
+    """非空单元格 / 行宽（用于表头启发式）。"""
+    if not r:
+        return 0.0
+    return sum(1 for v in r if v is not None and v != "") / len(r)
+
+
+def _trim_trailing(raw_rows: list[list[object]], fmt_rows: list[list[str]]) -> None:
+    """尾部全空列裁剪：找最后一个有值的列，截断其后所有列（前导空列不动）。"""
+    last_col = -1
+    for r in raw_rows:
+        for i in range(len(r) - 1, last_col, -1):
+            if r[i] is not None and r[i] != "":
+                last_col = i
+                break
+    if last_col < len(raw_rows[0]) - 1:
+        for r, f in zip(raw_rows, fmt_rows, strict=True):
+            del r[last_col + 1:]
+            del f[last_col + 1:]
+
+
+def _detect_preface(
+    raw_rows: list[list[object]],
+    header_row: int | None,
+    header_scan: bool,
+) -> int:
+    """返回表头行索引（0-based）；无前言返回 0。
+
+    显式 header_row（1-based）优先；否则启发式扫描前 ≤5 行：
+    row1 占比 <0.4 时，找第一个占比 >0.6 且相对上一行提升 ≥0.2 的行。
+    """
+    if header_row is not None:
+        if 1 <= header_row <= len(raw_rows):
+            return header_row - 1
+        return 0  # 越界 → 回退旧行为
+    if not header_scan or len(raw_rows) < 2:
+        return 0
+    first_ratio = _row_ratio(raw_rows[0])
+    if first_ratio >= 0.4:
+        return 0
+    prev = first_ratio
+    for i in range(1, min(5, len(raw_rows))):
+        r = _row_ratio(raw_rows[i])
+        if r > 0.6 and r - prev >= 0.2:
+            return i
+        prev = r
+    return 0
+
+
+def read_sheet_data(
+    ws,
+    max_rows: int = 20000,
+    date_coerce: bool = True,
+    header_row: int | None = None,
+    header_scan: bool = True,
+):
+    """读取 sheet，传播合并值，展平双行表头。返回 (headers, rows, preface)。
 
     date_coerce=False 时数值单元格永不转日期（datetime 分支不受影响）。
     合并单元格传播值 + 左上角 number_format；尾部全空列裁剪（前导空列保留）。
+    header_row=None + header_scan=True 时自动检测前言区（标题/状态行），
+    真实表头行之前的行作为 preface 返回（前言不参与列统计，永不丢弃）。
     """
     merged_ranges = list(ws.merged_cells.ranges)
 
@@ -165,7 +228,7 @@ def read_sheet_data(ws, max_rows: int = 20000, date_coerce: bool = True):
             fmt_rows.append(formats)
 
     if not raw_rows:
-        return [], []
+        return [], [], []
 
     max_len = max(len(r) for r in raw_rows)
     for r, f in zip(raw_rows, fmt_rows, strict=True):
@@ -173,17 +236,29 @@ def read_sheet_data(ws, max_rows: int = 20000, date_coerce: bool = True):
             r.append(None)
             f.append("")
 
-    # 尾部全空列裁剪：找最后一个有值的列，截断其后所有列（前导空列不动）
-    last_col = -1
-    for r in raw_rows:
-        for i in range(len(r) - 1, last_col, -1):
-            if r[i] is not None and r[i] != "":
-                last_col = i
-                break
-    if last_col < max_len - 1:
-        for r, f in zip(raw_rows, fmt_rows, strict=True):
-            del r[last_col + 1:]
-            del f[last_col + 1:]
+    # 尾部全空列裁剪（先做一次，让表头启发式的行宽有意义）
+    _trim_trailing(raw_rows, fmt_rows)
+
+    # 前言区检测（显式 --header-row 优先于自动扫描）
+    hidx = _detect_preface(raw_rows, header_row, header_scan)
+    preface_raw = raw_rows[:hidx]
+    preface_fmt = fmt_rows[:hidx]
+    raw_rows = raw_rows[hidx:]
+    fmt_rows = fmt_rows[hidx:]
+    if hidx:
+        # 剥离后按剩余网格重裁（列统计只看正文区）
+        _trim_trailing(raw_rows, fmt_rows)
+
+    # 前言区不参与日期强转统计
+    preface = [
+        " ".join(
+            t for t in (
+                normalize_cell(v, fmt=f[ci], coerce=False)
+                for ci, v in enumerate(r)
+            ) if t
+        )
+        for r, f in zip(preface_raw, preface_fmt, strict=True)
+    ]
 
     coerce_cols = _coerced_columns(raw_rows) if date_coerce else set()
     all_rows: list[list[str]] = [
@@ -204,9 +279,9 @@ def read_sheet_data(ws, max_rows: int = 20000, date_coerce: bool = True):
             headers: list[str] = []
             for h1, h2 in zip(all_rows[0], all_rows[1], strict=False):
                 headers.append(h2 if h2 else (h1 if h1 else ""))
-            return headers, all_rows[2:]
+            return headers, all_rows[2:], preface
 
-    return all_rows[0], all_rows[1:]
+    return all_rows[0], all_rows[1:], preface
 
 
 def sheet_is_simple(headers: list[str], has_merge: bool) -> bool:
@@ -214,7 +289,11 @@ def sheet_is_simple(headers: list[str], has_merge: bool) -> bool:
     return non_empty <= SIMPLE_MAX_COLS and not has_merge
 
 
-def file_is_simple(xlsx_path: Path) -> bool:
+def file_is_simple(
+    xlsx_path: Path,
+    header_row: int | None = None,
+    header_scan: bool = True,
+) -> bool:
     """文件级判定：所有 sheet 都简单 且 仅 1 个 visible sheet → True。"""
     wb = load_workbook(xlsx_path, data_only=True, read_only=False)
     visible_sheets = [
@@ -225,7 +304,9 @@ def file_is_simple(xlsx_path: Path) -> bool:
         wb.close()
         return False
 
-    headers, _ = read_sheet_data(visible_sheets[0])
+    headers, _, _ = read_sheet_data(
+        visible_sheets[0], header_row=header_row, header_scan=header_scan
+    )
     has_merge = len(list(visible_sheets[0].merged_cells.ranges)) > 0
     wb.close()
     return sheet_is_simple(headers, has_merge)
@@ -261,17 +342,25 @@ def collect_notes(ws) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
     return comments, validations
 
 
-def build_notes_lines(ws, multi_sheet: bool) -> list[str]:
-    """批注/数据验证 → Markdown 行（两个 section）。无内容返回 []。
+def build_notes_lines(
+    ws,
+    multi_sheet: bool,
+    preface: list[str] | None = None,
+) -> list[str]:
+    """前言区/批注/数据验证 → Markdown 行。无内容返回 []。
 
+    前言区放最前（表头扫描剥离的标题/状态行，永不丢弃）。
     多 sheet 时加 sheet 前缀（批注 `{sheet}!{cell}`，验证 `{sheet} {sqref}`）。
     """
     comments, validations = collect_notes(ws)
-    if not comments and not validations:
+    if not comments and not validations and not preface:
         return []
     c_prefix = f"{ws.title}!" if multi_sheet else ""
     v_prefix = f"{ws.title} " if multi_sheet else ""
     lines: list[str] = []
+    if preface:
+        lines.append("## 前言区\n")
+        lines.extend(f"- {t}" for t in preface if t)
     if comments:
         lines.append("## 批注\n")
         lines.extend(f"- {c_prefix}{cell}: {text}" for cell, text in comments)
@@ -303,6 +392,7 @@ def write_md(
     rows: list[list[str]],
     notes: list[str] | None = None,
     provenance_lines: list[str] | None = None,
+    preface: list[str] | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines: list[str] = []
@@ -312,6 +402,9 @@ def write_md(
         lines.append("-->")
         lines.append("")
     lines.append(f"# {title}\n")
+    if preface:
+        lines.extend(f"> {t}" for t in preface if t)
+        lines.append("")
     lines.append("| " + " | ".join(_md_escape_cell(h) for h in headers) + " |")
     lines.append("| " + " | ".join("---" for _ in headers) + " |")
     for row in rows:
@@ -338,10 +431,17 @@ def _upsert_manifest(output_dir: Path, record: dict) -> None:
     )
 
 
-def process_file(src: Path, output_dir: Path, date_coerce: bool = True) -> str:
+def process_file(
+    src: Path,
+    output_dir: Path,
+    date_coerce: bool = True,
+    header_row: int | None = None,
+    header_scan: bool = True,
+) -> str:
     """处理一个文件，返回产出的格式（'Markdown' / 'CSV' / 'skip'）。
 
     同时写/更新 {output_dir}/_manifest.json（provenance + fidelity，按 source_path 幂等）。
+    header_row（1-based 显式表头行）/ header_scan（自动前言区检测）逐层透传。
     """
     if src.suffix == ".docx":
         return "skip"
@@ -366,7 +466,7 @@ def process_file(src: Path, output_dir: Path, date_coerce: bool = True) -> str:
     artifacts: list[str] = []
 
     stem = src.stem
-    simple = file_is_simple(xlsx)
+    simple = file_is_simple(xlsx, header_row=header_row, header_scan=header_scan)
 
     wb = load_workbook(xlsx, data_only=True, read_only=False)
     visible = [
@@ -375,7 +475,10 @@ def process_file(src: Path, output_dir: Path, date_coerce: bool = True) -> str:
     ]
 
     if simple and len(visible) == 1:
-        headers, rows = read_sheet_data(visible[0], date_coerce=date_coerce)
+        headers, rows, preface = read_sheet_data(
+            visible[0], date_coerce=date_coerce,
+            header_row=header_row, header_scan=header_scan,
+        )
         if not headers:
             wb.close()
             return "skip"
@@ -383,7 +486,7 @@ def process_file(src: Path, output_dir: Path, date_coerce: bool = True) -> str:
         md_path = output_dir / f"{stem}.md"
         write_md(
             md_path, stem, headers, rows, notes=notes,
-            provenance_lines=provenance_lines,
+            provenance_lines=provenance_lines, preface=preface,
         )
         artifacts.append(md_path.relative_to(output_dir).as_posix())
         wb.close()
@@ -393,14 +496,17 @@ def process_file(src: Path, output_dir: Path, date_coerce: bool = True) -> str:
         csv_dir = output_dir / "csv"
         multi = len(visible) > 1
         for ws in visible:
-            headers, rows = read_sheet_data(ws, date_coerce=date_coerce)
+            headers, rows, preface = read_sheet_data(
+                ws, date_coerce=date_coerce,
+                header_row=header_row, header_scan=header_scan,
+            )
             if not headers:
                 continue
             safe = ws.title.replace("/", "_").replace(" ", "_")
             name = f"{stem}_{safe}.csv" if multi else f"{stem}.csv"
             write_csv(csv_dir / name, headers, rows)
             artifacts.append(f"csv/{name}")
-            notes = build_notes_lines(ws, multi_sheet=multi)
+            notes = build_notes_lines(ws, multi_sheet=multi, preface=preface)
             if notes:
                 sidecar = csv_dir / f"{name}.notes.md"
                 sidecar.write_text("\n".join(notes) + "\n", encoding="utf-8")
@@ -422,14 +528,36 @@ def process_file(src: Path, output_dir: Path, date_coerce: bool = True) -> str:
 
 
 def main() -> int:
-    args = [a for a in sys.argv[1:] if a != "--no-date-coerce"]
-    date_coerce = len(args) == len(sys.argv) - 1
-    if len(args) < 2:
-        print(f"用法: {sys.argv[0]} <input_dir> <output_dir> [--no-date-coerce]")
+    argv = sys.argv[1:]
+    positional: list[str] = []
+    date_coerce = True
+    header_scan = True
+    header_row: int | None = None
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--no-date-coerce":
+            date_coerce = False
+        elif a == "--no-header-scan":
+            header_scan = False
+        elif a == "--header-row" and i + 1 < len(argv):
+            i += 1
+            header_row = int(argv[i])
+        elif a.startswith("--header-row="):
+            header_row = int(a.split("=", 1)[1])
+        else:
+            positional.append(a)
+        i += 1
+
+    if len(positional) < 2:
+        print(
+            f"用法: {sys.argv[0]} <input_dir> <output_dir> "
+            "[--no-date-coerce] [--header-row N] [--no-header-scan]"
+        )
         return 1
 
-    input_dir = Path(args[0])
-    output_dir = Path(args[1])
+    input_dir = Path(positional[0])
+    output_dir = Path(positional[1])
     output_dir.mkdir(parents=True, exist_ok=True)
 
     files = sorted(
@@ -439,7 +567,10 @@ def main() -> int:
     print(f"处理 {len(files)} 个 Excel 文件...\n")
 
     for filename in files:
-        result = process_file(input_dir / filename, output_dir, date_coerce=date_coerce)
+        result = process_file(
+            input_dir / filename, output_dir,
+            date_coerce=date_coerce, header_row=header_row, header_scan=header_scan,
+        )
         symbol = "✓" if result != "skip" else "⊘"
         print(f"  {symbol} {filename}: {result}")
 
