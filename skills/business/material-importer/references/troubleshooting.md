@@ -90,3 +90,25 @@
 
 `tests/test_golden_fixtures.py` 钉住两个驱动本周修复的金样例
 （福州香格里拉 xlsx / 明源产品拆分 pptx），sha 漂移即 FAIL 提示更新预期。
+
+## 13. markitdown pptx shape-type 限制 → 渲染+OCR 升级
+
+**症状**：`markitdown` rc=1，`PptxConverter threw NotImplementedError: Shape instance of unrecognized shape type`；文件本身合法（PK 魔数，python-pptx 可解析）。
+**根因**：markitdown 的 pptx 转换器不支持部分异形 shape 类型，是提取器限制非文件损坏。
+**修复**：走升级路径 `pptx_table_guard.py escalate --slides 1..N`（soffice→pdf→pdftoppm 渲染）+ `ocr_extract.py`（DeepSeek-OCR-2）。2026-10-16 生产实证：2 个失败 deck（14+40 页）经此路径完整救回，21 列合并表头以 rowspan/colspan 结构恢复。raw 投影头部标 `fidelity: visual-ocr`。
+
+## 14. pptx 媒体引用名映射（含音频/NULL rel 边角）
+
+**症状**：markitdown 产物的 `![](楼栋png.jpg)` 类引用悬空，python-pptx 图片迭代找不到对应形状。
+**根因与修法**：markitdown 引用名来自 shape 的 cNvPr `name`（含非图片填充形状）；提取要走 slide XML：`cNvPr-name → a:blip/@r:embed → slide rels → media`。三个边角（2026-10-16 实测）：
+- 引用名像 `.jpg` 实为内嵌音频（背景音乐 MP3）→ 按 zip 真实类型保存为 mp3；
+- 源 pptx 关系 `Target="NULL"`（作者自剥图）→ 无物可救，引用留痕并记录原因；
+- 重复 shape 名按 slide 顺序消费候选。
+
+## 15. 批量转换展平命名三层坑
+
+**症状**：批量转换后 raw 出现 `xxx~a1b2c3.md` 撞名、部分文件 OSError Errno 36、markdown 内容存成 `.xlsx` 扩展名。
+**修法**（2026-10-16 竞对批量 572 件实证）：
+- 撞名：incoming 内部重复包展平后同名 → 按 sha256 去重，或嵌入源父目录段消歧，禁止 `~hash` 作为最终名（破坏后缀解析约定）；
+- Errno 36：文件名 >255 字节 → fit() 截断至 ≤240 字节，产物从暂存区按映射归位；
+- 错扩展名：按内容判别（`<!--` 开头 = markdown）重命名 `.md`，勿信扩展名。
