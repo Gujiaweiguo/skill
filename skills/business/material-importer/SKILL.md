@@ -104,6 +104,24 @@ $COMPANY_BASE/                     ← 🏢 当前公司根（config/company.yam
 3. **交互式确认**：每批导入后输出质量报告，逐条请用户确认
 4. **多文件混合拆分**：一次多份文件混入，AI 自动拆分到对应类别
 
+## 原件为源契约（P0 政策）
+
+- `$COMPANY_BASE/incoming/` 里的**原件是唯一权威源**；raw/materials 全部是派生投影，
+  Markdown **不是**结构权威（可能丢结构，例如 pptx 合并单元格表格在 md 投影中会错位）。
+- 每个派生产物必须携带 provenance（source 路径 + sha256）：
+  convert_excel.py 写 `raw/<dir>/_manifest.json` 与 MD 文首 `<!-- ... -->` 头；
+  markitdown 投影回填 source: 到 materials frontmatter。
+- 消费方引用素材时必须带**源锚点**（sheet/幻灯片/单元格，如 `凭证式样!O2`），
+  不能只给 md 行号——行号随投影重生成漂移。
+- 结构可疑的投影（合并表格、跨列错位）升级为**原生/视觉重读**原件：
+  `uv run scripts/pptx_table_guard.py detect <file-or-dir> [--json]`（合并格/列数>10/表头空置>30% 三规则，
+  实测命中明源 21 列合并表头案例）；命中后
+  `uv run scripts/pptx_table_guard.py escalate <file.pptx> --slides N[,M]` 定向渲染 PNG + provenance.json，
+  再用 ocr_extract.py 做 OCR。
+- 存量投影溯源回填：`uv run scripts/backfill_source.py <base> [--dry-run] [--json-report PATH]`
+  （materials 补 `source:` 指向 incoming 原件；raw/*.md 文首补 source+sha256 注释块；
+  仅唯一匹配才写，未匹配清单见报告 JSON。2026-10-16 已跑：materials 701→971，raw 369 个）。
+
 ## Pipeline
 
 ```
@@ -192,7 +210,11 @@ uv run {baseDir}/scripts/convert_excel.py <input_dir> <output_dir>
 脚本内置处理：
 - **合并单元格值传播**：openpyxl 只有左上角有值，传播到全部覆盖区域
 - **双行表头展平**：R1 分组合并 + R2 字段名 → 单行真实字段名
-- **Excel 序列号日期 → ISO**：`42404` → `2016-04-01`
+- **Excel 序列号日期 → ISO（列级判定）**：仅当该列 ≥2 个数值且全部落在 `30000<val<100000`（约 1982–2173 年）时整列转换（`42404` → `2016-04-01`）；年份/编码等小数值不再误转，`--no-date-coerce` 可完全关闭
+- **百分比显示**：number_format 含 `%` 的数值按 Excel 显示语义渲染（`0.15` → `15%`），其他格式不变
+- **批注/数据验证导出**：cell 批注 + list 类数据验证；CSV 路径写同名边车 `<name>.csv.notes.md`，MD 路径追加文末
+- **尾部全空列裁剪**：截断尾部无值列（前导空列保留），消除 200+ 尾部空逗号
+- **MD 表格转义**：单元格内换行 → `<br>`、`|` → `\|`（CSV 路径由 csv 模块引号处理）
 - **.xls / 误标 .xlsx（OLE2）自动转换**：检测魔数 `D0CF11E0`，用 libreoffice headless 转换
 
 产物结构：
@@ -203,8 +225,11 @@ raw/<source_dir>/
 ├── csv/                         # 复杂表的 CSV
 │   ├── 复杂表_sheet1.csv         #   单 sheet: <stem>.csv
 │   ├── 多sheet表_基本信息.csv     #   多 sheet: <stem>_<sheet>.csv
+│   │   └── *.csv.notes.md         #   有批注/数据验证时的边车（可选）
 │   └── 多sheet表_结算周期.csv
-└── (无索引 .md，不混格式)
+└── _manifest.json                #   溯源清单（source 路径/sha256/extractor 版本/产物/fidelity）
+                                  #   CSV 无内联头，溯源由 manifest 覆盖；MD 另有文首 <!-- --> 注释块
+                                  #   （无索引 .md，不混格式）
 ```
 
 ### P1.5 空章节清理（新增）
