@@ -33,6 +33,28 @@ created: "2026-01-01"
 """
 
 
+class ValidTypesTest(unittest.TestCase):
+    def test_init_template_type_is_valid_and_clean(self) -> None:
+        """初始化模板 是合法 type（2026-10-16 竞品导入 24 件使用），且不产生 warning。"""
+        self.assertIn("初始化模板", validate_material.VALID_TYPES)
+        md = VALID_MD.replace('type: "客户资料"', 'type: "初始化模板"')
+        with TemporaryDirectory() as tmp:
+            materials = Path(tmp) / "materials"
+            materials.mkdir()
+            (materials / "tpl.md").write_text(md, encoding="utf-8")
+
+            stdout = StringIO()
+            argv = ["validate_material.py", str(materials), "--json"]
+            with patch.object(sys, "argv", argv):
+                with redirect_stdout(stdout):
+                    validate_material.main()
+
+            report = json.loads(stdout.getvalue())
+
+        self.assertEqual(report["summary"]["invalid"], 0)
+        self.assertEqual(report["files"][0]["warnings"], [])
+
+
 class MainTest(unittest.TestCase):
     def test_raw_exclusion_is_path_segment_not_substring(self) -> None:
         with TemporaryDirectory() as tmp:
