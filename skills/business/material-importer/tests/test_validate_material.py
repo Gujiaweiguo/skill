@@ -81,5 +81,79 @@ class MainTest(unittest.TestCase):
         self.assertNotIn("raw/skipme.md", files[0])
 
 
+class IdUniquenessTest(unittest.TestCase):
+    def test_duplicate_id_marks_both_holders_invalid(self) -> None:
+        with TemporaryDirectory() as tmp:
+            materials = Path(tmp) / "materials"
+            materials.mkdir(parents=True)
+            (materials / "a.md").write_text(VALID_MD, encoding="utf-8")
+            (materials / "b.md").write_text(
+                VALID_MD.replace("示例客户", "示例客户B"), encoding="utf-8"
+            )
+
+            stdout = StringIO()
+            argv = ["validate_material.py", str(materials), "--json"]
+            with patch.object(sys, "argv", argv):
+                with redirect_stdout(stdout):
+                    with self.assertRaises(SystemExit) as cm:
+                        validate_material.main()
+
+            report = json.loads(stdout.getvalue())
+
+        self.assertEqual(cm.exception.code, 1)
+        self.assertEqual(report["summary"]["invalid"], 2)
+        by_file = {r["file"]: r for r in report["files"]}
+        for fname, r in by_file.items():
+            self.assertFalse(r["valid"], fname)
+            self.assertTrue(any("id 重复" in e for e in r["errors"]), fname)
+            # 错误信息必须指认另一个持有者
+            other = "b.md" if fname.endswith("a.md") else "a.md"
+            self.assertTrue(any(other in e for e in r["errors"]), fname)
+
+    def test_extracted_dir_is_skipped_for_id_check(self) -> None:
+        """_extracted/ 是机器 OCR 聚合产物（非人工策展记录），不参与 id 唯一性检查。"""
+        with TemporaryDirectory() as tmp:
+            materials = Path(tmp) / "materials"
+            extracted = materials / "_extracted"
+            extracted.mkdir(parents=True)
+            (materials / "curated.md").write_text(VALID_MD, encoding="utf-8")
+            (extracted / "aggregate.md").write_text(VALID_MD, encoding="utf-8")
+
+            stdout = StringIO()
+            argv = ["validate_material.py", str(materials), "--json"]
+            with patch.object(sys, "argv", argv):
+                with redirect_stdout(stdout):
+                    validate_material.main()
+
+            report = json.loads(stdout.getvalue())
+
+        self.assertEqual(report["summary"]["total"], 1)
+        self.assertEqual(report["summary"]["invalid"], 0)
+        self.assertTrue(report["files"][0]["file"].endswith("curated.md"))
+
+    def test_unique_ids_all_pass(self) -> None:
+        with TemporaryDirectory() as tmp:
+            materials = Path(tmp) / "materials"
+            materials.mkdir(parents=True)
+            (materials / "a.md").write_text(VALID_MD, encoding="utf-8")
+            (materials / "b.md").write_text(
+                VALID_MD.replace("customer-20260101-001", "customer-20260101-002"),
+                encoding="utf-8",
+            )
+
+            stdout = StringIO()
+            argv = ["validate_material.py", str(materials), "--json"]
+            with patch.object(sys, "argv", argv):
+                with redirect_stdout(stdout):
+                    validate_material.main()
+
+            report = json.loads(stdout.getvalue())
+
+        self.assertEqual(report["summary"]["total"], 2)
+        self.assertEqual(report["summary"]["invalid"], 0)
+        for r in report["files"]:
+            self.assertEqual(r["errors"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

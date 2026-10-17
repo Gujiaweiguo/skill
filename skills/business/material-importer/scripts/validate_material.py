@@ -13,6 +13,7 @@
   - 日期字段格式必须正确
   - created/updated 不能是未来日期
   - 素材类型特有字段检查（资质→expires, 案例→client 等）
+  - id 唯一性检查（目录模式跨文件；文件模式对同目录树扫描）
 """
 
 import json
@@ -202,6 +203,47 @@ def validate_file(file_path: str) -> dict[str, Any]:
     return result
 
 
+# 机器聚合产物目录名：这些目录下的文件是 OCR/批量转换的聚合输出（如 slides 聚合 md），
+# id 由脚本自动生成且允许跨来源重复，不属于人工策展记录，不参与 id 唯一性检查。
+EXCLUDED_DIR_SEGMENTS = {"raw", "_extracted"}
+
+
+def iter_material_files(target_dir: str) -> list[str]:
+    """遍历目录收集 md 文件，按完整路径段排除 raw/ 与 _extracted/。"""
+    collected = []
+    for root, _dirs, files in os.walk(target_dir):
+        segments = root.split(os.sep)
+        if any(seg in EXCLUDED_DIR_SEGMENTS for seg in segments):
+            continue
+        for f in files:
+            if f.endswith(".md"):
+                collected.append(os.path.join(root, f))
+    return collected
+
+
+def check_id_uniqueness(results: list[dict]) -> None:
+    """跨文件 id 唯一性检查：重复 id 使所有持有文件 ❌。
+
+    直接修改 results：向每个持有者追加 error 并置 valid=False。
+    依据 2026-10-17 质检实证：243 个重复 id 在旧校验下全部通过（1436/0）。
+    """
+    id_holders: dict[str, list[dict]] = {}
+    for r in results:
+        mid = r.get("fields", {}).get("id")
+        if isinstance(mid, str) and mid.strip():
+            id_holders.setdefault(mid.strip(), []).append(r)
+
+    for mid, holders in id_holders.items():
+        if len(holders) < 2:
+            continue
+        for holder in holders:
+            others = [h["file"] for h in holders if h is not holder]
+            holder["errors"].append(
+                f"id 重复: {mid}（其他持有者: {', '.join(others)}）"
+            )
+            holder["valid"] = False
+
+
 def print_text_report(results: list[dict]) -> None:
     """输出文本格式校验报告。"""
     total = len(results)
@@ -259,12 +301,25 @@ def main():
     results = []
 
     if os.path.isdir(target):
-        for root, dirs, files in os.walk(target):
-            if "raw" in root.split(os.sep):
-                continue
-            for f in files:
-                if f.endswith(".md"):
-                    results.append(validate_file(os.path.join(root, f)))
+        # 两遍：先逐文件校验，再跨文件做 id 唯一性检查
+        for path in iter_material_files(target):
+            results.append(validate_file(path))
+        check_id_uniqueness(results)
+    elif os.path.isfile(target):
+        result = validate_file(target)
+        results.append(result)
+        # 单文件模式：对所在目录树扫描 id，检测该文件 id 是否与其它文件撞号
+        # （_extracted/ 内的机器聚合文件不参与，见 EXCLUDED_DIR_SEGMENTS）
+        if "_extracted" not in os.path.abspath(target).split(os.sep):
+            siblings = []
+            for p in iter_material_files(os.path.dirname(os.path.abspath(target))):
+                if os.path.abspath(p) == os.path.abspath(target):
+                    continue
+                data, _err = parse_frontmatter(p)
+                mid = data.get("id") if isinstance(data, dict) else None
+                if isinstance(mid, str) and mid.strip():
+                    siblings.append({"file": os.path.relpath(p), "fields": {"id": mid}, "errors": [], "valid": True})
+            check_id_uniqueness([result] + siblings)
     elif os.path.isfile(target):
         results.append(validate_file(target))
     else:

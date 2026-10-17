@@ -443,3 +443,4 @@ Agent:
 - 共享文件 `references/domain-tags.md` 被 product-prd-generator / compound-learning 读取，改动需同步 AGENTS.md「Shared files」表和 `check_docs_consistency.sh` 的 `SHARED_FILES` 数组
 - 修复新坑 → 先加回归测试再修代码；驱动修复的金样例登记在 `tests/fixtures_registry.json`（引用外部仓路径+sha，不复制二进制）
 - convert_excel 逻辑变更须 bump `EXTRACTOR_VERSION`（manifest 溯源依赖它区分产物代际）
+- 批量导入 ≥50 件必须分层抽样质检：抽 20 份分层样本（厂商×来源型×子目录），按 5 维准则评分——内容健全性 / frontmatter 准确性（含 id 唯一性）/ 溯源链可解析 / 表格完整性 / OCR 可信度；批级通过率 <90% 的维度视为批缺陷。依据 2026-10-17 质检实证：4 个缺陷中 3 个纯机械流程不可见。
