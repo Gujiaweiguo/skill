@@ -85,7 +85,7 @@ P5: 交互确认（TOC + 成功率 + 迭代）
 
 ### Inputs
 
-- 用户提供的源码项目路径（如 `/opt/code/mysqlbot`）
+- 用户提供的源码项目路径（如 `/opt/code/mysqlbot`；历史示例项目，产品现名 LnkChatBI，该目录为旧案例路径，当前不一定存在）
 - 环境变量 `$USERGUIDE_BASE`
 - 可选 CLI flags：`--port`、`--no-auth`、`--auth-user`、`--auth-pass`、`--full`
 
@@ -543,6 +543,8 @@ P4 处理 `.docx` / `.pptx` 参考资料时调用 `markitdown`，**复用 `mater
 ---
 
 ## Usage Examples
+
+> 注：以下示例中的 `mysqlbot`（及 `/opt/code/mysqlbot` 路径）为历史示例项目名，产品现名 **LnkChatBI**；示例路径是旧案例，不代表目录当前存在。
 
 ### 示例 1：基础调用
 

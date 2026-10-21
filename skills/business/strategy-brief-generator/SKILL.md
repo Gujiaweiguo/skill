@@ -323,8 +323,8 @@ evidence-ledger.json      # P7 台账（唯一 json 例外）
 
 ```markdown
 # 产品机会清单（战略分析产出）
-> 操作指引：用户确认某机会后，在 docs 仓库执行
-> `scripts/onboard.sh product <company> <pid> --name "<机会名>"` 加入 company.yaml 产品台账。
+> 操作指引：用户确认某机会后，在 `/opt/code/docs` docs 仓库根目录执行
+> `bash scripts/onboard.sh product <company> <pid> --name "<机会名>"` 加入 company.yaml 产品台账。
 
 | # | 机会名 | 证据 ID | 目标客户 | 建议优先级 | 与现有产品关系 |
 |---|--------|---------|----------|-----------|---------------|
@@ -423,7 +423,7 @@ Agent:
   6. P5 市场信号 + ★政策监管信号.md 直产 materials（联网检索药监局/广东省 AI 政策补充）
   7. P7 四看 + evidence-ledger.json 平铺（政策文件引用带发文字号）
   8. $STRATEGY_ROOT 平铺：总报告 + 产品机会清单 + 待确认事项
-     提示用户确认机会后 onboard.sh product lianyou <pid> 反哺
+     提示用户确认机会后在 /opt/code/docs docs 仓执行 bash scripts/onboard.sh product lianyou <pid> 反哺
 ```
 
 ### 示例 2：lanlnk 竞品专项
