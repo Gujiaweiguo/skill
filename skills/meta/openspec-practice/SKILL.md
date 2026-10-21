@@ -53,7 +53,7 @@ merchant-*/platform-*/tenancy 等 scope 族）已纳入产品实现基线——�
 ## 不适用
 
 - 直接生成 PRD：用 `product-prd-generator`。
-- 直接执行单个 OpenSpec change：用已有 `/opsx-*` 命令或 `openspec-*` skills。
+- 直接执行单个 OpenSpec change：用 `openspec-*` skills（`opsx apply` / `openspec apply` 等短语可触发；旧 `/opsx-*` slash 命令已随 1.14.1 upstream sync 移除）。
 - 修业务代码但没有 OpenSpec/PRD/归档语境：按项目 `AGENTS.md` 和普通编码流程处理。
 - 为了统一格式补造历史 change 或重写不可变 archive。
 

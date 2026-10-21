@@ -14,7 +14,7 @@ Two skill types:
 |------|-------|
 | Edit skills here | `skills/<category>/<name>/` |
 | OpenCode symlinks | `.opencode/skills/<name>` → `../../skills/...` (relative) or `/opt/code/skill/skills/...` (absolute) |
-| OpenSpec commands | `.opencode/command/opsx-*.md` |
+| OpenSpec skills | `.opencode/skills/openspec-*/`（upstream artifacts，read-only；1.14.1 sync 后无独立 command 文件） |
 | External data (business skills) | `$LANLNK_BASE` = `/opt/code/docs/lanlnk` (not in this repo) |
 | External data (user guides) | `$USERGUIDE_BASE` = `<COMPANY_BASE>/materials/03-products/user-guides` (derived from company base, see COMPANIES.md §3) |
 | Config | `config/lanlnk.yaml` |
@@ -417,15 +417,17 @@ subprocess.run(
 
 ## OpenSpec Workflow
 
-CLI v1.1.1 on PATH. Each change = `openspec/changes/<name>/`.
+CLI v1.14.1 on PATH. Each change = `openspec/changes/<name>/`.
 
-| Command | Action |
-|---------|--------|
-| `/opsx-new` | Start new change |
-| `/opsx-ff` | Generate all artifacts at once |
-| `/opsx-apply` | Implement tasks from tasks.md |
-| `/opsx-verify` | Validate implementation |
-| `/opsx-archive` | Finalize |
+Workflow entry points are the `openspec-*` skills in `.opencode/skills/`（`openspec-new-change` / `openspec-ff-change` / `openspec-apply-change` / `openspec-verify-change` / `openspec-archive-change` 等）。旧 `.opencode/command/opsx-*.md` slash 命令已随 1.14.1 upstream sync 移除；skill 触发短语仍兼容 `opsx apply` / `openspec apply` 等说法。
+
+| Skill | Action |
+|-------|--------|
+| `openspec-new-change` | Start new change |
+| `openspec-ff-change` | Generate all artifacts at once |
+| `openspec-apply-change` | Implement tasks from tasks.md |
+| `openspec-verify-change` | Validate implementation |
+| `openspec-archive-change` | Finalize |
 
 Transient artifacts (`proposal.md`, `design.md`, `tasks.md`, `specs/`) are gitignored. Archives go to `openspec/changes/archive/`.
 

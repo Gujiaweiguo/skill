@@ -24,7 +24,7 @@ docs → 项目仓 released implementation-package 的**项目仓侧标准执行
    - 目标仓内**不存在**同 `package_id` 的既有 `implementation-return`（一次性消费守卫）。
 3. **preflight**：HEAD / origin 指针、工作区干净度、输入锚点（docs 文件 SHA-256）核对；门禁命令与证据路径**从本仓 AGENTS.md / Makefile 自读**——不硬编码任何产品的命令或路径。
 4. **宣告权限**：按包权限表逐项列 granted / denied（至少覆盖 commit / archive / push / docs 写入），权限优先级按契约 v1.4（released 包授权 > 仓默认规则；push 仅显式授予；docs 写入永不获得）。
-5. **执行**：按包内依赖波次与授权推进，**一次一个 apply**，尊重仓内 OpenSpec 纪律（`/opsx-*` 或既有工作流）。
+5. **执行**：按包内依赖波次与授权推进，**一次一个 apply**，尊重仓内 OpenSpec 纪律（`openspec-*` skills / `opsx apply` 短语或既有工作流）。
 6. **自主推进**：仅在包内异常回呼条件命中时暂停对应行并回呼 docs（格式见协议），其余自主推进，**不向 docs 请求步骤级提示**。
 7. **回执**：按包内 `checkpoint_policy` 发射 `implementation-return` JSON 并自校验字段（schema 自检清单见协议）。
 
