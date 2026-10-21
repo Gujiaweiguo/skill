@@ -86,7 +86,7 @@ INVENTORY: Final = [
     # 落地后补迁（计划见 docs 仓 lnkcrm reconciliation review-status-migration-plan-20261021.md）。
     ("lnkreport", "report-structure-authoring-parity-20261018", None, "", "", "miss", "miss", "miss", None, None, None),
     ("lnkreport", "visualization-family-remediation-20261021", "reviewed", "change_id", "feature_commit", "miss", "str-list", "str", "done", "implementation-package-execution", "implementation-return/1.7"),
-    ("lnkreport", "visualization-tenant-isolation-20261021", "reviewed", "change", "feature_commits", "list", "str-list", "str", "done", "implementation-package-execution", "1.0"),
+    ("lnkreport", "visualization-tenant-isolation-20261021", "absorbed", "change", "feature_commits", "list", "str-list", "str", "done", "implementation-package-execution", "1.0"),
 ]
 
 # 过渡例外（理由见模块 docstring）：这些字段的缺失不判 FAIL。
