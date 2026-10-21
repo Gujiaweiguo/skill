@@ -493,14 +493,15 @@ def test_reconciliation_routes_semantic_decisions_to_opc() -> None:
     assert _validate("reconciliation-record.schema.json", wrong_owner)
 
 
-def test_implementation_return_requires_verification_for_accepted_status() -> None:
+def test_implementation_return_requires_verification_for_absorbed_status() -> None:
+    # 2026-10-21 词表收口：accepted→absorbed（终态吸收需验证链）。
     base: dict[str, JsonValue] = {
         "schema_version": "1.0",
         "return_id": "RET-001",
         "product_id": "lnkcre",
         "trace_ids": ["PRD-CRE-001"],
         "target_repo": "/opt/code/lnkcre",
-        "review_status": "accepted",
+        "review_status": "absorbed",
         "proposed_updates": [],
     }
     assert _validate("implementation-return.schema.json", base)
@@ -514,13 +515,16 @@ def test_implementation_return_requires_verification_for_accepted_status() -> No
 
 
 def test_unreviewed_implementation_return_remains_proposed() -> None:
+    # 2026-10-21 词表收口：incomplete 已从词表移除——未完成由缺失 review_status +
+    # compat helper warning 表达（见 test_implementation_return_inventory.py），
+    # 未评审语义用 pending 承载。
     pending: dict[str, JsonValue] = {
         "schema_version": "1.0",
         "return_id": "RET-PENDING-001",
         "product_id": "lnkcre",
         "trace_ids": ["PRD-CRE-001"],
         "target_repo": "/opt/code/lnkcre",
-        "review_status": "incomplete",
+        "review_status": "pending",
         "proposed_updates": [{
             "destination_layer": "ontology",
             "summary": "Review semantic mismatch found during implementation",
@@ -528,12 +532,12 @@ def test_unreviewed_implementation_return_remains_proposed() -> None:
         }],
     }
     assert _validate("implementation-return.schema.json", pending) == []
-    accepted_without_verification: dict[str, JsonValue] = {
+    absorbed_without_verification: dict[str, JsonValue] = {
         **pending,
-        "review_status": "accepted",
+        "review_status": "absorbed",
         "review_owner": "OPC",
     }
-    assert _validate("implementation-return.schema.json", accepted_without_verification)
+    assert _validate("implementation-return.schema.json", absorbed_without_verification)
 
 
 def test_reverse_implementation_return_cannot_mutate_canonical_code_or_accept_update() -> None:
@@ -563,9 +567,9 @@ def test_reverse_implementation_return_cannot_mutate_canonical_code_or_accept_up
         }],
     }
     assert _validate("implementation-return.schema.json", code_write)
-    accepted_reverse: dict[str, JsonValue] = {
+    absorbed_reverse: dict[str, JsonValue] = {
         **reverse_return,
-        "review_status": "accepted",
+        "review_status": "absorbed",
         "open_spec_change_id": "lchbi-change-1",
         "verification_refs": ["verification.md"],
         "review_owner": "OPC",
@@ -575,7 +579,7 @@ def test_reverse_implementation_return_cannot_mutate_canonical_code_or_accept_up
             "status": "accepted",
         }],
     }
-    assert _validate("implementation-return.schema.json", accepted_reverse)
+    assert _validate("implementation-return.schema.json", absorbed_reverse)
 
 
 def test_accepted_reverse_return_does_not_accept_its_candidate_updates() -> None:
@@ -590,7 +594,7 @@ def test_accepted_reverse_return_does_not_accept_its_candidate_updates() -> None
         "source_revision": "abc123",
         "scan_coverage": {"status": "complete", "scope": ["src/reports"]},
         "verification_refs": ["verification.md"],
-        "review_status": "accepted",
+        "review_status": "absorbed",
         "review_owner": "OPC",
         "proposed_updates": [{
             "destination_layer": "ontology",

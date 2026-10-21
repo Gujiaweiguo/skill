@@ -716,3 +716,5 @@ print('ontology OK')
 **现象**（2026-10-21 回执吸收 pilot 实证）：`references/product-governance/implementation-return.schema.json` 的 `review_status` enum 是 `["incomplete","pending","accepted","rejected"]`，而 openspec-practice 契约 `skills/meta/openspec-practice/references/implementation-package.md`（v1.8+）与全部实际回执使用的生命周期是 `pending → reviewed → absorbed`。两侧词表不同源；schema 校验按现状会把真实回执判为非法。
 
 **处置**：schema 归本 skill（product-prd-generator）治理域。对齐方向建议以契约为准（enum 改 `pending/reviewed/absorbed` + 保留 `rejected`），同时对 `changes[]` 键名（`id`/`change_id`/`change` 三套并存）与 `proposed_updates`（自由文本 vs 结构体）做一次收口；改前先盘点 docs 仓全部存量回执的实际形状（30+ 件），避免 schema 收紧把历史回执打成非法。owner 裁决前，回执校验以契约为准、schema 仅作结构参考。
+
+**2026-10-21 已收口（enum 对齐契约词表 + 兼容字段），遗留：野值映射表待 owner 裁决。**

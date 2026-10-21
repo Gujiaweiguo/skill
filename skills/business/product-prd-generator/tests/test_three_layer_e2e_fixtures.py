@@ -274,7 +274,7 @@ def _forward_chain(product_id: str, product_class: str, profile: str, code_revis
         "open_spec_change_id": f"{product_id}-change-1",
         "source_revision": code_revision,
         "verification_refs": [f"verification-{product_id}.md"],
-        "review_status": "accepted",
+        "review_status": "absorbed",
         "review_owner": "OPC",
         "proposed_updates": [],
     }
@@ -354,7 +354,7 @@ def test_forward_no_change_flow_and_reverse_recovery_never_auto_promote() -> Non
         "open_spec_change_id": "lnkreport-change-9",
         "source_revision": "2222222",
         "verification_refs": ["verification-9.md"],
-        "review_status": "accepted",
+        "review_status": "absorbed",
         "review_owner": "OPC",
         "proposed_updates": [],
     }
@@ -410,7 +410,7 @@ def test_forward_no_change_flow_and_reverse_recovery_never_auto_promote() -> Non
         "source_revision": "9999999",
         "scan_coverage": {"status": "partial", "scope": ["src/reports"], "limitations": ["tests not scanned"]},
         "verification_refs": ["verification-7.md"],
-        "review_status": "accepted",
+        "review_status": "absorbed",
         "review_owner": "OPC",
         "proposed_updates": [{
             "destination_layer": "ontology",
