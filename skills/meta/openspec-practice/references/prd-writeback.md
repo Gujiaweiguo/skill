@@ -90,6 +90,8 @@ docs 侧必须记录：
 7. 更新前先列出候选 changes、目标 PRD、将修改的 PRD 文件和范围，以及按 `implementation-return.schema.json` 组织的 `proposed_updates` 清单，等用户确认。
 8. 用户确认后再进入回写；canonical 更新仍须由 destination owner 审核接受。用户确认仅在其身份为 destination owner 或获授权代理时才满足该审核门。不改目标项目代码，不创建目标项目 change。
 
+用户确认必须落盘为 owner decision record；至少包含 `status`、`decision`、`owner`、`OWNER SIGN-OFF`、`approved_changes` 和 `forbidden_changes`。会话中的口头“已批准”不作为独立审计证据。
+
 ## 回写规则
 
 - 目标治理顺序：未来增量先做 ontology impact check（记录变更或有依据的无变更），再形成 PRD delta，最后交目标代码仓实施。已存在的代码领先场景可反向形成带 revision/coverage 的实现事实与 reconciliation/candidate，但不得将实现现状自动升级为产品意图。

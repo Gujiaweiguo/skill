@@ -45,11 +45,16 @@
 | L2 多 change 或跨 scope | L1 全部字段 + 目标仓 revision/commit | 另需：全部相关 scope 清单、每个 scope 的验证命令、change 依赖/冲突/执行顺序、独占边界标注（数据库/权限/路由/共享组件）、一次只推进一个 apply。不默认要求完整三元组 |
 | L3 交付回写 / canonical 晋升 / 正式对账 | L2 全部字段 + 完整三元组（feature SHA / archive SHA / origin 远端指针）+ implementation-return proposal | 目标项目仓逐项复核后才能创建对应 change；canonical 晋升必须 destination owner 审核 |
 
+## 一次性实施交接包（可执行授权形态）
+
+需要「Owner 决策前置 + 范围内受限自主执行 + 完成后统一回写」的批次交接，使用 [`implementation-package.md`](./implementation-package.md)（全公司契约）生成正式包与 `implementation-return` 回执（`origin_flow=implementation-package-execution`），落在 `<company_base>/30-products/<product>/reconciliation/`。默认 release 规则（v1.7）：基线充分、Owner 决策已明确且无阻塞未决项时，「出实施包」直接生成 `package_status=released` 正式包，并在**同一条回复**同时输出交接包摘要、包绝对路径与项目仓启动段——不等待、不要求用户回复「同意」；Owner 有异议时直接提修改意见，更新 released 包后再次同条输出摘要与启动段；draft 仅用于缺口/未决业务决策或用户明确要求草案。正式包 released 交付时**默认附项目仓启动段**：目标仓已接入 `implementation-package-execution` 用一行「执行实施包 <绝对路径>」；未接入时渲染完整回退提示词（可直接复制到项目仓会话）。会话级实施提示词与启动段均不归档；本文件的字段契约仍是其上游。
+
 ## docs 侧交接字段（输出给项目仓）
 
 - docs artifact absolute path（docs 产物绝对路径）
 - stable ID（稳定 ID）
 - docs commit SHA
+- docs 工作区版本：工作区干净时为 docs commit SHA；有未提交输入时还需逐文件 SHA-256、采集时间和 `workspace-version`
 - requirement / feature IDs
 - classification（五分类，定义见 `artifact-to-changes.md`）
 - evidence paths（证据路径）

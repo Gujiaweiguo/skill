@@ -124,6 +124,10 @@ def discover_scopes(root: Path) -> tuple[list[Path], list[str]]:
 
 
 def count_unchecked_tasks(tasks_file: Path) -> int | None:
+    # ``Path.glob`` can yield a dangling symlink; keep it in the unreadable
+    # bucket instead of treating it as an absent archive artifact.
+    if not os.path.lexists(tasks_file):
+        return None
     try:
         return sum(
             1
@@ -293,7 +297,14 @@ def scan_scope(scope: Path) -> dict[str, Any]:
         stale_files: list[dict[str, Any]] = []
         unreadable_files: list[dict[str, str]] = []
         stale_total = 0
-        for tasks_file in archive_dir.glob("*/tasks.md") if archive_dir.exists() else []:
+        archive_task_files: list[Path] = []
+        if archive_dir.exists():
+            for change_dir in archive_dir.iterdir():
+                if change_dir.is_dir():
+                    tasks_file = change_dir / "tasks.md"
+                    if tasks_file.exists() or os.path.lexists(tasks_file):
+                        archive_task_files.append(tasks_file)
+        for tasks_file in archive_task_files:
             count = count_unchecked_tasks(tasks_file)
             if count is None:
                 unreadable_files.append(

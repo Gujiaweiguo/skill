@@ -1,6 +1,6 @@
 ---
 name: openspec-practice
-description: OpenSpec 实战工作流 Skill。用于用短口令处理真实项目里的 OpenSpec 现场扫描、PRD 差异消费、PRD/增量 PRD/模块 PRD/UI 方案/治理 Plan 转 changes、多 active change 管理、多 OpenSpec scope、archive 漂移审计、PRD 回写，以及把 verified 经验通过复利工程持续回灌到手册或 skill。触发场景：“现场扫描 mi/lnkchat”、“消费 PRD 差异”、“消费 PRD 路径，目标 lnkchat”、“消费增量 PRD 路径，目标 lnkchat”、“消费模块 PRD 路径，目标 lnkchat”、“消费 UI 方案 路径，目标项目”、“消费治理 Plan 路径，目标项目”、“整理 active changes”、“检查多 scope”、“归档漂移审计”、“回写 PRD lnkchat”、“用 OpenSpec 实战 skill”。
+description: OpenSpec 实战工作流 Skill。用于用短口令处理真实项目里的 OpenSpec 现场扫描、PRD 差异消费、PRD/增量 PRD/模块 PRD/UI 方案/治理 Plan 转 changes、多 active change 管理、多 OpenSpec scope、archive 漂移审计、一次性实施交接包、PRD 回写，以及把 verified 经验通过复利工程持续回灌到手册或 skill。触发场景：“现场扫描 mi/lnkchat”、“消费 PRD 差异”、“消费 PRD 路径，目标 lnkchat”、“消费增量 PRD 路径，目标 lnkchat”、“消费模块 PRD 路径，目标 lnkchat”、“消费 UI 方案 路径，目标项目”、“消费治理 Plan 路径，目标项目”、“出实施包”、“整理 active changes”、“检查多 scope”、“归档漂移审计”、“回写 PRD lnkchat”、“用 OpenSpec 实战 skill”。
 ---
 
 # OpenSpec Practice
@@ -70,13 +70,14 @@ merchant-*/platform-*/tenancy 等 scope 族）已纳入产品实现基线——�
 | `消费模块 PRD <路径>，目标 <项目>` | 模块 PRD 绝对路径，目标项目名或路径 | `references/artifact-to-changes.md` |
 | `消费 UI 方案 <路径>，目标 <项目>` | UI 方案 / backlog 绝对路径，目标项目名或路径 | `references/artifact-to-changes.md` |
 | `消费治理 Plan <路径>，目标 <项目>` | 治理 Plan / 审计报告绝对路径，目标项目名或路径 | `references/artifact-to-changes.md` |
+| `出实施包 [产品/批次]` | 已有 PRD/增量 PRD/基线与目标产品上下文；批次不明确时由会话询问。基线充分且无未决业务决策时默认直接生成 released 正式包，摘要+路径+启动段同条输出 | `references/implementation-package.md` + `references/cross-repo-handoff.md` |
 | `整理 active changes` | 项目路径 | `references/active-change-triage.md` |
 | `检查多 scope` | 仓库路径 | `references/multi-scope.md` |
 | `归档漂移审计 <change>` | archived change 路径或 change id | `references/archive-drift.md` |
 | `回写 PRD` / `回写 PRD <项目名/时间范围/change...>` | 默认从项目上下文自动发现最近 archived changes；项目名、时间范围、change id/path 可作精确筛选 | `references/prd-writeback.md` |
 | `复利工程` / `沉淀这次经验` | 本次已验证经验 | `references/maintenance.md` |
 
-跨仓交接字段与项目仓收尾报告模板由 L2/L3 流程共用：`references/cross-repo-handoff.md`。
+跨仓交接字段与项目仓收尾报告模板由 L2/L3 流程共用：`references/cross-repo-handoff.md`；其可执行授权形态——一次性实施交接包（Owner 决策前置 + 受限自主执行 + 统一回写）与 implementation-return 回执——见 `references/implementation-package.md`（全公司契约）。
 
 项目路径解析：
 
@@ -162,6 +163,7 @@ uv run python scripts/scan_openspec.py <PROJECT_ROOT>
 - 不直接修改产品代码、canonical ontology 或 canonical PRD；skill 仓库不拥有任何产品的 canonical 层，不写产品代码仓库，目标仓库始终拥有自己的 OpenSpec changes 与验证。
 - 不把 PRD 过时或 code_map / term-aliases 漏判转成代码 change；不因目标项目仓库内找不到 PRD 就判定 PRD 不存在，先核对用户给出的 docs 绝对路径。
 - 完整交付三元组与回写协议仅 L3 启用。PRD 消费与回写遵循 product-prd-generator 的共享 product-governance 契约（`skills/business/product-prd-generator/references/product-governance/`）；proposal 起始状态、destination owner 审核、review-gated ontology 提案、晋升后 pairwise 对账等细则以 `references/prd-writeback.md` 为本 skill 内唯一权威描述，入口不复制。
+- 一次性实施交接以 `references/implementation-package.md` 的正式包 + implementation-return 回执为权威记录；出实施包默认直接生成 `package_status=released` 正式包（基线充分、Owner 决策已明确、无阻塞未决项时），**同一条回复同时输出**交接包摘要、交接包绝对路径和项目仓启动段——同意不是必需步骤，不等待用户回复；Owner 有异议时直接提修改意见，更新 released 包后再次同条输出；存在未决业务决策或用户明确要求草案时才出 draft 并列 OQ；released 交付默认同时返回交接包绝对路径和项目仓启动段（目标仓已接入 `implementation-package-execution` 用一行「执行实施包 <绝对路径>」，未接入用完整回退提示词）；会话级实施提示词只在会话中生成和发送，不归档。
 - 新流程优先要求 `verification-report.md`；历史项目缺报告时按 proposal/tasks/specs/code/tests 做证据审计。
 - Python 一律用 `uv run`，不使用 `pip`。
 

@@ -37,7 +37,7 @@
 ## Implementation Plan 门禁
 
 - Implementation Plan v1 的每一项必须标注：分类、证据路径、验收标准、验证命令。
-- 没有目标项目仓复核结果时，不得直接进入 `/opsx-new` 或 `/opsx-ff`。
+- 没有目标项目仓复核结果时，不得直接创建 change（`openspec-new-change` skill 或 `opsx new` 短语）。
 - 保留默认行为：只出 Plan，用户确认后、目标项目仓复核完成，才创建 change。
 
 ## 步骤
@@ -45,7 +45,7 @@
 1. 读取目标项目 `AGENTS.md`、`openspec/specs/`、active changes、近期 archive。
 2. 抽取 PRD 报告里的候选缺口，逐项标五分类（见上表）。
 3. 对 `confirmed-implementation` 缺口输出 Implementation Plan v1：每项标注分类、证据路径、验收标准、验证命令，另含 `<CHANGE_ID>`、依赖顺序、回归范围、是否需要先做 Prometheus plan。
-4. 等用户确认、且目标项目仓复核结果回来后，才进入 `/opsx-new` 或 `/opsx-ff`。
+4. 等用户确认、且目标项目仓复核结果回来后，才进入 change 创建流程（`openspec-new-change` skill，必要时 `openspec-ff-change` 快速生成全部 artifacts）。
 
 ## 拆分原则
 
