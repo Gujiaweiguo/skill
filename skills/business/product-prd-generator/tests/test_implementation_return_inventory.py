@@ -11,8 +11,10 @@ docs 仓另有 2 件 out/prd/lnkchat 旧式件（顶层 status="done-pending-own
 断言分两组：
   组一（重点）：27 件真实形态经放宽后 schema 直接 validate 通过，无需归一化。
     仅以下「过渡例外」允许失败点（逐条理由，非静默放行）：
-      - review_status 野值（closed-registered-and-pushed / docs-evidence-… /
-        approved-and-archived）：enum 只含契约词表，野值→词表映射待 owner 裁决；
+      - review_status 野值：2026-10-21 owner 裁决批（A+B+C）已把 10 件真野值/
+        缺失迁为 absorbed（原值保留在 review_status_superseded）；现基线中仅剩
+        report-structure-authoring-parity 一件顶层缺失（文件被并行会话占用，
+        落地后补迁）。野值保留语义由合成用例锚定；
       - absorbed / code-evidence-reverse 件缺 absorbed 门槛字段
         （open_spec_change_id / verification_refs / source_revision / scan_coverage /
         review_owner）：存量件早于「吸收完成必须有证据锚」门槛落地，收紧需
@@ -60,18 +62,18 @@ INVENTORY: Final = [
     ("lnkcre", "rent-plan-haiding-20261021", "pending", "id", "feature_commits", "list", "empty", "str", "pending", "implementation-package-execution", "1.0"),
     ("lnkcre", "tax-export-dev-fixtures-20261019", "absorbed", "change_id", "feature_commits", "dict", "obj-list", "obj", "done", "implementation-package-execution", "1.0"),
     # --- lnkcrm (12) ---
-    ("lnkcrm", "admin-nav-hierarchy", None, "change", "", "list", "miss", "str", "done", "implementation-package-execution", "1"),
-    ("lnkcrm", "crosscut", None, "change_id", "feature_commits", "miss", "str-list", "str", None, "implementation-package-execution", "1.0"),
-    ("lnkcrm", "e2e-smoke-hardening", None, "change", "feature_commit", "list", "miss", "str", "done", "implementation-package-execution", "1"),
+    ("lnkcrm", "admin-nav-hierarchy", "absorbed", "change", "", "list", "miss", "str", "done", "implementation-package-execution", "1"),
+    ("lnkcrm", "crosscut", "absorbed", "change_id", "feature_commits", "miss", "str-list", "str", None, "implementation-package-execution", "1.0"),
+    ("lnkcrm", "e2e-smoke-hardening", "absorbed", "change", "feature_commit", "list", "miss", "str", "done", "implementation-package-execution", "1"),
     ("lnkcrm", "member-freeze-unfreeze", "absorbed", "", "", "list", "obj-list", "miss", None, "code-evidence-reverse", "1.0"),
-    ("lnkcrm", "nav-followups", None, "change", "feature_commit", "list", "miss", "str", "done", "implementation-package-execution", "1"),
-    ("lnkcrm", "s6-d1b", "closed-registered-and-pushed", "", "", "miss", "miss", "str", None, "implementation-package-execution", "1.0"),
+    ("lnkcrm", "nav-followups", "absorbed", "change", "feature_commit", "list", "miss", "str", "done", "implementation-package-execution", "1"),
+    ("lnkcrm", "s6-d1b", "absorbed", "", "", "miss", "miss", "str", None, "implementation-package-execution", "1.0"),
     ("lnkcrm", "s6-platform-002", "absorbed", "", "", "list", "obj-list", "miss", None, "code-evidence-reverse", "1.0"),
-    ("lnkcrm", "verify-hygiene", None, "change", "feature_commit", "list", "empty", "str", "done", "implementation-package-execution", 1),
+    ("lnkcrm", "verify-hygiene", "absorbed", "change", "feature_commit", "list", "empty", "str", "done", "implementation-package-execution", 1),
     ("lnkcrm", "w1-c2c3c4", "absorbed", "change_id", "feature_commits", "list", "obj-list", "str", None, "implementation-package-execution", "1.0"),
-    ("lnkcrm", "w2a", None, "change_id", "feature_commits", "miss", "miss", "str", None, "implementation-package-execution", "1.0"),
-    ("lnkcrm", "w3a-w1s", "docs-evidence-review-passed-project-ledger-accepted-local-unpushed", "change_id", "feature_commits", "miss", "str-list", "str", None, "implementation-package-execution", "1.0"),
-    ("lnkcrm", "w3b", None, "change_id", "feature_commits", "miss", "str-list", "str", None, "implementation-package-execution", "1.0"),
+    ("lnkcrm", "w2a", "absorbed", "change_id", "feature_commits", "miss", "miss", "str", None, "implementation-package-execution", "1.0"),
+    ("lnkcrm", "w3a-w1s", "absorbed", "change_id", "feature_commits", "miss", "str-list", "str", None, "implementation-package-execution", "1.0"),
+    ("lnkcrm", "w3b", "absorbed", "change_id", "feature_commits", "miss", "str-list", "str", None, "implementation-package-execution", "1.0"),
     # --- lnkreport (10) ---
     ("lnkreport", "backlog-cleanup-20261019", "pending", "", "", "list", "empty", "str", None, "implementation-package-execution", "1.0"),
     ("lnkreport", "backlog-remaining-20261020", "absorbed", "change_id", "feature_commits", "list", "obj-list", "obj", "done", "implementation-package-execution", "1.0"),
@@ -79,7 +81,9 @@ INVENTORY: Final = [
     ("lnkreport", "embedded-viewer-shell-20261019", "pending", "change", "feature_commits", "list", "obj-list", "str", "done", "implementation-package-execution", "1.0"),
     ("lnkreport", "epviewer-w1-20261018", "pending", "change", "feature_commits", "list", "str-list", "str", "done", "implementation-package-execution", "1.0"),
     ("lnkreport", "render-reliability-followups-20261020", "absorbed", "change_id", "feature_commits", "list", "obj-legacy", "str", "done", "implementation-package-execution", "1.0"),
-    ("lnkreport", "report-grid-paste-format-virgin-target-persistence-20261019", "approved-and-archived", "", "", "list", "obj-list", "obj", None, "implementation-package-execution", "1.0"),
+    ("lnkreport", "report-grid-paste-format-virgin-target-persistence-20261019", "absorbed", "", "", "list", "obj-list", "obj", None, "implementation-package-execution", "1.0"),
+    # 2026-10-21 迁移批唯一未迁件：目标文件被并行 docs 会话占用（在途未提交），
+    # 落地后补迁（计划见 docs 仓 lnkcrm reconciliation review-status-migration-plan-20261021.md）。
     ("lnkreport", "report-structure-authoring-parity-20261018", None, "", "", "miss", "miss", "miss", None, None, None),
     ("lnkreport", "visualization-family-remediation-20261021", "reviewed", "change_id", "feature_commit", "miss", "str-list", "str", "done", "implementation-package-execution", "implementation-return/1.7"),
     ("lnkreport", "visualization-tenant-isolation-20261021", "reviewed", "change", "feature_commits", "list", "str-list", "str", "done", "implementation-package-execution", "1.0"),
@@ -248,13 +252,27 @@ def test_normalize_real_return_shapes(spec: tuple[Any, ...]) -> None:
 
 
 def test_wild_review_status_vocabulary_is_preserved_not_mapped() -> None:
-    """三个已知野值必须保留原文（warning），不得猜测映射到词表。"""
+    """野值必须保留原文（warning），不得猜测映射到词表。
+
+    2026-10-21 owner 裁决批（A+B+C）已把 10 件真野值/缺失迁为 absorbed
+    （原值保留在回执 review_status_superseded），真件基线中现仅剩
+    report-structure-authoring-parity 一件缺失（被并行会话占用待补迁）。
+    本用例改为合成驱动：锚定 helper 对未来新野值的保留语义。
+    """
     for wild in (
         "closed-registered-and-pushed",
         "docs-evidence-review-passed-project-ledger-accepted-local-unpushed",
         "approved-and-archived",
     ):
-        ret = _build_fixture(next(s for s in INVENTORY if s[2] == wild))
+        ret = {
+            "schema_version": "1.0",
+            "return_id": f"RET-FIX-WILD-{wild[:12]}",
+            "product_id": "lnkcrm",
+            "origin_flow": "implementation-package-execution",
+            "trace_ids": ["REC-FIX-WILD"],
+            "review_status": wild,
+            "proposed_updates": [],
+        }
         view, warnings = normalize_implementation_return(ret)
         assert "review_status" not in view
         assert any(wild in w and "野值" in w for w in warnings)
