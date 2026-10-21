@@ -718,3 +718,5 @@ print('ontology OK')
 **处置**：schema 归本 skill（product-prd-generator）治理域。对齐方向建议以契约为准（enum 改 `pending/reviewed/absorbed` + 保留 `rejected`），同时对 `changes[]` 键名（`id`/`change_id`/`change` 三套并存）与 `proposed_updates`（自由文本 vs 结构体）做一次收口；改前先盘点 docs 仓全部存量回执的实际形状（30+ 件），避免 schema 收紧把历史回执打成非法。owner 裁决前，回执校验以契约为准、schema 仅作结构参考。
 
 **2026-10-21 已收口（enum 对齐契约词表 + 兼容字段），遗留：野值映射表待 owner 裁决。**
+
+**Owner 口径（2026-10-21 裁决，A+B+C）**：11 件存量野值/缺失 review_status 全部裁 `absorbed`（执行计划见 docs 仓 lnkcrm reconciliation `review-status-migration-plan-20261021.md`，等在途会话落地后一批执行）。三条判定口径随裁决生效：①回执字段与台账矛盾时以 ledger decision_log 为准，迁移时同步修正回执陈旧字段；②push 由后续整链完成时 absorbed 不被 `pushed:false` 阻塞，迁移时回填 true 并注记证据来源；③**verification-only 批次的吸收证据形态 = waves 收口文本 + S6 台账快照（无 ledger change 实体），接受为有效 absorbed 证据**——后续同类回执（如 s6-d1b 形态）判定沿用此模板。
