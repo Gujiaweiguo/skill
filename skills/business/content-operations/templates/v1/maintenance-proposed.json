@@ -1,0 +1,10 @@
+{
+  "entity_type": "article",
+  "entity_id": "24",
+  "rationale": "<非空：本次修订的理由，供人审参考>",
+  "base_digest": "<current 快照字节 SHA-256，由 scripts/maintenance_payload.py 构建时计算>",
+  "proposed_fields": {
+    "<changed_field>": "<desired value>"
+  },
+  "status": "pending-review"
+}

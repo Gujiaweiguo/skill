@@ -1,7 +1,7 @@
 # Content Operations Skill Specification
 
 ## Purpose
-Defines the lnkwebsite content-operations draft-import contracts: case/product payload validation, client authorization gates, and forbidden brand-term checks before CMS draft creation.
+Defines the lnkwebsite content-operations skill contracts: draft-only article/case/product payload validation (client authorization gates, forbidden brand-term checks) before CMS draft creation, and evidence-gated maintenance revisions for published content (build → diff review → human review → apply, with the Skill never approving or applying).
 ## Requirements
 ### Requirement: Case payloads conform to the draft-import contract
 
@@ -34,8 +34,6 @@ The Skill SHALL validate a Product payload before CMS import. The payload SHALL 
 #### Scenario: AI Vision product claims non-MVP capability
 - **WHEN** a Product payload has slug="mallsense-ai" and details.capabilities includes "精准客流"
 - **THEN** the Skill SHALL reject the payload (roadmap item in capabilities)
-
-## MODIFIED Requirements
 
 ### Requirement: The Skill creates drafts only
 

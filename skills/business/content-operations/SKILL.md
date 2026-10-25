@@ -1,17 +1,22 @@
 ---
 name: content-operations
-version: "1.0.0"
+version: "1.1.0"
 status: validated
 scope: lnkwebsite
 description: |-
   蓝联创新网站内容运营 Skill。将有证据支撑的选题按 Research、Generation、Validation、Draft Import
   四个阶段转成 lnkwebsite CMS 草稿，保留研究包、Pattern Draft、审阅记录、Article JSON、校验报告和导入回执。
+  对已发布内容（article/case/product）提供 Maintenance 修订能力：改前快照 → diff 审阅 → 人审 → 应用，
+  Skill 只建 pending-review 修订单，永不 approve/reject/apply。
   触发场景："生成官网文章草稿"、"校验 Article JSON"、"把已审批文章导入 CMS 草稿"、
-  "为 lnkwebsite 做内容运营"。仅处理 lnkwebsite 现有栏目，不负责公开发布、栏目扩展、排期自动化或批量导入。
+  "修订已发布文章"、"给已发布内容建维护修订单"、"为 lnkwebsite 做内容运营"。
+  仅处理 lnkwebsite 现有栏目，不负责公开发布、栏目扩展、排期自动化或批量导入。
 compatibility: |-
   Requires Python 3.10+ and uv. Runtime scripts depend on the ``markdown`` library (auto-installed by ``uv sync``).
   Runtime artifacts use CONTENT_OUTPUT_BASE (default /opt/code/docs/lanlnk/lnkwebsite/content).
   Draft Import requires OpenCode MCP Streamable HTTP transport to the lnkwebsite MCP server.
+  Maintenance requires MCP tools ``maintenance_revision_create`` / ``maintenance_revision_get``
+  with token scope ``content.maintenance.draft`` + ``content.maintenance.read``.
 ---
 
 # Content Operations
@@ -26,7 +31,7 @@ Promotion Rule: pilot → validated 需 3 次端到端跑通 + 人审通过。
 | 2 | 2026-08-01 | AI Agent vs Automation | industry-insight (ai-trends) | 25 | ✅ approved |
 | 3 | 2026-08-01 | What is Function Calling | term-entry (ai-trends) | 26 | ✅ approved |
 
-Promotion date: 2026-08-01. All 4 phases (Research → Generation → Validation → Draft Import) completed end-to-end for each pilot. 28 unit tests green throughout.
+Promotion date: 2026-08-01. All 4 phases (Research → Generation → Validation → Draft Import) completed end-to-end for each pilot. 29 unit tests green at v1.0.0; 58 after the v1.1.0 Maintenance handler (29 pre-existing tests untouched).
 
 ## 目标与边界
 
@@ -134,6 +139,60 @@ uv run python -m scripts.write_receipt \
 
 **完成条件**：MCP `article_create` 返回 article ID，返回状态为 `draft`，且回执已原子写入。
 
+## Maintenance（已发布内容修订，R-CMS-03）
+
+针对已发布的 article/case/product 建立可追溯修订。**安全边界：Skill 建单（pending-review）不审单不应用**——approve/reject/apply 是人工 publisher 在 admin UI 的动作，Skill 与其脚本永不执行（OD-CMS03-TRANSPORT）；token scope `content.maintenance.draft` + `content.maintenance.read`。
+
+产物目录：`$CONTENT_OUTPUT_BASE/maintenance/<entity-type>/<entity-id>/<工作名>/`（MCP 建单前用 `<entity-id>-proposed` 工作名，回执内记录真实 revision id）。
+
+**Step 1（构建）**：保存当前快照 `current.json`（只读获取后落盘）与期望 `desired.json`，构建 payload 与人读 diff：
+
+```bash
+uv run python -m scripts.maintenance_payload \
+  --entity-type article --entity-id 24 \
+  --current "$MAINT/<id>-proposed/current.json" \
+  --desired "$MAINT/<id>-proposed/desired.json" \
+  --rationale "<修订理由>" \
+  --output-dir "$MAINT/<id>-proposed"
+```
+
+输出 `proposed.json`（`proposed_fields` 仅含差异；服务端禁改字段 `{id,status,published_at,created_at,updated_at}` 一律不得进入，客户端预检阻塞）+ `diff-review.md`（改前 vs proposed，人审材料）。`base_digest` 为 current 快照字节 SHA-256。
+
+**Step 2（校验）**：exit 码门禁 + SHA-256 校验报告：
+
+```bash
+uv run python -m scripts.validate_maintenance \
+  "$MAINT/<id>-proposed/proposed.json" \
+  --report "$MAINT/<id>-proposed/validation-report.json"
+```
+
+**Step 3（建单回执）**：agent 调 MCP `maintenance_revision_create(entity_type, entity_id, rationale, proposed_fields)`（服务端按其快照算 base_digest 并返回 `id/base_digest/proposed_fields/filtered_fields/status`），随后按返回值落回执：
+
+```bash
+uv run python -m scripts.maintenance_receipt \
+  "$MAINT/<id>-proposed/proposed.json" \
+  --revision-id <id-from-mcp> \
+  --cms-status <status-from-mcp> \
+  --base-digest <base_digest-from-mcp> \
+  --filtered-fields '<filtered_fields-from-mcp JSON>' \
+  --receipt "$MAINT/<id>-proposed/create-receipt.json"
+```
+
+回执仅在 `status=pending-review` 且返回 `base_digest` 与本地 payload `base_digest` 回显一致时写入；任一不符即拒收（exit 1，不落回执）。
+
+**Step 4（post-apply 验证）**：人工在 admin UI approve → apply 之后（Skill 外部动作），agent 调 MCP `maintenance_revision_get` 并把返回落盘为 `revision-get.json`，再验证：
+
+```bash
+uv run python -m scripts.maintenance_post_apply \
+  --revision "$MAINT/<id>-proposed/revision-get.json" \
+  --receipt "$MAINT/<id>-proposed/create-receipt.json" \
+  --output "$MAINT/<id>-proposed/post-apply-verification.json"
+```
+
+仅当 `status=applied` 且 `post_snapshot_id` 非空、且回执指向同一 revision 时落验证产物。
+
+**完成条件**：校验报告、diff 审阅、回执、post-apply 验证四件产物齐，且全程未发生 Skill 侧 approve/reject/apply。
+
 ## 质量门禁
 
 1. Research Pack 与 Pattern Draft 遵守 `/opt/code/skill/references/docspec/DocSpec-通用文档质量规范.md` 和 `文档验收清单.md`。
@@ -142,7 +201,8 @@ uv run python -m scripts.write_receipt \
 4. `status` 省略或为 `draft`；任何其他状态、发布意图字段或未知字段均阻塞。
 5. MCP 调用前重新校验 payload；写回执时再次核对 validation report、review record 和 source draft。
 6. MCP token 只由 OpenCode MCP 配置管理；任何运行时文件均不得包含 token。
-7. 运行 `uv run pytest -q`，确认 receipt CLI 覆盖成功、非草稿状态和无效 artifact 路径。
+7. Maintenance payload 的 `proposed_fields` 不得含服务端禁改字段；MCP create 结果非 `pending-review` 或 `base_digest` 回显不一致时不得写回执；post-apply 非 `applied` 或 `post_snapshot_id` 为空时不得写验证产物。
+8. 运行 `uv run pytest -q`，确认 receipt CLI 覆盖成功、非草稿状态和无效 artifact 路径；maintenance 用例覆盖校验器全分支与拒收路径。
 
 ## 失败模式
 
@@ -154,6 +214,9 @@ uv run python -m scripts.write_receipt \
 | MCP 连接或认证失败 | 不写回执；检查 OpenCode MCP server URL、backend 状态和 Bearer token 配置后重试 |
 | MCP 未返回 article ID | 不写回执；保留输入和校验报告并排查 MCP 调用结果 |
 | 回执路径不在 `publish-jobs/` | 阻塞，改用固定 runtime taxonomy |
+| current/desired 无差异或只动了禁改字段 | 构建即失败（exit 1），不出 proposed.json |
+| maintenance create 返回非 pending-review 或 base_digest 不一致 | 不写回执；排查快照来源后重建（快照可能已过期） |
+| post-apply 时 revision 非 applied 或无 post_snapshot_id | 不写验证产物；等待人工 apply 完成后重新 get 验证 |
 
 ## 维护规则
 

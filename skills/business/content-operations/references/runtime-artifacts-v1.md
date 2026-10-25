@@ -14,6 +14,7 @@ Contract version: `1.0.0`
 | `drafts/` | Generation | `<content-id>.md` from `templates/v1/pattern-draft.md` |
 | `review/` | Human review | `<content-id>.json` from `templates/v1/review-record.json` |
 | `publish-jobs/` | Validation and Draft Import | `<slug>/article.json`, `validation-report.json`, `import-receipt.json` |
+| `maintenance/` | Maintenance (R-CMS-03) | `<entity-type>/<entity-id>/<revision-id>/` 下：`proposed.json`、`diff-review.md`、`validation-report.json`、`create-receipt.json`、`post-apply-verification.json`（构建期 revision-id 未定时用工作名 `<entity-id>-proposed`；MCP 建单后目录名续用该工作名，回执内记录真实 revision id） |
 | `published/` | External human-controlled release process | Reserved snapshots; this Skill does not write here |
 | `reports/` | Operations reporting | Optional run summaries that reference receipts |
 
@@ -25,7 +26,8 @@ Paths passed to the importer must resolve within the expected directory. Symlink
 2. Review record identifies the absolute source draft, exact payload SHA-256, approval decision, and completed slug availability check.
 3. Validation report identifies the same payload SHA-256 and has `valid=true` with no issues.
 4. Receipt is written only after the CMS returns `status=draft`.
-5. No artifact contains endpoint credentials or tokens.
+5. Maintenance receipt is written only after MCP `maintenance_revision_create` returns `status=pending-review` with a matching `base_digest`; post-apply verification is written only after `maintenance_revision_get` shows `status=applied` with a non-empty `post_snapshot_id`. The Skill never approves, rejects, or applies a maintenance revision.
+6. No artifact contains endpoint credentials or tokens.
 
 ## Retention
 

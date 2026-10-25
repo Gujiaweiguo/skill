@@ -37,8 +37,12 @@ ignore = ["COM812", "CPY001", "D203", "D213", "ISC001"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["ARG", "D", "PLR2004", "S101", "S105", "S106", "SLF001"]
+"tests/test_maintenance.py" = ["RUF001", "RUF002", "RUF003"]
 "scripts/**/*.py" = ["T201"]
 "scripts/import_artifacts.py" = ["EM101", "TRY003"]
+"scripts/maintenance_payload.py" = ["EM101", "EM102", "TRY003", "TRY004"]
+"scripts/maintenance_receipt.py" = ["EM101", "EM102", "TRY003", "PLR0913"]
+"scripts/maintenance_post_apply.py" = ["EM101", "EM102", "TRY003", "TRY301"]
 
 [tool.ruff.format]
 quote-style = "double"
