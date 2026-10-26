@@ -177,6 +177,13 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
         by_id, project, scan_coverage, roadmap_seeding=bool(code_map.get("ontology_roadmap_seeding", False))
     )
 
+    spec_capability_ids = {
+        str(cap.get("id", ""))
+        for cap in spec_capabilities
+        if isinstance(cap, Mapping)
+    } if isinstance(spec_capabilities, list) else set()
+    _apply_ontology_coverage(by_id, project, spec_capability_ids)
+
     _add_codebase_features(by_id, project)
 
     code_root_str = str(code_map.get("source_path", ""))
@@ -232,6 +239,10 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
     _spec_doc_status_sweep(by_id)
     for cap_id, capability in by_id.items():
         if capability.evidence_provenance in {"spec-only", "archive-only", "archive-and-spec-only"}:
+            if any(e.note == "coverage-ledger" for e in capability.evidence):
+                # coverage 台账升级项：spec 交付已由产品本体台账确认，不再追加
+                # "spec evidence 未验证运行时" 的评审保留性 gap
+                continue
             review_gap = "spec/archive evidence does not directly verify current runtime or tests"
             if review_gap not in capability.gaps:
                 by_id[cap_id] = ReconciledCapability(
@@ -549,6 +560,92 @@ def _add_ontology_declared_capabilities(
         print(f"  ontology declared capabilities: +{added} present-unconfirmed (empty code baseline)")
     elif added:
         print(f"  ontology declared capabilities: +{added} missing (roadmap seeding, populated baseline)")
+
+
+def _apply_ontology_coverage(
+    by_id: dict[str, ReconciledCapability],
+    project: str,
+    spec_capability_ids: set[str],
+) -> None:
+    """Apply the structured coverage ledger from the product ontology.
+
+    The ontology's optional top-level ``coverage`` key maps spec scopes to
+    delivered ontology capabilities::
+
+        coverage:
+          <spec_scope>:
+            change: <openspec change id>
+            commit: <sha>
+            capabilities:
+              - id: <ontology capability id>
+                coverage: full | partial
+                note: <optional gap note>
+
+    ID namespaces of spec scopes and ontology capabilities do not overlap;
+    only this ledger knows the semantic mapping. When a scope was actually
+    scanned (present in ``spec_capability_ids``), its declared capabilities
+    are upgraded: full → existing/high/no gaps, partial → partial with the
+    note as gap. Roadmap-seeded items stop being roadmap items once
+    delivered. Scopes not in the scanned set are skipped entirely — an
+    archived-but-not-scanned scope must not fabricate coverage.
+    """
+    ontology_path = _resolve_project_ontology(project)
+    if ontology_path is None:
+        return
+    data = yaml.safe_load(ontology_path.read_text(encoding="utf-8"))
+    if not isinstance(data, Mapping):
+        return
+    coverage = data.get("coverage", {})
+    if not isinstance(coverage, Mapping):
+        return
+    for raw_scope, entry in coverage.items():
+        scope = str(raw_scope)
+        if scope not in spec_capability_ids:
+            continue
+        capabilities = entry.get("capabilities", []) if isinstance(entry, Mapping) else []
+        if not isinstance(capabilities, list):
+            continue
+        upgraded = 0
+        spec_ref = EvidenceRef(kind="spec", ref=f"spec:{scope}/spec.md", note="coverage-ledger")
+        for item in capabilities:
+            if not isinstance(item, Mapping):
+                continue
+            cap_id = str(item.get("id", ""))
+            level = str(item.get("coverage", ""))
+            note = str(item.get("note", "") or "")
+            current = by_id.get(cap_id)
+            if current is None:
+                print(f"  coverage ledger warning: capability '{cap_id}' not declared in ontology modules (scope {scope}), skipped")
+                continue
+            if not current.roadmap_seeded:
+                continue
+            if level == "full":
+                by_id[cap_id] = ReconciledCapability(
+                    id=current.id,
+                    name=current.name,
+                    code_status=CapabilityStatus.EXISTING.value,
+                    doc_status=current.doc_status,
+                    reconciled_status=CapabilityStatus.EXISTING.value,
+                    confidence=Confidence.HIGH.value,
+                    gaps=(),
+                    evidence=current.evidence + (spec_ref,),
+                )
+                upgraded += 1
+            elif level == "partial":
+                gap = note or "部分覆盖：scope 声明 partial"
+                by_id[cap_id] = ReconciledCapability(
+                    id=current.id,
+                    name=current.name,
+                    code_status=CapabilityStatus.PARTIAL.value,
+                    doc_status=current.doc_status,
+                    reconciled_status=CapabilityStatus.PARTIAL.value,
+                    confidence=current.confidence,
+                    gaps=(gap,),
+                    evidence=current.evidence + (spec_ref,),
+                )
+                upgraded += 1
+        if upgraded:
+            print(f"  coverage ledger: {upgraded} capabilities upgraded via scope {scope}")
 
 
 def _spec_doc_status_sweep(by_id: dict[str, ReconciledCapability]) -> None:

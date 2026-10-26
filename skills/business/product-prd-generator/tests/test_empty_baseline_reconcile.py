@@ -127,6 +127,31 @@ def _patch_ontology(monkeypatch, tmp_path: Path, data: dict) -> Path:
     return ontology
 
 
+ONT_WITH_COVERAGE = {
+    **ONT_INPUT,
+    "coverage": {
+        # 匹配合成 spec scope：full / partial / 未知 id 各一
+        "card-topup-scope": {
+            "change": "add-card-topup",
+            "commit": "abc123",
+            "capabilities": [
+                {"id": "card-account-topup", "coverage": "full"},
+                {"id": "card-online-consumption", "coverage": "partial", "note": "仅支持在线余额消费，积分消费未实现"},
+                {"id": "capability-not-in-ontology", "coverage": "full"},
+            ],
+        },
+        # 反例：scope 不在 spec_capabilities 中，整组不得生效
+        "archived-but-unscanned-scope": {
+            "change": "add-old-refund",
+            "commit": "def456",
+            "capabilities": [
+                {"id": "card-original-trade-refund", "coverage": "full"},
+            ],
+        },
+    },
+}
+
+
 def test_reconcile_seeds_ontology_capabilities_on_empty_baseline(monkeypatch, tmp_path) -> None:
     _patch_ontology(monkeypatch, tmp_path, ONT_INPUT)
     # source_path 必须指向隔离 tmp_path：reconcile 会读 <source_path>/openspec/
@@ -335,3 +360,75 @@ def test_roadmap_seeded_items_aggregated_in_prd_body(monkeypatch, tmp_path) -> N
 
     # 播种项带 roadmap_seeded 标记，可被下游区分
     assert all(c["roadmap_seeded"] for c in caps)
+
+
+def test_reconcile_applies_ontology_coverage_ledger(monkeypatch, tmp_path) -> None:
+    """结构化 coverage 台账：扫描到的 scope 把 roadmap 播种项升级为已交付/部分交付。"""
+    _patch_ontology(monkeypatch, tmp_path, ONT_WITH_COVERAGE)
+    code_map = {
+        "project": "lnkcard",
+        "source_path": str(tmp_path),
+        "commit_sha": "abc123",
+        "scan_coverage": POPULATED_COVERAGE,
+        "ontology_roadmap_seeding": True,
+        "spec_capabilities": [
+            {"id": "card-topup-scope", "status": "existing", "evidence": []},
+        ],
+        "matrix_rows": [],
+    }
+    result = reconcile(code_map, {"features": [], "requirements": []})
+    by_id = {cap.id: cap for cap in result.capabilities}
+
+    # full：existing / high / 无 gap / spec ref / 不再是 roadmap 项
+    full = by_id["card-account-topup"]
+    assert full.reconciled_status == "existing"
+    assert full.code_status == "existing"
+    assert full.confidence == "high"
+    assert full.gaps == ()
+    assert full.roadmap_seeded is False
+    assert any(
+        e.kind == "spec" and e.ref == "spec:card-topup-scope/spec.md" for e in full.evidence
+    )
+
+    # partial：partial / 单条含 note 的 gap / spec ref
+    partial = by_id["card-online-consumption"]
+    assert partial.reconciled_status == "partial"
+    assert partial.code_status == "partial"
+    assert partial.gaps == ("仅支持在线余额消费，积分消费未实现",)
+    assert partial.roadmap_seeded is False
+    assert any(
+        e.kind == "spec" and e.ref == "spec:card-topup-scope/spec.md" for e in partial.evidence
+    )
+
+    # 未知 id：不产生新条目（总数 = 本体 4 项 + spec scope 1 项）
+    assert "capability-not-in-ontology" not in by_id
+    assert len(result.capabilities) == 5
+
+    # 反例：scope 不在 spec_capabilities → 状态保持 roadmap missing 不变
+    untouched = by_id["card-original-trade-refund"]
+    assert untouched.reconciled_status == "missing"
+    assert untouched.roadmap_seeded is True
+    assert any("roadmap" in g for g in untouched.gaps)
+
+
+def test_reconcile_coverage_ledger_noop_without_key(monkeypatch, tmp_path) -> None:
+    """ontology 无 coverage 键 → 无操作，既有 roadmap 播种行为不变。"""
+    _patch_ontology(monkeypatch, tmp_path, ONT_INPUT)
+    code_map = {
+        "project": "lnkcard",
+        "source_path": str(tmp_path),
+        "commit_sha": "abc123",
+        "scan_coverage": POPULATED_COVERAGE,
+        "ontology_roadmap_seeding": True,
+        "spec_capabilities": [
+            {"id": "card-topup-scope", "status": "existing", "evidence": []},
+        ],
+        "matrix_rows": [],
+    }
+    result = reconcile(code_map, {"features": [], "requirements": []})
+    # 无 coverage 键 → 台账无操作：本体 4 项仍全部 roadmap missing，spec scope 1 项原样
+    assert len(result.capabilities) == 5
+    for cap in result.capabilities:
+        if cap.roadmap_seeded:
+            assert cap.reconciled_status == "missing"
+            assert any("roadmap" in g for g in cap.gaps)
