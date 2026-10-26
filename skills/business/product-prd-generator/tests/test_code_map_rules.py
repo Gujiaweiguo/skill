@@ -109,7 +109,11 @@ def test_extract_lnkcard_repo_renders_populated_spec_baseline():
     """真实 /opt/code/lnkcard（Change A/B/C 归档后）端到端：commit_sha=真实 HEAD、
     5 个 spec scope（含 card-accounts-and-value-ledger 与
     card-recharge-and-idempotent-recovery）、matrix/direct 全
-    not-scanned——不得产出任何 LnkCRE matrix/ontology 引用。空基线渲染语义
+    not-scanned——不得产出任何 LnkCRE matrix/ontology 引用（此处的 LnkCRE 是
+    刻意提及的跨域污染守卫：rules 加载失败会静默回落商管 LnkCRE legacy 默认
+    规则，matrix.enabled 默认 True 且指向 LnkCRE 专属
+    product-definition-matrix.md；下述 matrix_rows==() 与 matrix not-scanned
+    断言即守住该回落不得发生）。空基线渲染语义
     （commit_sha=unknown、零 capability、empty-baseline limitation）已被
     Change A/B/C 的真实推进取代（2026-10-26，fixture 随归档推进）。"""
     import unittest
