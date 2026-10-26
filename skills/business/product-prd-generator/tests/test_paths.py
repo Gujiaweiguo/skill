@@ -369,31 +369,25 @@ def test_lnkcard_canonical_id_and_code_root_requires_explicit(monkeypatch: pytes
     assert resolve_code_root("lnkcard") == Path("/opt/code/lnkcard")
 
 
-def test_lnkcard_unresolved_layers_never_fallback_to_lnkcre(monkeypatch: pytest.MonkeyPatch) -> None:
-    """lnkcard ontology/term-aliases 均 unresolved（骨架「未建立」）。
+def test_lnkcard_canonical_ontology_resolution_after_promotion(monkeypatch: pytest.MonkeyPatch) -> None:
+    """lnkcard（2026-10-26 首版晋升后）：canonical tier-1 命中。
 
-    2026-10-26 lnkcard 首轮生成后契约更新：unresolved 时允许回落**本产品**
-    生成区 out/prd/lnkcard/output/（skill 自产自用），但仍拒绝商管
-    business-ontology / 商管词表（跨域污染闸门不变）；生成区也不存在时
-    仍显式报错。
+    - ontology/term-aliases 解析到 `30-products/lnkcard/ontology/`（canonical v1.0），
+      不再走生成区兜底（生成区件已随晋升移除，双源不并存）；
+    - 跨域污染闸门不变：解析结果绝不指向商管 business-ontology / 商管词表；
+    - 历史 unresolved-era 生成区兜底语义（首轮生成时 canonical 未建立，允许回落
+      本产品生成区）已由晋升取代，作为 fixture 推进记录保留于 git 历史。
     """
     monkeypatch.setenv("COMPANY_BASE", "/opt/code/docs/lanlnk")
     monkeypatch.delenv("LANLNK_BASE", raising=False)
-    generation_zone = Path("/opt/code/docs/lanlnk/out/prd/lnkcard/output")
-    if (generation_zone / "ontology.yaml").is_file():
-        resolved = ontology_path_for_project("lnkcard")
-        assert resolved == generation_zone / "ontology.yaml"
-        assert "business-ontology" not in str(resolved)
-    else:
-        with pytest.raises(MissingProductDataError):
-            ontology_path_for_project("lnkcard")
-    if (generation_zone / "term-aliases.yaml").is_file():
-        resolved_aliases = term_aliases_path_for_project("lnkcard", SKILL_ROOT)
-        assert resolved_aliases == generation_zone / "term-aliases.yaml"
-        assert "references" not in str(resolved_aliases)
-    else:
-        with pytest.raises(MissingProductDataError):
-            term_aliases_path_for_project("lnkcard", SKILL_ROOT)
+    canonical = Path("/opt/code/docs/lanlnk/30-products/lnkcard/ontology")
+    resolved = ontology_path_for_project("lnkcard")
+    assert resolved == canonical / "ontology.yaml"
+    assert "business-ontology" not in str(resolved)
+    assert "out/prd" not in str(resolved)
+    resolved_aliases = term_aliases_path_for_project("lnkcard", SKILL_ROOT)
+    assert resolved_aliases == canonical / "term-aliases.yaml"
+    assert "references" not in str(resolved_aliases)
 
 
 def test_lnkvision_markdown_authority_is_returned_without_yaml_fallback(

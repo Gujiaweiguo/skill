@@ -20,3 +20,6 @@ exclude_paths:
   - "**/node_modules/**"
   - "**/.venv/**"
   - "**/__pycache__/**"
+# 早期产品开关：本体目标能力作为 roadmap 项（missing 规划项）进入功能清单；
+# 成熟产品保持默认 false，走 spec 驱动流程，避免淹没既有清单。
+ontology_roadmap_seeding: true

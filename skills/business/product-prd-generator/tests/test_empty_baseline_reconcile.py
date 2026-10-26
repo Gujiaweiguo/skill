@@ -168,6 +168,46 @@ def test_reconcile_does_not_seed_when_baseline_populated(monkeypatch, tmp_path) 
     assert all(cap.reconciled_status != "present-unconfirmed" for cap in result.capabilities)
 
 
+def test_reconcile_roadmap_seeding_on_populated_baseline(monkeypatch, tmp_path) -> None:
+    """populated 基线 + 产品级开关：本体未命中能力播种为 missing roadmap 项。"""
+    _patch_ontology(monkeypatch, tmp_path, ONT_INPUT)
+    code_map = {
+        "project": "lnkcard",
+        "source_path": str(tmp_path),
+        "commit_sha": "abc123",
+        "scan_coverage": POPULATED_COVERAGE,
+        "ontology_roadmap_seeding": True,
+        "spec_capabilities": [],
+        "matrix_rows": [],
+    }
+    result = reconcile(code_map, {"features": [], "requirements": []})
+
+    assert len(result.capabilities) == 4
+    for cap in result.capabilities:
+        assert cap.reconciled_status == "missing"
+        assert cap.code_status == "missing"
+        assert cap.doc_status == "existing"
+        assert cap.confidence == "low"
+        assert any("roadmap" in g for g in cap.gaps)
+        assert any(e.kind == "doc" and e.ref.startswith("ontology:") for e in cap.evidence)
+
+
+def test_reconcile_populated_without_flag_still_does_not_seed(monkeypatch, tmp_path) -> None:
+    """populated 基线 + 无开关：不播种（回归保护，行为与 does_not_seed 一致）。"""
+    _patch_ontology(monkeypatch, tmp_path, ONT_INPUT)
+    code_map = {
+        "project": "lnkcard",
+        "source_path": str(tmp_path),
+        "commit_sha": "abc123",
+        "scan_coverage": POPULATED_COVERAGE,
+        "ontology_roadmap_seeding": False,
+        "spec_capabilities": [],
+        "matrix_rows": [],
+    }
+    result = reconcile(code_map, {"features": [], "requirements": []})
+    assert len(result.capabilities) == 0
+
+
 def test_reconcile_json_keeps_status() -> None:
     payload = recon.to_json(recon.ReconcileResult(
         project="lnkcard",
@@ -244,3 +284,54 @@ def test_status_enum_untouched() -> None:
     assert {s.value for s in CapabilityStatus} == {
         "existing", "partial", "missing", "explicitly-not-do"
     }
+
+
+def test_roadmap_seeded_items_aggregated_in_prd_body(monkeypatch, tmp_path) -> None:
+    """roadmap 播种项在 PRD 正文聚合渲染：版本规划/风险节不逐条内联 26 项明细。"""
+    _patch_ontology(monkeypatch, tmp_path, ONT_INPUT)
+    code_map = {
+        "project": "lnkcard",
+        "source_path": str(tmp_path),
+        "commit_sha": "abc123",
+        "scan_coverage": POPULATED_COVERAGE,
+        "ontology_roadmap_seeding": True,
+        "spec_capabilities": [],
+        "matrix_rows": [],
+    }
+    result = reconcile(code_map, {"features": [], "requirements": []})
+    caps = recon.to_json(result)["capabilities"]
+
+    plan = render._render_version_plan(caps)
+    # 聚合行存在，且不逐条列出 roadmap 项 ID
+    assert "roadmap 目标能力 4 项" in plan
+    for cap in result.capabilities:
+        assert cap.id not in plan
+        assert cap.name not in plan
+
+    risks = render._render_risks(caps)
+    # 风险节：roadmap 项合并为一条聚合风险，无逐条条目
+    assert "- 4 项本体目标能力未实施（roadmap）" in risks
+    for cap in result.capabilities:
+        assert f"**{cap.name}**" not in risks
+
+    # 客户需求未覆盖节：roadmap 项仅聚合行，不逐条内联 cap id
+    unmatched = render._render_unmatched_requirements(caps)
+    assert "- roadmap 目标能力 4 项" in unmatched
+    for cap in result.capabilities:
+        assert cap.id not in unmatched
+        assert f"**{cap.name}**" not in unmatched
+
+    # 版本规划节：existing 项不进任何 bucket，节首聚合已交付行
+    existing_caps = [
+        {
+            "id": "test-gates", "name": "test gates", "reconciled_status": "existing",
+            "confidence": "high", "gaps": ["spec/archive evidence does not directly verify current runtime or tests"],
+        }
+    ]
+    plan_with_existing = render._render_version_plan(caps + existing_caps)
+    assert "已交付（existing）1 项，不再列入规划" in plan_with_existing
+    assert "test-gates" not in plan_with_existing
+    assert "test gates" not in plan_with_existing
+
+    # 播种项带 roadmap_seeded 标记，可被下游区分
+    assert all(c["roadmap_seeded"] for c in caps)

@@ -109,6 +109,7 @@ class CodeMap:
     matrix_rows: tuple[MatrixRow, ...]
     scan_coverage: ScanCoverage
     direct_evidence: tuple[object, ...] = ()
+    ontology_roadmap_seeding: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +164,7 @@ class ReconciledCapability:
     confidence: Confidence | str
     gaps: tuple[str, ...] = ()
     evidence: tuple[EvidenceRef, ...] = ()
+    roadmap_seeded: bool = False
 
     @property
     def evidence_provenance(self) -> str:

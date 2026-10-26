@@ -64,6 +64,8 @@ def test_rules_returns_dict_with_required_keys():
             assert key in rules, f"Project {project}: missing required key {key}"
         assert "path" in rules["specs"], f"Project {project}: specs.path missing"
         assert "enabled" in rules["matrix"], f"Project {project}: matrix.enabled missing"
+        # roadmap 播种开关默认关闭（成熟产品走 spec 驱动）
+        assert rules["ontology_roadmap_seeding"] is False, f"Project {project}: default flag must be False"
 
 
 # ─── lnkcard（2026-10-26 onboarding）：空基线扫描规则 ───────────────────
@@ -126,6 +128,8 @@ def test_extract_lnkcard_repo_renders_populated_spec_baseline():
     }
     assert code_map.matrix_rows == ()
     assert payload["commit_sha"] not in ("", "unknown", None)
+    # 真实 lnkcard rules 已开启 roadmap 播种开关（早期产品）
+    assert payload["ontology_roadmap_seeding"] is True
     scanners = payload["scan_coverage"]["scanners"]
     assert scanners["matrix"]["status"] == "not-scanned"
     assert scanners["direct_code"]["status"] == "not-scanned"

@@ -173,7 +173,9 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
 
     _add_spec_referenced_capabilities(by_id, doc_map, _ontology_capability_ids(project))
 
-    _add_ontology_declared_capabilities(by_id, project, scan_coverage)
+    _add_ontology_declared_capabilities(
+        by_id, project, scan_coverage, roadmap_seeding=bool(code_map.get("ontology_roadmap_seeding", False))
+    )
 
     _add_codebase_features(by_id, project)
 
@@ -475,10 +477,17 @@ def _is_empty_code_baseline(scan_coverage: object) -> bool:
     return any("empty baseline" in str(item).lower() for item in limitations)
 
 
+_ROADMAP_SEEDING_GAP = (
+    "本体声明的 roadmap 目标能力，未在已扫描的 OpenSpec specs/归档中命中"
+    "（代码基线已 populated）；为规划项，非已确认缺失的运行时能力"
+)
+
+
 def _add_ontology_declared_capabilities(
     by_id: dict[str, ReconciledCapability],
     project: str,
     scan_coverage: object,
+    roadmap_seeding: bool = False,
 ) -> None:
     """Seed the capability inventory from the product ontology on an empty code baseline.
 
@@ -491,8 +500,17 @@ def _add_ontology_declared_capabilities(
 
     Guard: only runs when scan coverage explicitly reports an empty baseline,
     so products with real code baselines keep their spec/matrix-driven flow.
+
+    Third branch (roadmap seeding): for early-stage products whose code
+    baseline is already populated but which declare many more ontology target
+    capabilities than the scanned specs (e.g. lnkcard: 4 specs vs 26 ontology
+    targets), a per-product switch in code-map-rules yaml
+    (``ontology_roadmap_seeding: true``) seeds the unmatched ontology
+    capabilities as ``missing`` roadmap items — planning targets, NOT
+    confirmed runtime gaps.
     """
-    if not _is_empty_code_baseline(scan_coverage):
+    empty_baseline = _is_empty_code_baseline(scan_coverage)
+    if not empty_baseline and not roadmap_seeding:
         return
     ontology_path = _resolve_project_ontology(project)
     if ontology_path is None:
@@ -503,19 +521,34 @@ def _add_ontology_declared_capabilities(
     for cap_id, cap_name in _iter_ontology_capabilities(data):
         if cap_id in by_id:
             continue
-        by_id[cap_id] = ReconciledCapability(
-            id=cap_id,
-            name=cap_name,
-            code_status=CapabilityStatus.MISSING.value,
-            doc_status=CapabilityStatus.EXISTING.value,
-            reconciled_status="present-unconfirmed",
-            confidence=Confidence.LOW.value,
-            gaps=(_EMPTY_BASELINE_GAP,),
-            evidence=(EvidenceRef(kind="doc", ref=ref),),
-        )
+        if empty_baseline:
+            by_id[cap_id] = ReconciledCapability(
+                id=cap_id,
+                name=cap_name,
+                code_status=CapabilityStatus.MISSING.value,
+                doc_status=CapabilityStatus.EXISTING.value,
+                reconciled_status="present-unconfirmed",
+                confidence=Confidence.LOW.value,
+                gaps=(_EMPTY_BASELINE_GAP,),
+                evidence=(EvidenceRef(kind="doc", ref=ref),),
+            )
+        else:
+            by_id[cap_id] = ReconciledCapability(
+                id=cap_id,
+                name=cap_name,
+                code_status=CapabilityStatus.MISSING.value,
+                doc_status=CapabilityStatus.EXISTING.value,
+                reconciled_status=CapabilityStatus.MISSING.value,
+                confidence=Confidence.LOW.value,
+                gaps=(_ROADMAP_SEEDING_GAP,),
+                evidence=(EvidenceRef(kind="doc", ref=ref),),
+                roadmap_seeded=True,
+            )
         added += 1
-    if added:
+    if added and empty_baseline:
         print(f"  ontology declared capabilities: +{added} present-unconfirmed (empty code baseline)")
+    elif added:
+        print(f"  ontology declared capabilities: +{added} missing (roadmap seeding, populated baseline)")
 
 
 def _spec_doc_status_sweep(by_id: dict[str, ReconciledCapability]) -> None:
@@ -756,6 +789,7 @@ def to_json(result: ReconcileResult) -> dict[str, object]:
                 "reconciled_status": cap.reconciled_status,
                 "confidence": cap.confidence,
                 "evidence_provenance": cap.evidence_provenance,
+                "roadmap_seeded": cap.roadmap_seeded,
                 "gaps": list(cap.gaps),
                 "evidence": [{"kind": e.kind, "ref": e.ref} for e in cap.evidence],
             }

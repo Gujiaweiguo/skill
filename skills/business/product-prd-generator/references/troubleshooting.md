@@ -720,3 +720,18 @@ print('ontology OK')
 **2026-10-21 已收口（enum 对齐契约词表 + 兼容字段），遗留：野值映射表待 owner 裁决。**
 
 **Owner 口径（2026-10-21 裁决，A+B+C）**：11 件存量野值/缺失 review_status 全部裁 `absorbed`（执行计划见 docs 仓 lnkcrm reconciliation `review-status-migration-plan-20261021.md`，等在途会话落地后一批执行）。三条判定口径随裁决生效：①回执字段与台账矛盾时以 ledger decision_log 为准，迁移时同步修正回执陈旧字段；②push 由后续整链完成时 absorbed 不被 `pushed:false` 阻塞，迁移时回填 true 并注记证据来源；③**verification-only 批次的吸收证据形态 = waves 收口文本 + S6 台账快照（无 ledger change 实体），接受为有效 absorbed 证据**——后续同类回执（如 s6-d1b 形态）判定沿用此模板。
+
+## 活状态测试：产品代码仓推进后 lnk<X> fixture 族集体失败
+
+**现象**（2026-10-26 lnkcard 实证）：产品代码仓归档 change / 产生提交后，断言**真实仓库当前状态**的测试族集体失败（本轮 4 个：`test_product_governance_contracts` 的 authority 语义、`test_paths` 的 resolve_code_root 门禁、`test_code_map_rules` 的真实仓提取、`test_empty_baseline_reconcile` 的合成用例污染）。这不是回归，而是**基线漂移**：fixture 快照停留在 onboarding 时的空仓状态（零提交、openspec/specs 空）。
+
+**处置**：按当前已核实基线推进断言，而不是回退产品仓或加 skip。本轮推进实例（empty → populated，lnkcard `b82863d` → `c18f34d`）：
+
+1. `authority["code"]`：`present-unconfirmed` → `complete`（由真实归档 change 驱动；complete 只表示"代码基线已建立"，不代表能力全量完成）；
+2. `resolve_code_root`：authority complete 后信任 company.yaml 登记的 code_root，不再要求显式 `--code-root`；
+3. 真实仓提取：empty-baseline limitation 消失、commit_sha 为真实 HEAD、spec capabilities = 实际 scope 集合；断言 scope 集合而非逐字符 SHA（SHA 每次提交都变）；
+4. 合成用例隔离：凡构造合成 code_map 的用例，`source_path` 必须指向 tmp_path——reconcile 会读 `<source_path>/openspec/changes/archive/` 归档证据，指向真实仓会被新归档污染（本轮 4→8 capability 污染实例）。
+
+**预防触发器**：产品每次归档 change（或首次产生提交）后，同步检查该产品在 `tests/` 的 fixture 族；活状态断言只锚定「结构性不变量」（scope 集合、authority 状态机、语义门禁），不锚定易变值（SHA、条数快照）。
+
+**关联设计决策**：reconcile 的基线三态语义（empty → present-unconfirmed 播种；populated → 不播种走 spec 驱动；populated + 产品级 `ontology_roadmap_seeding` 开关 → 本体目标能力以 missing roadmap 项播种）见 `code-map-rules-lnkcard.yaml` 与 reconcile `_add_ontology_declared_capabilities`。

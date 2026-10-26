@@ -178,25 +178,26 @@ def test_company_ledger_registers_seven_software_products_and_lnkwebsite_prd_onl
 
 
 def test_lnkcard_baseline_semantics_after_foundation_changes() -> None:
-    """lnkcard（2026-10-26）：Change A/B 归档后的三层基线语义。
+    """lnkcard（2026-10-26）：首版晋升 canonical 后的三层基线语义。
 
-    - ontology/PRD authority = unresolved（canonical 未晋升，生成区候选不冒充权威）；
-    - code 基线已建立：Change A（foundation + test gates）与 Change B
-      （card-accounts-and-value-ledger）实施并归档，git 仓有提交、
-      openspec/specs 有 scope → code authority = complete。
-      complete 在此仅表示"代码基线已建立"（repo_revision + openspec_scopes
-      可解析），不代表产品能力全量完成——能力对账以功能清单
-      reconciled_status 为准（Change C-F 仍未实施）；
-    - 历史 guard（空仓零提交不得报 complete）已由事实推进取代：
-      present-unconfirmed → complete 的跃迁由真实归档 change 驱动。
+    - 三层 authority 全部 complete：Change A/B 归档建立代码基线（2026-10-26 上午），
+      首版候选经 owner 评审晋升 canonical（同日下午，裁决 D1-a/D2-a/D3-a，
+      见 30-products/lnkcard/reconciliation/promotion-review-lnkcard-20261026.md）；
+      ontology entry 解析到 canonical ontology.yaml（非生成区兜底）；
+    - complete 仅表示"该层基线已建立"，不代表产品能力全量完成——能力对账以
+      功能清单 reconciled_status 为准（roadmap 26 项目标未实施，Change C-F 待新包）；
+    - 历史 guard 语义链（空仓零提交不得报 complete → 归档 change 驱动 complete）已由
+      两次事实推进取代。
     """
     company = _paths.resolve_company(company_id="lanlnk")
     product = _paths.resolve_product("lnkcard", company)
     assert product.layers["docs_root"] == Path("/opt/code/docs/lanlnk/30-products/lnkcard")
     assert product.layers["code_root"] == Path("/opt/code/lnkcard")
-    assert product.authority["ontology"].status == "unresolved"
-    assert product.layers.get("ontology_entry") is None
-    assert product.authority["prd"].status == "unresolved"
+    assert product.authority["ontology"].status == "complete"
+    assert product.layers.get("ontology_entry") == Path(
+        "/opt/code/docs/lanlnk/30-products/lnkcard/ontology/ontology.yaml"
+    )
+    assert product.authority["prd"].status == "complete"
     assert product.authority["code"].status == "complete"
     assert isinstance(product.repo_revision, str) and product.repo_revision
     assert "card-accounts-and-value-ledger" in product.openspec_scopes

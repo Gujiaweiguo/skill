@@ -52,6 +52,7 @@ _LEGACY_RULES: dict[str, Any] = {
     },
     "future_scanners": {},
     "exclude_paths": [],
+    "ontology_roadmap_seeding": False,
 }
 
 
@@ -182,6 +183,7 @@ def _load_code_map_rules(project: str, skill_root: Path | None) -> dict[str, Any
     data.setdefault("matrix", {"enabled": True, "path": "artifacts/alignment/product-definition-matrix.md"})
     data.setdefault("future_scanners", {})
     data.setdefault("exclude_paths", [])
+    data.setdefault("ontology_roadmap_seeding", False)
     return data
 
 
@@ -236,6 +238,7 @@ def extract(
         matrix_rows=matrix_rows,
         scan_coverage=scan_coverage,
         direct_evidence=direct_evidence.matches,
+        ontology_roadmap_seeding=bool(rules.get("ontology_roadmap_seeding", False)),
     )
 
 
@@ -244,6 +247,7 @@ def to_json(code_map: CodeMap) -> dict[str, object]:
         "project": code_map.project,
         "source_path": code_map.source_path,
         "commit_sha": code_map.commit_sha,
+        "ontology_roadmap_seeding": code_map.ontology_roadmap_seeding,
         "scan_coverage": scan_coverage_to_json(code_map.scan_coverage),
         "direct_evidence": {
             "matches": [

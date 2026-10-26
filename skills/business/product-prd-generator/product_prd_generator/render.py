@@ -403,22 +403,43 @@ def _render_evidence_table(capabilities: list[dict[str, Any]]) -> str:  # noqa: 
 
 def _render_version_plan(capabilities: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
     buckets: dict[str, list[str]] = {label: [] for label in ("P0", "P1", "P2", "P3", "暂缓")}
+    roadmap_counts: dict[str, int] = {label: 0 for label in ("P0", "P1", "P2", "P3", "暂缓")}
+    delivered = 0
     for cap in capabilities:
         if not cap.get("gaps"):
             continue
         status = cap.get("reconciled_status", "missing")
+        # 已交付（existing）能力不进任何未来规划 bucket，仅节首聚合计数
+        if status == "existing":
+            delivered += 1
+            continue
         version = VERSION_BY_STATUS.get(status, "P2")
+        # roadmap 播种项是规划元数据：正文聚合为一行，明细由功能清单/差距分析承载
+        if cap.get("roadmap_seeded"):
+            roadmap_counts[version] += 1
+            continue
         name = cap.get("name", cap.get("id", ""))
         gaps = "; ".join(cap.get("gaps", []))
         buckets[version].append(f"{name}：{gaps}" if gaps else name)
     lines = ["## 6. 版本规划", "", "说明：仅列出存在 gap 的能力；已实现且无 gap 的项不进入版本规划。", ""]
+    if delivered:
+        lines.append(
+            f"已交付（existing）{delivered} 项，不再列入规划；明细见功能清单.md 与「当前产品基线」节"
+        )
+        lines.append("")
     for label in ("P0", "P1", "P2", "P3", "暂缓"):
         items = buckets[label]
-        lines.append(f"### {label}（{len(items)} 项）")
+        roadmap_n = roadmap_counts[label]
+        lines.append(f"### {label}（{len(items) + roadmap_n} 项）")
+        if roadmap_n:
+            lines.append(
+                f"- roadmap 目标能力 {roadmap_n} 项：本体声明的未实施目标"
+                "（明细见功能清单与差距分析），按需求证据优先级排序后进入后续版本规划"
+            )
         if items:
             for item in items:
                 lines.append(f"- {item}")
-        else:
+        elif not roadmap_n:
             lines.append("- （无）")
         lines.append("")
     return "\n".join(lines)
@@ -441,8 +462,15 @@ def _render_image_refs(capabilities: list[dict[str, Any]]) -> str:  # noqa: ANY_
 
 def _render_risks(capabilities: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
     low_conf = [cap for cap in capabilities if cap.get("confidence") == "low"]
+    # roadmap 播种项的 gap 合并为一条聚合风险：规划项非运行时缺陷，明细见差距分析
+    roadmap = [cap for cap in low_conf if cap.get("roadmap_seeded")]
+    others = [cap for cap in low_conf if not cap.get("roadmap_seeded")]
     lines = ["## 8. 风险与待确认项", "", f"低置信度能力：{len(low_conf)} 项", ""]
-    for cap in low_conf:
+    if roadmap:
+        lines.append(
+            f"- {len(roadmap)} 项本体目标能力未实施（roadmap）：为规划项非运行时缺陷，明细见差距分析.md"
+        )
+    for cap in others:
         name = cap.get("name", cap.get("id", ""))
         gaps = "; ".join(cap.get("gaps", []))
         lines.append(f"- **{name}**: {gaps}")
@@ -669,13 +697,22 @@ def _render_unmatched_requirements(capabilities: list[dict[str, Any]]) -> str:  
     if not missing:
         return "## 5. 客户需求未覆盖\n\n当前所有客户需求均在代码能力范围内有对应。\n"
     missing.sort(key=lambda c: (-len(c.get("evidence", [])), c.get("name", "")))
+    # roadmap 播种项：本体目标需求暂无代码承接，属规划元数据——正文聚合，
+    # 明细由需求清单.md / 差距分析.md 承载，不逐条重复。
+    roadmap = [cap for cap in missing if cap.get("roadmap_seeded")]
+    others = [cap for cap in missing if not cap.get("roadmap_seeded")]
     lines = [
         "## 5. 客户需求未覆盖",
         "",
         f"共 {len(missing)} 项客户明确提出但当前代码无对应能力的需求：",
         "",
     ]
-    for cap in missing:
+    if roadmap:
+        lines.append(
+            f"- roadmap 目标能力 {len(roadmap)} 项：本体声明的目标需求暂无代码承接，"
+            "明细见需求清单.md 与差距分析.md"
+        )
+    for cap in others:
         name = cap.get("name", cap.get("id", ""))
         evidence = cap.get("evidence", [])
         clients = [e.get("ref", "").replace("customer:", "") for e in evidence if e.get("kind") == "doc"]
