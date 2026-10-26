@@ -90,6 +90,8 @@ _PRODUCT_ALIASES: dict[str, str] = {
     "lnkgateway": "lnkgateway",
     "lnkcrm": "lnkcrm",
     "lnkwebsite": "lnkwebsite",
+    # LnkCard 预付费卡系统（2026-10-26 onboarding，initial-baseline 治理）
+    "lnkcard": "lnkcard",
 }
 
 # 每个产品的"目录段别名"——doc_map 产品过滤用它识别属于该产品的路径段。
@@ -103,6 +105,7 @@ _PRODUCT_DIR_SEGMENTS: dict[str, tuple[str, ...]] = {
     "lnkgateway": ("lnkgateway",),
     "lnkcrm": ("lnkcrm",),
     "lnkwebsite": ("lnkwebsite",),
+    "lnkcard": ("lnkcard",),
 }
 
 _REGISTERED_PRODUCTS = frozenset(_PRODUCT_DIR_SEGMENTS)
@@ -115,6 +118,10 @@ _PRODUCT_CODE_ROOTS: dict[str, str | None] = {
     "lnkgateway": "/opt/code/lnkgateway",
     "lnkcrm": None,
     "lnkwebsite": "/opt/code/lnkwebsite",
+    # lnkcard：company.yaml code_root 已配置（/opt/code/lnkcard 空骨架仓，零提交）；
+    # resolver code authority=present-unconfirmed（非 complete）→ resolve_code_root
+    # 要求显式 --code-root，code-map 首轮按未扫描/空基线处理（code-map-rules-lnkcard.yaml）
+    "lnkcard": "/opt/code/lnkcard",
 }
 
 # PRD 产物细分目录（requirement：基线/增量/需求/决策/交接 各归其位）。
@@ -436,6 +443,12 @@ def ontology_path_for_project(project: str) -> Path:
         if entry and entry.is_file():
             return entry
         if status in {"not-applicable", "unresolved", "not-found", "inaccessible"}:
+            # canonical authority 未建立时兜底**本产品**生成区（如 lnkcard
+            # initial-baseline：ontology.yaml 仍在 out/prd/<cid>/output/，尚未
+            # 晋升 30-products/<pid>/ontology/）。自产自用，不是跨产品回落。
+            legacy_zone = base / "out" / "prd" / context.id / "output" / "ontology.yaml"
+            if legacy_zone.is_file():
+                return legacy_zone
             raise MissingProductDataError(
                 f"产品 {context.id!r} 的 ontology authority 状态为 {status}，"
                 "拒绝回落其他产品的 ontology。"
@@ -486,6 +499,12 @@ def term_aliases_path_for_project(project: str, skill_root: Path) -> Path:
         if entry and entry.parent.joinpath("term-aliases.yaml").is_file():
             return entry.parent / "term-aliases.yaml"
         if context.authority["ontology"].status in {"not-applicable", "unresolved", "not-found", "inaccessible"}:
+            # canonical authority 未建立时兜底**本产品**生成区（如 lnkcard
+            # initial-baseline：term-aliases.yaml 仍在 out/prd/<cid>/output/，
+            # 尚未晋升）。自产自用，不是跨产品回落。
+            legacy_zone = base / "out" / "prd" / context.id / "output" / "term-aliases.yaml"
+            if legacy_zone.is_file():
+                return legacy_zone
             raise MissingProductDataError(
                 f"产品 {context.id!r} 的 term-aliases authority 无法从 shared.product_context 解析。"
             )

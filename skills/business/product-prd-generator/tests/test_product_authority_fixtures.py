@@ -130,6 +130,15 @@ def _layer_fixtures() -> dict[str, dict[str, dict[str, JsonValue]]]:
                 revision="4323b8c9f6f195dd82083348dd6e854e7360afa3",
             ),
         },
+        # lnkcard（2026-10-26 onboarding）：三层 authority 全部 unresolved——
+        # ontology/PRD 为骨架「未建立」声明；code_root 指向空骨架 git 仓
+        # （零提交、openspec/specs 空、无业务代码），code 基线未建立
+        # （repo_revision=None / scopes=0 是显式空基线信号，不得推导 complete）。
+        "lnkcard": {
+            "ontology": _ref("lnkcard", "business", business, "ontology", reason="Ontology unresolved: initial onboarding skeleton, no owner-confirmed candidate"),
+            "prd": _ref("lnkcard", "business", business, "prd", reason="PRD baseline unresolved: initial onboarding skeleton, not established"),
+            "code": _ref("lnkcard", "business", business, "code", reason="Code baseline not established: empty git repo (no commits), zero OpenSpec scopes, no app code/tests"),
+        },
         "lnkchatbi": {
             "ontology": _ref("lnkchatbi", "tool", tool, "ontology", authority_ref="30-products/lnkchatbi/ontology/ontology.yaml"),
             "prd": _ref("lnkchatbi", "tool", tool, "prd", authority_ref="30-products/lnkchatbi/prd/"),
@@ -162,6 +171,8 @@ def test_all_seven_products_declare_three_layers_with_valid_contracts() -> None:
     fixtures = _layer_fixtures()
     expected_products = {
         "lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat",
+        # lnkcard 2026-10-26 onboarding：三层全 unresolved 登记（空基线，不发明 authority）
+        "lnkcard",
     }
     assert set(fixtures) == expected_products
     for product_id, layers in fixtures.items():
@@ -187,7 +198,7 @@ def test_fixture_profiles_match_baseline_contract_and_business_tool_split() -> N
             assert layer_ref["ontology_profile"] == ontology_profile
     business_products = {p for p, l in fixtures.items() if l["ontology"]["product_class"] == "business"}
     tool_products = set(fixtures) - business_products
-    assert business_products == {"lnkcre", "lnkcrm"}
+    assert business_products == {"lnkcre", "lnkcrm", "lnkcard"}
     assert tool_products == {"lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat"}
 
 
@@ -197,6 +208,10 @@ def test_registry_nulls_stay_unresolved_without_invented_authority() -> None:
         ("lnkcrm", "prd"): "planned",
         ("lnkgateway", "ontology"): "no owner-confirmed",
         ("lnkgateway", "prd"): "no prd_root",
+        # lnkcard 空基线登记（2026-10-26）：三层均 unresolved，不得发明 authority_ref
+        ("lnkcard", "ontology"): "initial onboarding skeleton",
+        ("lnkcard", "prd"): "not established",
+        ("lnkcard", "code"): "no commits",
     }
     # lnkcrm/code left the unresolved set via O5-lnkcrm-code reconciliation
     # (route A, 2026-10-04): company.yaml code_root ratified, so it must now

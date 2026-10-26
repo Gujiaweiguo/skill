@@ -36,6 +36,8 @@ class SourceType(str, Enum):
     CURRENT = "current-product"
     ARCHITECTURE = "target-architecture"
     COMPETITOR = "competitor"
+    OWNER = "owner-decisions"
+    LEGACY = "legacy-material"
     UNKNOWN = "unknown"
 
 
@@ -62,8 +64,23 @@ def _load_aliases(skill_root: Path, project: str = "商管系统") -> tuple[dict
                         aliases[item] = standard
 
     # Source 2: ontology.yaml (broad, shared industry knowledge, project-scoped)
-    ontology_path = ontology_path_for_project(project)
-    if ontology_path.is_file():
+    # canonical authority 未建立时（如 lnkcard initial-baseline）兜底读取本产品
+    # 生成区 ontology（自产自用，非跨产品回落；对齐 reconcile._resolve_project_ontology）
+    ontology_path: Path | None
+    try:
+        ontology_path = ontology_path_for_project(project)
+    except Exception:
+        ontology_path = None
+    if ontology_path is None or not ontology_path.is_file():
+        from ._paths import _lanlnk_base, canonical_product_id
+
+        try:
+            legacy = _lanlnk_base() / "out" / "prd" / canonical_product_id(project) / "output" / "ontology.yaml"
+        except BaseException:
+            legacy = None
+        if legacy is not None and legacy.is_file():
+            ontology_path = legacy
+    if ontology_path is not None and ontology_path.is_file():
         ontology = yaml.safe_load(ontology_path.read_text(encoding="utf-8")) or {}
         if isinstance(ontology, dict):
             modules = ontology.get("modules", {})
@@ -107,14 +124,19 @@ def _source_family(source_file: str) -> str | None:
 def _source_priority(source_file: str) -> int:
     if _source_family(source_file):
         return 0
+    # owner 决策输入是产品权威输入，优先于其他来源（去重保留 owner 版本）。
+    if "00-owner-decisions" in source_file.replace("\\", "/").split("/")[-1].lower():
+        return 1
     source = source_file.replace('\\', '/')
     if '/00-current-product/' in source:
-        return 1
-    if '/01-customer-requirements/' in source:
         return 2
-    if '/02-competitors/' in source:
+    if '/01-customer-requirements/' in source:
         return 3
-    return 4
+    if '/02-competitors/' in source:
+        return 4
+    if re.match(r'^\d{2}-legacy-', source.split('/')[-1].lower()):
+        return 5
+    return 6
 
 
 # 海鼎家族（海鼎/华侨城/锦和）的文档使用不同标题风格描述同一套合同条款。
@@ -205,6 +227,14 @@ def _classify_source_type(rel_path: Path) -> str:
         return SourceType.CURRENT.value
     if "02-competitors" in parts or "13-competitors" in parts:
         return SourceType.COMPETITOR.value
+    # 产品专属 raw 输入（raw/prd-<project>/ 平铺文件，2026-10-26 lnkcard 先例）：
+    # 00-owner-decisions.md = owner 已确认产品决策；NN-legacy-*.md = 遗留系统
+    # 资料（历史证据，保留来源路径，不当作现行客户需求）。
+    name = rel_path.name.lower()
+    if name.startswith("00-owner-decisions"):
+        return SourceType.OWNER.value
+    if re.match(r"^\d{2}-legacy-", name):
+        return SourceType.LEGACY.value
     return SourceType.UNKNOWN.value
 
 

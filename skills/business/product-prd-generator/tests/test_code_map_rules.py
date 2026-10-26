@@ -64,3 +64,74 @@ def test_rules_returns_dict_with_required_keys():
             assert key in rules, f"Project {project}: missing required key {key}"
         assert "path" in rules["specs"], f"Project {project}: specs.path missing"
         assert "enabled" in rules["matrix"], f"Project {project}: matrix.enabled missing"
+
+
+# ─── lnkcard（2026-10-26 onboarding）：空基线扫描规则 ───────────────────
+
+
+def test_rules_lnkcard_matrix_and_direct_scanners_disabled():
+    """lnkcard 首轮基线：只扫 openspec/specs；matrix/直接代码/测试一律禁用。
+
+    代码仓为空骨架（无业务代码），启用关键词扫描会把空集误读为
+    「已验证的能力缺失」——故 direct_runtime_sources/tests 均 disabled。
+    """
+    rules = _load_code_map_rules("lnkcard", SKILL_ROOT)
+    assert rules["project"] == "lnkcard"
+    assert rules["specs"]["path"] == "openspec/specs"
+    assert rules["matrix"]["enabled"] is False
+    assert rules["future_scanners"]["direct_runtime_sources"]["enabled"] is False
+    assert rules["future_scanners"]["tests"]["enabled"] is False
+
+
+def test_scan_coverage_empty_specs_dir_reports_explicit_empty_baseline(tmp_path):
+    """specs 目录存在但零 scope：扫描已执行（complete）但必须携带 empty-baseline
+    limitation + artifact_count=0——空集不得被读成已验证的完整基线。"""
+    from product_prd_generator.scan_coverage import build_scan_coverage
+
+    code_root = tmp_path
+    specs_root = code_root / "openspec" / "specs"
+    specs_root.mkdir(parents=True)
+    coverage = build_scan_coverage(code_root, specs_root, None, 0, 0)
+    assert coverage.specs.artifact_count == 0
+    assert coverage.specs.status.value == "complete"
+    assert coverage.specs.limitations
+    assert "empty baseline" in coverage.specs.limitations[0]
+    # matrix disabled + direct scanners disabled → 全部 not-scanned，整体不报 complete
+    assert coverage.matrix.status.value == "not-scanned"
+    assert coverage.direct_code.status.value == "not-scanned"
+    assert coverage.direct_tests.status.value == "not-scanned"
+    assert coverage.status.value != "complete"
+
+
+def test_extract_lnkcard_repo_renders_populated_spec_baseline():
+    """真实 /opt/code/lnkcard（Change A/B 归档后）端到端：commit_sha=真实 HEAD、
+    4 个 spec scope（含 card-accounts-and-value-ledger）、matrix/direct 全
+    not-scanned——不得产出任何 LnkCRE matrix/ontology 引用。空基线渲染语义
+    （commit_sha=unknown、零 capability、empty-baseline limitation）已被
+    Change A/B 的真实推进取代（2026-10-26）。"""
+    import unittest
+    code_root = Path("/opt/code/lnkcard")
+    if not code_root.is_dir():
+        raise unittest.SkipTest("真实 /opt/code/lnkcard 不在本机（CI 跳过）")
+    from product_prd_generator.code_map import extract, to_json
+
+    code_map = extract(code_root, "lnkcard", skill_root=SKILL_ROOT)
+    payload = to_json(code_map)
+    spec_ids = {cap.id for cap in code_map.spec_capabilities}
+    assert spec_ids == {
+        "card-accounts-and-value-ledger",
+        "dev-test-environment",
+        "test-gates",
+        "verification-evidence",
+    }
+    assert code_map.matrix_rows == ()
+    assert payload["commit_sha"] not in ("", "unknown", None)
+    scanners = payload["scan_coverage"]["scanners"]
+    assert scanners["matrix"]["status"] == "not-scanned"
+    assert scanners["direct_code"]["status"] == "not-scanned"
+    assert scanners["direct_tests"]["status"] == "not-scanned"
+    assert scanners["specs"]["artifact_count"] == 4
+    assert scanners["specs"]["status"] == "complete"
+    assert not scanners["specs"]["limitations"]
+    # direct 扫描器未启用 → 整体不得报 complete
+    assert payload["scan_coverage"]["status"] != "complete"

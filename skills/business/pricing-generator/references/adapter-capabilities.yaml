@@ -93,3 +93,11 @@ capabilities:
     verified_at: "2026-10-04"
     owner: opc
     notes: "无售前报价商业场景。"
+  - consumer_id: pricing-generator
+    product_id: lnkcard
+    status: onboarding
+    evidence:
+      - "LnkCard 产品治理 onboarding 登记（2026-10-26）：company.yaml 台账已登记；报价输入结构未评估"
+    verified_at: "2026-10-26"
+    owner: opc
+    notes: "registration-only：adapter 能力未评估（unassessed）；不构成报价数据基线。"

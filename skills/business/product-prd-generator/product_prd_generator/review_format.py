@@ -102,6 +102,7 @@ def render_review_brief(data: ReviewBriefInput) -> str:
         f"| existing | {data.status_stats.get('existing', 0)} |",
         f"| partial | {data.status_stats.get('partial', 0)} |",
         f"| missing | {data.status_stats.get('missing', 0)} |",
+        f"| present-unconfirmed（目标能力，代码基线未建立） | {data.status_stats.get('present-unconfirmed', 0)} |",
         "",
         "---",
         "",

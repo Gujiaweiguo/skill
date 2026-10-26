@@ -148,6 +148,25 @@ class ProductResolutionTest(unittest.TestCase):
             self.assertEqual(product.repo_revision, "abc1234")
             self.assertEqual(product.openspec_scopes, ("demo",))
 
+    def test_configured_code_root_without_commits_is_not_complete(self) -> None:
+        """code_root 目录存在但 git 仓零提交（HEAD 不存在）→ 不得报 complete。
+
+        真实 git init 空仓（无 mock）：rev-parse HEAD 必败 → revision=None →
+        present-unconfirmed（空骨架基线），repo_revision/scopes 显式空信号。
+        """
+        import subprocess
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory) / "acme"
+            code = base / "code"
+            (code / "openspec" / "specs").mkdir(parents=True)
+            subprocess.run(["git", "init", "-q", str(code)], check=True, capture_output=True)
+            company_file(base, "acme", f"  - id: demo\n    name: Demo\n    code_root: {code}\n")
+            product = resolve_product("demo", resolve_company(company_base=base))
+            self.assertEqual(product.authority["code"].status, "present-unconfirmed")
+            self.assertEqual(product.authority["code"].path, code)
+            self.assertIsNone(product.repo_revision)
+            self.assertEqual(product.openspec_scopes, ())
+
     def test_registered_unresolved_ontology_does_not_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory) / "acme"
@@ -300,6 +319,8 @@ EXPECTED_PRODUCTS = {
     "lnkreport",
     "lnkvision",
     "lnkwebsite",
+    # lnkcard（2026-10-26 onboarding）：九产品必测集合
+    "lnkcard",
 }
 
 _LANLNK_BASE = Path("/opt/code/docs/lanlnk")
@@ -434,6 +455,29 @@ class LanlnkEightProductIntegrationTest(unittest.TestCase):
     def test_unknown_product_does_not_fallback_to_lnkcre(self) -> None:
         with self.assertRaises(ResolutionError):
             self._resolve("nonexistent-product-x")
+
+    def test_lnkcard_empty_skeleton_code_is_not_complete(self) -> None:
+        """lnkcard（2026-10-26 onboarding）：空骨架仓不得报 code complete。
+
+        code_root 目录存在 ≠ 代码实现基线成立：/opt/code/lnkcard 是无提交 git 仓
+        （HEAD 不存在）、openspec/specs 为空、无业务代码/测试 → code authority
+        必须 present-unconfirmed（不得 complete）；repo_revision=None +
+        openspec_scopes=() 是下游判断"空基线"的显式信号，绝不能据此推导
+        PRD capabilities 全部 missing，也不能把空集标成 complete。
+        """
+        product = self._resolve("lnkcard")
+        self.assertEqual(product.layers["docs_root"], _LANLNK_BASE / "30-products" / "lnkcard")
+        self.assertEqual(product.authority["ontology"].status, "unresolved")
+        self.assertIsNone(product.layers["ontology_entry"])
+        self.assertEqual(product.authority["prd"].status, "unresolved")
+        self.assertEqual(product.layers["code_root"], Path("/opt/code/lnkcard"))
+        self.assertNotEqual(product.authority["code"].status, "complete")
+        self.assertIn(product.authority["code"].status, {"present-unconfirmed", "unresolved"})
+        self.assertIsNone(product.repo_revision)
+        self.assertEqual(product.openspec_scopes, ())
+        payload = product.as_dict()
+        self.assertIsNone(payload["repo_revision"])
+        self.assertEqual(payload["openspec"]["scope_count"], 0)
 
 
 if __name__ == "__main__":

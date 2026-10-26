@@ -5,7 +5,7 @@
   "type": "object",
   "required": ["product_id", "product_class", "layer", "status"],
   "properties": {
-    "product_id": {"enum": ["lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat"]},
+    "product_id": {"enum": ["lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat", "lnkcard"]},
     "product_class": {"enum": ["business", "tool"]},
     "ontology_profile": {"enum": ["business-ontology", "tool-ontology"]},
     "layer": {"enum": ["ontology", "prd", "code"]},

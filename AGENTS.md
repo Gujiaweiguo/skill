@@ -322,6 +322,7 @@ frontend-slides ──── 独立（PptxGenJS），技术分享场景，与 pp
 crela-daily-skill ── 独立（websearch + 文本格式化）
 winshang-crawler ─── 独立（自含 src/ + pyproject.toml，独立 git history）
 content-operations ─ 独立（lnkwebsite 内容研究→生成→校验→CMS 草稿导入）
+content-distribution ─ 消费 content-operations 产出的已发布 article（多渠道适配分发：掘金/GitHub Docs/知乎，adapter pattern，2026-10 由 juejin-publish 重构更名）
 
 ops-manual-generator  独立（纯模板，读项目 IaC 文件输出 Markdown 部署/维护手册）
 

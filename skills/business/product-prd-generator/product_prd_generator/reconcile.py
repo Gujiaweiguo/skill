@@ -9,7 +9,13 @@ from typing import Any
 
 import yaml
 
-from ._paths import codebase_features_path_for_project, ontology_path_for_project, overrides_path_for_project
+from ._paths import (
+    _lanlnk_base,
+    canonical_product_id,
+    codebase_features_path_for_project,
+    ontology_path_for_project,
+    overrides_path_for_project,
+)
 from .archive_evidence import apply_archive_evidence, load_archive_evidence
 from .models import EvidenceKind, EvidenceRef, ReconcileResult, ReconciledCapability, RequirementRecord
 
@@ -166,6 +172,8 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
     _add_unmatched_customer_requirements(by_id, doc_features)
 
     _add_spec_referenced_capabilities(by_id, doc_map, _ontology_capability_ids(project))
+
+    _add_ontology_declared_capabilities(by_id, project, scan_coverage)
 
     _add_codebase_features(by_id, project)
 
@@ -356,31 +364,158 @@ def _add_unmatched_customer_requirements(
         )
 
 
-def _ontology_capability_ids(project: str) -> frozenset[str]:
-    """Load declared ontology capability IDs used to validate doc references."""
-    path = ontology_path_for_project(project)
-    if not path.is_file():
-        return frozenset()
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+def _iter_ontology_capabilities(data: object) -> tuple[tuple[str, str], ...]:
+    """Generic product-ontology capability extraction.
+
+    Supports the product-level generic structure ``modules -> sub_functions ->
+    capabilities`` (e.g. lnkcard / lnkcre business ontology), where ``modules``
+    and ``sub_functions`` may be mappings (keyed by id) or lists of mappings,
+    and ``capabilities`` entries may be plain id strings or mappings with an
+    ``id``/``name``. Yields ``(capability_id, display_name)`` pairs; the
+    display name prefers the sub_function's ``name``, falling back to the
+    capability id.
+    """
     if not isinstance(data, Mapping):
-        return frozenset()
-    modules = data.get("modules", {})
-    if not isinstance(modules, Mapping):
-        return frozenset()
-    capability_ids: set[str] = set()
-    for module in modules.values():
+        return ()
+
+    def _values(node: object) -> list[Any]:
+        if isinstance(node, Mapping):
+            return list(node.values())
+        if isinstance(node, list):
+            return list(node)
+        return []
+
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for module in _values(data.get("modules", {})):
         if not isinstance(module, Mapping):
             continue
-        sub_functions = module.get("sub_functions", {})
-        if not isinstance(sub_functions, Mapping):
-            continue
-        for sub_function in sub_functions.values():
+        for sub_function in _values(module.get("sub_functions", {})):
             if not isinstance(sub_function, Mapping):
                 continue
+            sub_name = str(sub_function.get("name", "")).strip()
             capabilities = sub_function.get("capabilities", [])
-            if isinstance(capabilities, list):
-                capability_ids.update(str(capability) for capability in capabilities)
-    return frozenset(capability_ids)
+            if not isinstance(capabilities, list):
+                continue
+            for capability in capabilities:
+                if isinstance(capability, str):
+                    cap_id, cap_name = capability, ""
+                elif isinstance(capability, Mapping):
+                    cap_id = str(capability.get("id", capability.get("capability_id", "")))
+                    cap_name = str(capability.get("name", ""))
+                else:
+                    continue
+                if not cap_id or cap_id in seen:
+                    continue
+                seen.add(cap_id)
+                out.append((cap_id, cap_name or sub_name or cap_id))
+    return tuple(out)
+
+
+def _resolve_project_ontology(project: str) -> Path | None:
+    """Resolve the product ontology for reconcile, including the generation zone.
+
+    canonical authority 未建立时（如 lnkcard initial-baseline：ontology.yaml
+    仍在生成区 out/prd/<cid>/output/，尚未晋升 30-products/<pid>/ontology/），
+    ``ontology_path_for_project`` 会 raise unresolved。这里兜底读取**本产品**
+    生成区 ontology——skill 自产自用，不是跨产品回落（不触碰商管默认件）。
+    """
+    path: Path | None = None
+    try:
+        path = ontology_path_for_project(project)
+    except Exception:
+        path = None
+    if path is not None and path.is_file():
+        return path
+    try:
+        base = _lanlnk_base()
+        cid = canonical_product_id(project)
+    except BaseException:
+        return None
+    legacy = base / "out" / "prd" / cid / "output" / "ontology.yaml"
+    return legacy if legacy.is_file() else None
+
+
+def _ontology_capability_ids(project: str) -> frozenset[str]:
+    """Load declared ontology capability IDs used to validate doc references."""
+    path = _resolve_project_ontology(project)
+    if path is None:
+        return frozenset()
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return frozenset(cap_id for cap_id, _ in _iter_ontology_capabilities(data))
+
+
+_EMPTY_BASELINE_GAP = (
+    "代码基线未建立（empty-baseline）：代码仓库为骨架仓（无提交/无业务代码/无测试），"
+    "该能力为产品本体声明的目标能力，未经代码扫描确认（code authority: present-unconfirmed）"
+)
+
+
+def _is_empty_code_baseline(scan_coverage: object) -> bool:
+    """True when the code scan ran but found zero spec/code artifacts.
+
+    Reads the scan-coverage JSON carried in code_map: the specs scanner
+    completed with ``artifact_count == 0`` and an explicit ``empty baseline``
+    limitation. Empty set must NOT be read as a verified complete baseline,
+    nor as per-capability confirmed absence.
+    """
+    if not isinstance(scan_coverage, Mapping):
+        return False
+    scanners = scan_coverage.get("scanners", {})
+    if not isinstance(scanners, Mapping):
+        return False
+    specs = scanners.get("specs", {})
+    if not isinstance(specs, Mapping):
+        return False
+    if int(specs.get("artifact_count", 0) or 0) != 0:
+        return False
+    limitations = specs.get("limitations", [])
+    if not isinstance(limitations, list):
+        return False
+    return any("empty baseline" in str(item).lower() for item in limitations)
+
+
+def _add_ontology_declared_capabilities(
+    by_id: dict[str, ReconciledCapability],
+    project: str,
+    scan_coverage: object,
+) -> None:
+    """Seed the capability inventory from the product ontology on an empty code baseline.
+
+    2026-10-26 lnkcard incident fix: with an empty code repo (no commits, no
+    specs) the inventory used to collapse to 0 capabilities ("能力项 0 /
+    差距分析共 0 项"). On an empty baseline, every capability declared by the
+    product ontology (modules -> sub_functions -> capabilities) enters the
+    inventory as ``present-unconfirmed``: the ontology declares the target,
+    code presence is unverified — NOT confirmed-missing, NOT complete.
+
+    Guard: only runs when scan coverage explicitly reports an empty baseline,
+    so products with real code baselines keep their spec/matrix-driven flow.
+    """
+    if not _is_empty_code_baseline(scan_coverage):
+        return
+    ontology_path = _resolve_project_ontology(project)
+    if ontology_path is None:
+        return
+    data = yaml.safe_load(ontology_path.read_text(encoding="utf-8"))
+    ref = f"ontology:{ontology_path.name}"
+    added = 0
+    for cap_id, cap_name in _iter_ontology_capabilities(data):
+        if cap_id in by_id:
+            continue
+        by_id[cap_id] = ReconciledCapability(
+            id=cap_id,
+            name=cap_name,
+            code_status=CapabilityStatus.MISSING.value,
+            doc_status=CapabilityStatus.EXISTING.value,
+            reconciled_status="present-unconfirmed",
+            confidence=Confidence.LOW.value,
+            gaps=(_EMPTY_BASELINE_GAP,),
+            evidence=(EvidenceRef(kind="doc", ref=ref),),
+        )
+        added += 1
+    if added:
+        print(f"  ontology declared capabilities: +{added} present-unconfirmed (empty code baseline)")
 
 
 def _spec_doc_status_sweep(by_id: dict[str, ReconciledCapability]) -> None:
@@ -659,14 +794,26 @@ _VALUE_KEYWORDS = ("效率", "降低", "提升", "减少", "提高", "自动", "
 _INTERFACE_KEYWORDS = ("接口", "对接", "集成", "OA", "单点登录", "webhook", "API对接")
 
 
-def _calculate_priority(customer_count: int, code_status: str, nearby_text: str, function: str = "") -> str:
+def _calculate_priority(
+    customer_count: int,
+    code_status: str,
+    nearby_text: str,
+    function: str = "",
+    source_type: str = "",
+) -> str:
     """Rule 3B: auto-suggest priority based on customer count, code status, value keywords.
     'unmatched' (can't match term) scores lower than 'missing' (confirmed absent).
-    Interface/integration requirements get a penalty (user feedback: lower priority)."""
+    Interface/integration requirements get a penalty (user feedback: lower priority).
+    owner-decisions 输入是 owner 已确认的产品决策，直接按高优先候选计（2026-10-26
+    lnkcard：首期范围/排除项必须可见）；present-unconfirmed 是目标能力，高于普通
+    unmatched。"""
     score = min(customer_count, 3)
+    if source_type == "owner-decisions":
+        # owner 已确认决策（如 lnkcard 首期范围）默认进入高优先级评审视野
+        score += 3
     if code_status == "missing":
         score += 2
-    elif code_status in ("partial", "unmatched"):
+    elif code_status in ("partial", "unmatched", "present-unconfirmed"):
         score += 1
     combined_text = function + " " + nearby_text
     if any(kw in nearby_text for kw in _VALUE_KEYWORDS):
@@ -712,7 +859,10 @@ def _build_requirement_records(
         code_status = matched.reconciled_status if matched else "unmatched"
         customers = term_customers.get(term, set())
         nearby = str(feat.get("nearby_text", ""))
-        priority = _calculate_priority(len(customers), code_status, nearby, str(feat.get("function", "")))
+        priority = _calculate_priority(
+            len(customers), code_status, nearby, str(feat.get("function", "")),
+            source_type=str(feat.get("source_type", "")),
+        )
         records.append(RequirementRecord(
             source_file=str(feat.get("source_file", "")),
             source_type=str(feat.get("source_type", "")),

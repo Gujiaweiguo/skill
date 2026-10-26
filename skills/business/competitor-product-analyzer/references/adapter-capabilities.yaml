@@ -83,3 +83,11 @@ capabilities:
     verified_at: "2026-10-04"
     owner: opc
     notes: "无竞品对照场景。"
+  - consumer_id: competitor-product-analyzer
+    product_id: lnkcard
+    status: onboarding
+    evidence:
+      - "LnkCard 产品治理 onboarding 登记（2026-10-26）：company.yaml 台账已登记；无竞品对照目标本体（ontology=unresolved）"
+    verified_at: "2026-10-26"
+    owner: opc
+    notes: "registration-only：adapter 能力未评估（unassessed）；术语归一与对照分析未运行。"

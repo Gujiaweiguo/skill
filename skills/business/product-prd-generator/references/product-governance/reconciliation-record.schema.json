@@ -7,7 +7,7 @@
   "properties": {
     "schema_version": {"const": "1.0"},
     "reconciliation_id": {"type": "string", "minLength": 1},
-    "product_id": {"enum": ["lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat"]},
+    "product_id": {"enum": ["lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat", "lnkcard"]},
     "pair": {"enum": ["ontology-prd", "prd-code", "ontology-code"]},
     "left": {"$ref": "layer-reference.schema.json"},
     "right": {"$ref": "layer-reference.schema.json"},

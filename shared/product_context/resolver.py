@@ -428,8 +428,16 @@ def resolve_product(product_id: str, company_context: CompanyContext) -> Product
         code_status = "inaccessible"
         code_path = code_root
     else:
-        code_status = "complete"
         code_path = code_root
+        # 2026-10-26 lnkcard 实证语义收口：code_root 目录存在 ≠ 代码实现基线成立。
+        # .git 存在但 rev-parse HEAD 无效（空仓/零提交）→ present-unconfirmed
+        # （空骨架仓，无任何业务代码基线）；repo_revision=None + openspec_scopes=()
+        # 是下游判断"未建立代码基线"的显式信号，不得报 complete。
+        code_status = (
+            "present-unconfirmed"
+            if (code_root / ".git").exists() and _git_revision(code_root) is None
+            else "complete"
+        )
     product_status = "prd-only" if "prd-only" in (index_text or "").lower() or "prd-only" in (ontology_text or "").lower() else str(item.get("product_status") or ("complete" if item.get("prd_ready") else "partial"))
     code_revision = _git_revision(code_path) if code_path else None
     authorities = {

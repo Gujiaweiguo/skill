@@ -39,7 +39,13 @@ PRODUCTS = (
     "lnkvision",
     "lnkgateway",
     "lnkwebsite",
+    # LnkCard 预付费卡系统（2026-10-26 onboarding，initial-baseline 治理；
+    # 六消费者一律 onboarding = registration-only/unassessed）
+    "lnkcard",
 )
+
+# lnkcard 六格的登记日期（区别于 O2 首版矩阵的 2026-10-04 冻结日期）。
+LNKCARD_ONBOARDING_DATE = "2026-10-26"
 
 ALLOWED_STATUSES = {
     "implemented",
@@ -115,6 +121,9 @@ AUDIT_DATE = "2026-10-04"
 # references/adapter-capability-owner-decision-pricing-final-2026-10-05.md，
 # not-sold-independently：两产品不单独售卖、无独立标准价，沿 O7-chat 权威先例；
 # DATA 结构保留、无价拒单行为即策略执行；evidence 同批更新；pricing 本地全景钉同批）。
+# 修订（LNKCARD-ONBOARD，2026-10-26）：六消费者各新增 lnkcard = onboarding
+# （registration-only / unassessed：仅登记产品宇宙，未经任何真实 adapter 运行评估，
+# 不标 implemented/partial；verified_at = 2026-10-26，与 O2 冻结日期区分）。
 EXPECTED_MATRIX: dict[str, dict[str, str]] = {
     "product-prd-generator": {
         "lnkcre": "implemented",
@@ -125,6 +134,7 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
         "lnkvision": "unsupported",
         "lnkgateway": "not-applicable",
         "lnkwebsite": "not-applicable",
+        "lnkcard": "onboarding",
     },
     "requirement-evaluator": {
         "lnkcre": "implemented",
@@ -135,6 +145,7 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
         "lnkvision": "partial",
         "lnkgateway": "blocked",
         "lnkwebsite": "not-applicable",
+        "lnkcard": "onboarding",
     },
     "pricing-generator": {
         "lnkcre": "implemented",
@@ -145,6 +156,7 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
         "lnkvision": "not-applicable",
         "lnkgateway": "not-applicable",
         "lnkwebsite": "not-applicable",
+        "lnkcard": "onboarding",
     },
     "competitor-product-analyzer": {
         "lnkcre": "implemented",
@@ -155,6 +167,7 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
         "lnkvision": "onboarding",
         "lnkgateway": "not-applicable",
         "lnkwebsite": "not-applicable",
+        "lnkcard": "onboarding",
     },
     "company-intro-generator": {
         "lnkcre": "implemented",
@@ -165,6 +178,7 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
         "lnkvision": "implemented",
         "lnkgateway": "not-applicable",
         "lnkwebsite": "not-applicable",
+        "lnkcard": "onboarding",
     },
     "strategy-brief-generator": {
         "lnkcre": "implemented",
@@ -175,13 +189,14 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
         "lnkvision": "implemented",
         "lnkgateway": "implemented",
         "lnkwebsite": "implemented",
+        "lnkcard": "onboarding",
     },
 }
 
 EXPECTED_DISTRIBUTION = {
     "implemented": 16,
     "partial": 13,
-    "onboarding": 5,
+    "onboarding": 11,
     "unsupported": 1,
     "not-applicable": 12,
     "blocked": 1,
@@ -296,10 +311,10 @@ class AdapterCapabilityFilesTest(unittest.TestCase):
             self.assertEqual(top.get("verified_at"), AUDIT_DATE, consumer)
             self.assertEqual(top.get("decision_record"), DECISION_RECORD, consumer)
 
-    def test_exactly_eight_units_covering_all_products(self) -> None:
+    def test_exactly_nine_units_covering_all_products(self) -> None:
         for consumer, (_top, units) in load_all().items():
             product_ids = [unit.get("product_id") for unit in units]
-            self.assertEqual(len(units), 8, consumer)
+            self.assertEqual(len(units), 9, consumer)
             self.assertEqual(set(product_ids), set(PRODUCTS), consumer)
             self.assertEqual(len(product_ids), len(set(product_ids)), f"{consumer}: 产品重复")
 
@@ -324,7 +339,13 @@ class AdapterCapabilityFilesTest(unittest.TestCase):
                 label = f"{consumer}/{unit['product_id']}"
                 self.assertIn(unit["status"], ALLOWED_STATUSES, label)
                 self.assertTrue(_DATE_RE.match(unit["verified_at"]), label)
-                self.assertEqual(unit["verified_at"], AUDIT_DATE, label)
+                # lnkcard 六格为 2026-10-26 onboarding 登记；其余维持 O2 冻结日期。
+                expected_date = (
+                    LNKCARD_ONBOARDING_DATE
+                    if unit["product_id"] == "lnkcard"
+                    else AUDIT_DATE
+                )
+                self.assertEqual(unit["verified_at"], expected_date, label)
                 self.assertEqual(unit["owner"], "opc", label)
                 self.assertEqual(unit["consumer_id"], consumer, label)
 

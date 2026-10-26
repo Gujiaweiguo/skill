@@ -85,3 +85,11 @@ capabilities:
     verified_at: "2026-10-04"
     owner: opc
     notes: "站点内容运营由 content-operations 系 skill 承担（矩阵外）。"
+  - consumer_id: company-intro-generator
+    product_id: lnkcard
+    status: onboarding
+    evidence:
+      - "LnkCard 产品治理 onboarding 登记（2026-10-26）：company.yaml 台账已登记；叙事资产未建"
+    verified_at: "2026-10-26"
+    owner: opc
+    notes: "registration-only：adapter 能力未评估（unassessed）；无叙事素材入库。"

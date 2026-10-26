@@ -37,10 +37,20 @@ def build_scan_coverage(
     direct_tests: ScannerCoverage | None = None,
 ) -> ScanCoverage:
     specs_exists = specs_root.is_dir()
+    # 空基线显式化（2026-10-26 lnkcard 实证）：specs 目录存在但零 spec scope 时，
+    # 扫描已执行（status=complete）但必须携带 empty-baseline limitation + artifact_count=0，
+    # 不得让下游把空集读成"已验证的完整实现基线"。
+    specs_limitations: tuple[str, ...] = ()
+    if not specs_exists:
+        specs_limitations = ("Configured OpenSpec specs root does not exist.",)
+    elif spec_count == 0:
+        specs_limitations = (
+            "OpenSpec specs root exists but contains no spec scopes (empty baseline; no code capability claims).",
+        )
     specs = ScannerCoverage(
         status=ScanStatus.COMPLETE if specs_exists else ScanStatus.INACCESSIBLE,
         scope=(str(specs_root.relative_to(code_root)), "*/spec.md"),
-        limitations=() if specs_exists else ("Configured OpenSpec specs root does not exist.",),
+        limitations=specs_limitations,
         artifact_count=spec_count,
     )
 

@@ -29,6 +29,7 @@ VERSION_BY_STATUS = {
     "existing": "P3",
     "partial": "P1",
     "missing": "P2",
+    "present-unconfirmed": "P1",
     "explicitly-not-do": "暂缓",
 }
 
@@ -70,8 +71,49 @@ def _git_dirty(code_root: str) -> bool:
     return bool(completed.stdout.strip())
 
 
-def _baseline_notes(doc_map: dict[str, Any] | None, code_root: str) -> tuple[str, str]:
-    """Build the 来源 line and dirty-worktree note from actual doc_map evidence."""
+def _git_has_commits(code_root: str) -> bool:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", code_root, "rev-parse", "--verify", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return True  # 无法判定时不改变既有行为
+    return completed.returncode == 0
+
+
+def _is_empty_baseline_coverage(scan_coverage: object) -> bool:
+    if not isinstance(scan_coverage, dict):
+        return False
+    scanners = scan_coverage.get("scanners", {})
+    if not isinstance(scanners, dict):
+        return False
+    specs = scanners.get("specs", {})
+    if not isinstance(specs, dict):
+        return False
+    if int(specs.get("artifact_count", 0) or 0) != 0:
+        return False
+    limitations = specs.get("limitations", [])
+    if not isinstance(limitations, list):
+        return False
+    return any("empty baseline" in str(item).lower() for item in limitations)
+
+
+def _baseline_notes(
+    doc_map: dict[str, Any] | None,
+    code_root: str,
+    scan_coverage: object = None,
+) -> tuple[str, str]:
+    """Build the 来源 line and baseline note from actual doc_map evidence.
+
+    2026-10-26 lnkcard 修复：零提交骨架仓（git status 有未跟踪文件但无任何
+    commit）不得写成"存在未提交修改"；空基线必须显式声明
+    "仓库骨架存在、无提交/无业务代码/无测试、代码基线未建立/未扫描"
+    （present-unconfirmed + scan coverage empty-baseline 语义）。
+    """
     features = []
     if isinstance(doc_map, dict):
         raw_features = doc_map.get("features", [])
@@ -79,13 +121,25 @@ def _baseline_notes(doc_map: dict[str, Any] | None, code_root: str) -> tuple[str
             features = [f for f in raw_features if isinstance(f, dict)]
     has_customer = any(str(f.get("source_type", "")) == "customer-requirements" for f in features)
     has_competitor = any(str(f.get("source_type", "")) == "competitor" for f in features)
+    has_owner = any(str(f.get("source_type", "")) == "owner-decisions" for f in features)
     sources = [f"当前产品代码基线（{code_root}）"]
     if has_customer:
         sources.insert(0, "客户需求")
+    if has_owner:
+        sources.insert(0, "owner 产品决策")
     if has_competitor:
-        sources.insert(0 if has_customer else 0, "竞品资料")
+        sources.insert(0 if (has_customer or has_owner) else 0, "竞品资料")
     dirty_note = ""
-    if _git_dirty(code_root):
+    empty_baseline = _is_empty_baseline_coverage(scan_coverage) or (
+        code_root and not _git_has_commits(code_root)
+    )
+    if empty_baseline:
+        dirty_note = (
+            "- 基线说明：代码仓库为骨架仓（仓库骨架存在、无提交/无业务代码/无测试），"
+            "代码基线未建立、本轮未做代码扫描（scan coverage: empty-baseline；"
+            "code authority: present-unconfirmed）；目标能力不得据此判为已确认缺失或已完备"
+        )
+    elif _git_dirty(code_root):
         dirty_note = "- 基线说明：代码仓库当前存在未提交修改，能力基线以功能清单 pinned 的 HEAD commit 为准"
     return " + ".join(sources), dirty_note
 
@@ -100,12 +154,15 @@ def _render_project_context(
     total = sum(stats.values())
     sources_line = sources_desc or f"客户需求 + 竞品资料 + 当前产品代码基线（{code_root}）"
     extra = f"\n{dirty_note}" if dirty_note else ""
+    pu = stats.get("present-unconfirmed", 0)
+    pu_line = f" / present-unconfirmed {pu}" if pu else ""
+    pu_row = f"\n| present-unconfirmed（目标能力，代码基线未建立） | {pu} |" if pu else ""
     return f"""## 1. 背景
 
 - 项目：{project}
 - 来源：{sources_line}
 - 能力总数：{total}
-- 状态分布：existing {stats.get("existing", 0)} / partial {stats.get("partial", 0)} / missing {stats.get("missing", 0)} / explicitly-not-do {stats.get("explicitly-not-do", 0)}{extra}
+- 状态分布：existing {stats.get("existing", 0)} / partial {stats.get("partial", 0)} / missing {stats.get("missing", 0)} / explicitly-not-do {stats.get("explicitly-not-do", 0)}{pu_line}{extra}
 
 ## 2. 当前产品基线
 
@@ -114,7 +171,7 @@ def _render_project_context(
 | existing | {stats.get("existing", 0)} |
 | partial | {stats.get("partial", 0)} |
 | missing | {stats.get("missing", 0)} |
-| explicitly-not-do | {stats.get("explicitly-not-do", 0)} |
+| explicitly-not-do | {stats.get("explicitly-not-do", 0)} |{pu_row}
 """
 
 
@@ -204,11 +261,13 @@ def _render_approval_flow_evidence(requirements: list[dict[str, Any]], docs_root
 
 def _render_customer_summary(doc_map: dict[str, Any] | None) -> str:  # noqa: ANY_OK
     if not doc_map:
-        return "## 2A. 客户需求汇总\n\n（待 doc-map 提供 source_type=customer-requirements 的 features 后填充）\n"
+        return "## 2A. 需求与决策汇总\n\n（待 doc-map 提供 source_type=customer-requirements / owner-decisions 的 features 后填充）\n"
     grouped: dict[str, dict[str, list[str]]] = defaultdict(lambda: {"files": [], "items": []})
     by_file: dict[str, list[dict[str, Any]]] = defaultdict(list)  # noqa: ANY_OK
     for feat in doc_map.get("features", []):
-        if feat.get("source_type") == "customer-requirements":
+        # owner-decisions 是 owner 已确认的产品决策输入（如 lnkcard 首期范围），
+        # 与客户需求一起进入汇总，保证决策在 PRD 输出可见。
+        if feat.get("source_type") in {"customer-requirements", "owner-decisions"}:
             by_file[feat.get("source_file", "")].append(feat)
     for source_file, feats in sorted(by_file.items()):
         current_module = ""
@@ -223,7 +282,7 @@ def _render_customer_summary(doc_map: dict[str, Any] | None) -> str:  # noqa: AN
                 continue
             if term not in grouped[current_module]["items"]:
                 grouped[current_module]["items"].append(term)
-    lines = ["## 2A. 客户需求汇总", "", f"共 {len(grouped)} 个模块。", ""]
+    lines = ["## 2A. 需求与决策汇总（客户需求 + owner 决策）", "", f"共 {len(grouped)} 个模块。", ""]
     for module, payload in grouped.items():
         files = ", ".join(dict.fromkeys(payload["files"]))
         items = payload["items"]
@@ -290,7 +349,7 @@ def _render_feature_list(
     status_counts = Counter(
         cap.get("reconciled_status")
         for cap in capabilities
-        if cap.get("reconciled_status") in {"existing", "partial", "missing", "explicitly-not-do"}
+        if cap.get("reconciled_status") in {"existing", "partial", "missing", "explicitly-not-do", "present-unconfirmed"}
     )
     metadata = {
         "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -307,6 +366,7 @@ def _render_feature_list(
             "partial": status_counts.get("partial", 0),
             "missing": status_counts.get("missing", 0),
             "explicitly_not_do": status_counts.get("explicitly-not-do", 0),
+            "present_unconfirmed": status_counts.get("present-unconfirmed", 0),
         },
         "high_confidence_count": sum(cap.get("confidence") == "high" for cap in capabilities),
     }
@@ -504,6 +564,7 @@ def _render_prd_handoff(inputs: RenderInputs, output_dir: Path, code_root: str) 
         f"| existing | {stats.get('existing', 0)} |",
         f"| partial | {stats.get('partial', 0)} |",
         f"| missing | {stats.get('missing', 0)} |",
+        f"| present-unconfirmed（目标能力，代码基线未建立） | {stats.get('present-unconfirmed', 0)} |",
         f"| explicitly-not-do | {stats.get('explicitly-not-do', 0)} |",
         "",
         "## 4. 目标项目执行入口",
@@ -792,7 +853,9 @@ def _render_priority_review(requirements: list[dict[str, Any]]) -> str:  # noqa:
         sub = req.get("sub_scenario", "")
         clause_path = req.get("clause_path", "")
         nearby = req.get("nearby_text", "")
-        customer = req.get("source_customer", "") or "未知"
+        customer = req.get("source_customer", "") or (
+            "owner 决策" if req.get("source_type") == "owner-decisions" else "未知"
+        )
         status = req.get("code_status", "unmatched")
         matched = req.get("matched_capability", "") or "未匹配"
         lines.append(f"## {i}. {func}")
@@ -855,7 +918,7 @@ def _extract_roles(text: str) -> list[str]:
     return found[:3]
 
 
-_STATUS_ICON = {"existing": "✅", "partial": "⚠️", "missing": "❌", "unmatched": "🔍"}
+_STATUS_ICON = {"existing": "✅", "partial": "⚠️", "missing": "❌", "unmatched": "🔍", "present-unconfirmed": "🎯"}
 
 _DEPT_MAP: dict[str, list[str]] = {
     "招商": ["招商", "招商专员", "招商经理", "招商总监", "招商中心", "租赁部"],
@@ -1268,7 +1331,7 @@ def render_prd(inputs: RenderInputs, code_root: str = "") -> str:
         tables_by_module=tables_by_mod,
         unmatched_table_count=len(unmatched_tables),
     ))
-    sources_desc, dirty_note = _baseline_notes(inputs.doc_map, code_root)
+    sources_desc, dirty_note = _baseline_notes(inputs.doc_map, code_root, inputs.reconcile.get("scan_coverage"))
     parts = [
         f"# {project} 产品 PRD\n",
         review_brief,

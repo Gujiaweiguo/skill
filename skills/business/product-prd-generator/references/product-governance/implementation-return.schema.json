@@ -16,7 +16,7 @@
       ]
     },
     "return_id": {"type": "string", "minLength": 1},
-    "product_id": {"enum": ["lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat"]},
+    "product_id": {"enum": ["lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat", "lnkcard"]},
     "origin_flow": {
       "description": "Direction for this return only; reverse-origin findings remain proposals.",
       "$comment": "implementation-package-execution 为全部实施包回执（implementation-package-execution skill 产出）的 origin_flow 值，2026-10-21 纳入词表。",
@@ -61,7 +61,19 @@
           "archive_path": {"type": "string"},
           "s6_rows": {"type": ["string", "integer", "array", "null"], "$comment": "存量形态：自由文本说明 / 行数 / 行列表 / null"},
           "gates": {"type": ["string", "object", "array"], "$comment": "存量形态：门禁结论长文本 / 结构化 / 列表"},
-          "wave": {"type": ["string", "integer"]}
+          "wave": {"type": ["string", "integer"]},
+          "phase_record": {
+            "$comment": "v2.0 新增（2026-10-26）：openspec-practice implementation-package v2.0 契约要求 plan-and-apply/create-or-consume 回执逐 change 记录 created/planned/validated/implemented 四阶段事实（见 implementation-package.md 附录字段表）。schema 层保持 optional——历史 apply-existing 回执可省略；plan-and-apply 回执的条件必填由 implementation-package-execution 执行协议规定（回执自身不携带 execution_mode，schema 无法条件化）。",
+            "type": "object",
+            "properties": {
+              "created": {"$ref": "#/$defs/phaseFact"},
+              "planned": {"$ref": "#/$defs/phaseFact"},
+              "validated": {"$ref": "#/$defs/phaseFact"},
+              "implemented": {"$ref": "#/$defs/phaseFact"}
+            },
+            "minProperties": 1,
+            "additionalProperties": true
+          }
         },
         "additionalProperties": true
       }
@@ -127,6 +139,19 @@
     "protected_workspace_preserved": {"type": ["boolean", "object", "array", "null"]},
     "s6_ledger_untouched": {"type": ["boolean", "string", "null"]},
     "absorption": {"type": "object"}
+  },
+  "$defs": {
+    "phaseFact": {
+      "$comment": "阶段事实：发生时记录自由键事实（additionalProperties 放宽与过渡态一致，如 change_id/commands/commits）；未发生必须显式 skipped=true + reason，不得留空冒充已发生。",
+      "type": "object",
+      "properties": {
+        "skipped": {"type": "boolean"},
+        "reason": {"type": "string", "minLength": 1}
+      },
+      "if": {"properties": {"skipped": {"const": true}}, "required": ["skipped"]},
+      "then": {"required": ["reason"]},
+      "additionalProperties": true
+    }
   },
   "allOf": [
     {

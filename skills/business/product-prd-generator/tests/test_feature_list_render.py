@@ -72,6 +72,7 @@ def test_feature_list_front_matter_reports_source_revision_and_counts(tmp_path: 
             "partial": 1,
             "missing": 1,
             "explicitly_not_do": 1,
+            "present_unconfirmed": 0,
         },
         "high_confidence_count": 3,
     }
@@ -103,4 +104,5 @@ def test_feature_list_front_matter_uses_null_revision_for_non_git_root(tmp_path:
         "partial": 0,
         "missing": 0,
         "explicitly_not_do": 0,
+        "present_unconfirmed": 0,
     }

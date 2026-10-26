@@ -92,3 +92,11 @@ capabilities:
     verified_at: "2026-10-04"
     owner: opc
     notes: "★ 改判 unsupported→not-applicable（O2 首版矩阵）：无 PRD 生成场景，产品在软件产品契约之外。"
+  - consumer_id: product-prd-generator
+    product_id: lnkcard
+    status: onboarding
+    evidence:
+      - "LnkCard 产品治理 onboarding 登记（2026-10-26）：company.yaml 台账 + 30-products/lnkcard 三层骨架已建；resolver ontology/prd=unresolved（骨架未建立声明）为正确信号"
+    verified_at: "2026-10-26"
+    owner: opc
+    notes: "initial-baseline 治理入口；registration-only：adapter 能力未评估（unassessed），未经一次真实运行不得升 implemented/partial。"

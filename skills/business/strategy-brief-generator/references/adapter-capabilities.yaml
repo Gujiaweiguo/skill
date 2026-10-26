@@ -81,3 +81,11 @@ capabilities:
     verified_at: "2026-10-04"
     owner: opc
     notes: "盘点维度 implemented（公司资产盘点含官网产品事实）。"
+  - consumer_id: strategy-brief-generator
+    product_id: lnkcard
+    status: onboarding
+    evidence:
+      - "LnkCard 产品治理 onboarding 登记（2026-10-26）：company.yaml products 台账 + resolver 状态（SKILL.md P4 台账驱动）"
+    verified_at: "2026-10-26"
+    owner: opc
+    notes: "registration-only：adapter 能力未评估（unassessed）；盘点深度受 ontology/prd unresolved 限制，不阻断。"

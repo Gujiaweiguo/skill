@@ -114,6 +114,9 @@ def test_layer_reference_rejects_cross_product_ontology_fallback() -> None:
 SOFTWARE_PRODUCT_PROFILES: dict[str, tuple[str, str]] = {
     "lnkcre": ("business", "business-ontology"),
     "lnkcrm": ("business", "business-ontology"),
+    # lnkcard（LnkCard 预付费卡系统）2026-10-26 onboarding：owner 决策 ID=lnkcard、
+    # class=business（业务系统，非工具/平台）；ontology/PRD authority 均 draft/unresolved。
+    "lnkcard": ("business", "business-ontology"),
     "lnkchatbi": ("tool", "tool-ontology"),
     "lnkreport": ("tool", "tool-ontology"),
     "lnkvision": ("tool", "tool-ontology"),
@@ -172,6 +175,55 @@ def test_company_ledger_registers_seven_software_products_and_lnkwebsite_prd_onl
     chatbi = _paths.resolve_product("lnkchatbi", company)
     assert chatbi.product_status == "complete"
     assert _capability_status("lnkchatbi") == "partial"
+
+
+def test_lnkcard_baseline_semantics_after_foundation_changes() -> None:
+    """lnkcard（2026-10-26）：Change A/B 归档后的三层基线语义。
+
+    - ontology/PRD authority = unresolved（canonical 未晋升，生成区候选不冒充权威）；
+    - code 基线已建立：Change A（foundation + test gates）与 Change B
+      （card-accounts-and-value-ledger）实施并归档，git 仓有提交、
+      openspec/specs 有 scope → code authority = complete。
+      complete 在此仅表示"代码基线已建立"（repo_revision + openspec_scopes
+      可解析），不代表产品能力全量完成——能力对账以功能清单
+      reconciled_status 为准（Change C-F 仍未实施）；
+    - 历史 guard（空仓零提交不得报 complete）已由事实推进取代：
+      present-unconfirmed → complete 的跃迁由真实归档 change 驱动。
+    """
+    company = _paths.resolve_company(company_id="lanlnk")
+    product = _paths.resolve_product("lnkcard", company)
+    assert product.layers["docs_root"] == Path("/opt/code/docs/lanlnk/30-products/lnkcard")
+    assert product.layers["code_root"] == Path("/opt/code/lnkcard")
+    assert product.authority["ontology"].status == "unresolved"
+    assert product.layers.get("ontology_entry") is None
+    assert product.authority["prd"].status == "unresolved"
+    assert product.authority["code"].status == "complete"
+    assert isinstance(product.repo_revision, str) and product.repo_revision
+    assert "card-accounts-and-value-ledger" in product.openspec_scopes
+    assert _capability_status("lnkcard") == "onboarding"
+    # schema 契约：lnkcard 已进 layer-reference / ontology-change-set 产品宇宙（business）。
+    lnkcard_unresolved: dict[str, JsonValue] = {
+        "product_id": "lnkcard",
+        "product_class": "business",
+        "ontology_profile": "business-ontology",
+        "layer": "ontology",
+        "status": "unresolved",
+        "reason": "Initial onboarding skeleton; no owner-confirmed ontology candidate",
+    }
+    assert _validate("layer-reference.schema.json", lnkcard_unresolved) == []
+    lnkcard_change_set: dict[str, JsonValue] = {
+        "schema_version": "1.0",
+        "change_set_id": "ONT-LNKCARD-BASELINE-000",
+        "product_id": "lnkcard",
+        "ontology_profile": "business-ontology",
+        "change_mode": "initial-baseline",
+        "origin_flow": "forward-governance",
+        "baseline": {"status": "absent"},
+        "inputs": [],
+        "changes": [],
+        "review": {"status": "draft"},
+    }
+    assert _validate("ontology-change-set.schema.json", lnkcard_change_set) == []
 
 
 def test_source_reference_keeps_decisions_separate_from_observations() -> None:
@@ -512,6 +564,59 @@ def test_implementation_return_requires_verification_for_absorbed_status() -> No
         "verification_refs": ["verification-report.md"],
         "review_owner": "OPC",
     }) == []
+
+
+def test_implementation_return_phase_record_optional_and_structured() -> None:
+    # 2026-10-26 implementation-package v2.0 契约缺口补齐：plan-and-apply 回执
+    # changes[].phase_record 记 created/planned/validated/implemented 四阶段。
+    # schema 保持 optional（历史 apply-existing 回执可省略）；条件必填由
+    # implementation-package-execution 执行协议规定。
+    base: dict[str, JsonValue] = {
+        "schema_version": "1.0",
+        "return_id": "RET-PHASE-001",
+        "product_id": "lnkcre",
+        "trace_ids": ["PRD-CRE-001"],
+        "target_repo": "/opt/code/lnkcre",
+        "review_status": "pending",
+        "proposed_updates": [],
+    }
+    # 历史 apply-existing 形态：无 phase_record，仍然合法。
+    assert _validate("implementation-return.schema.json", base) == []
+    full: dict[str, JsonValue] = {
+        **base,
+        "changes": [{
+            "change_id": "cre-add-report",
+            "feature_commits": ["abc1234"],
+            "phase_record": {
+                "created": {"change_id": "cre-add-report", "artifacts": ["proposal.md", "design.md", "tasks.md"]},
+                "planned": {"tasks": "tasks.md 定稿"},
+                "validated": {"strict_validate": "passed", "commands": ["openspec validate --strict"]},
+                "implemented": {"skipped": True, "reason": "apply 未授权，工件保留 draft"},
+            },
+        }],
+    }
+    assert _validate("implementation-return.schema.json", full) == []
+    skipped_without_reason: dict[str, JsonValue] = {
+        **base,
+        "changes": [{
+            "change_id": "cre-add-report",
+            "phase_record": {
+                "created": {"change_id": "cre-add-report"},
+                "validated": {"skipped": True},
+            },
+        }],
+    }
+    assert _validate("implementation-return.schema.json", skipped_without_reason)
+    empty_record: dict[str, JsonValue] = {
+        **base,
+        "changes": [{"change_id": "cre-add-report", "phase_record": {}}],
+    }
+    assert _validate("implementation-return.schema.json", empty_record)
+    bad_phase_type: dict[str, JsonValue] = {
+        **base,
+        "changes": [{"change_id": "cre-add-report", "phase_record": {"created": "created"}}],
+    }
+    assert _validate("implementation-return.schema.json", bad_phase_type)
 
 
 def test_unreviewed_implementation_return_remains_proposed() -> None:

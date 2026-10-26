@@ -7,7 +7,7 @@
   "properties": {
     "schema_version": {"const": "1.0"},
     "change_set_id": {"type": "string", "minLength": 1},
-    "product_id": {"enum": ["lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat"]},
+    "product_id": {"enum": ["lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat", "lnkcard"]},
     "ontology_profile": {"enum": ["business-ontology", "tool-ontology"]},
     "change_mode": {"enum": ["initial-baseline", "incremental"]},
     "origin_flow": {"description": "Direction for this change only; never a product-level workflow classification.", "enum": ["forward-governance", "code-evidence-reverse"]},

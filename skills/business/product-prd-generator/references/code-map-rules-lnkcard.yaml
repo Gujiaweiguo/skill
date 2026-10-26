@@ -1,0 +1,22 @@
+project: lnkcard
+description: >-
+  LnkCard 初始产品基线。首轮代码仓仅有 onboarding/OpenSpec 空骨架；不使用
+  LnkCRE alignment matrix，也不启用直接代码或测试文件扫描，避免把无业务代码的空集
+  误读为已验证能力缺失。代码 authority 与 scan coverage 应明确标记。
+specs:
+  path: openspec/specs
+matrix:
+  enabled: false
+future_scanners:
+  direct_runtime_sources:
+    enabled: false
+    note: 没有业务实现代码，首次运行禁止使用静态关键词扫描替代实现基线。
+  tests:
+    enabled: false
+    note: 尚无业务代码/测试，尚未实施测试扫描。
+exclude_paths:
+  - "**/.git/**"
+  - "**/.opencode/**"
+  - "**/node_modules/**"
+  - "**/.venv/**"
+  - "**/__pycache__/**"

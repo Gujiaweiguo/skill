@@ -86,3 +86,11 @@ capabilities:
     verified_at: "2026-10-04"
     owner: opc
     notes: "官网不外卖，无售前评估商业场景。"
+  - consumer_id: requirement-evaluator
+    product_id: lnkcard
+    status: onboarding
+    evidence:
+      - "LnkCard 产品治理 onboarding 登记（2026-10-26）：company.yaml 台账已登记；产品层 PRD/功能清单未建立（resolver prd=unresolved）"
+    verified_at: "2026-10-26"
+    owner: opc
+    notes: "registration-only：adapter 能力未评估（unassessed）；售前评估需产品层基线先落地。"

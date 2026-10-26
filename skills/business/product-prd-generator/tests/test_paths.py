@@ -355,6 +355,47 @@ def test_registered_unresolved_ontology_does_not_fallback(tmp_path: Path, monkey
             ontology_path_for_project(project)
 
 
+# ─── lnkcard（2026-10-26）：Change A/B 归档后的 code root 解析 ───────────
+
+
+def test_lnkcard_canonical_id_and_code_root_requires_explicit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """lnkcard 已注册：canonical id 归一生效；Change A/B 归档后 code authority=
+    complete（git 有提交 + openspec specs 有 scope）→ resolve_code_root 信任
+    company.yaml 登记的 code_root；显式 --code-root 仍然优先。"""
+    monkeypatch.setenv("COMPANY_BASE", "/opt/code/docs/lanlnk")
+    monkeypatch.delenv("LANLNK_BASE", raising=False)
+    assert canonical_product_id("LnkCard") == "lnkcard"
+    assert resolve_code_root("lnkcard", "/tmp/explicit-lnkcard") == Path("/tmp/explicit-lnkcard")
+    assert resolve_code_root("lnkcard") == Path("/opt/code/lnkcard")
+
+
+def test_lnkcard_unresolved_layers_never_fallback_to_lnkcre(monkeypatch: pytest.MonkeyPatch) -> None:
+    """lnkcard ontology/term-aliases 均 unresolved（骨架「未建立」）。
+
+    2026-10-26 lnkcard 首轮生成后契约更新：unresolved 时允许回落**本产品**
+    生成区 out/prd/lnkcard/output/（skill 自产自用），但仍拒绝商管
+    business-ontology / 商管词表（跨域污染闸门不变）；生成区也不存在时
+    仍显式报错。
+    """
+    monkeypatch.setenv("COMPANY_BASE", "/opt/code/docs/lanlnk")
+    monkeypatch.delenv("LANLNK_BASE", raising=False)
+    generation_zone = Path("/opt/code/docs/lanlnk/out/prd/lnkcard/output")
+    if (generation_zone / "ontology.yaml").is_file():
+        resolved = ontology_path_for_project("lnkcard")
+        assert resolved == generation_zone / "ontology.yaml"
+        assert "business-ontology" not in str(resolved)
+    else:
+        with pytest.raises(MissingProductDataError):
+            ontology_path_for_project("lnkcard")
+    if (generation_zone / "term-aliases.yaml").is_file():
+        resolved_aliases = term_aliases_path_for_project("lnkcard", SKILL_ROOT)
+        assert resolved_aliases == generation_zone / "term-aliases.yaml"
+        assert "references" not in str(resolved_aliases)
+    else:
+        with pytest.raises(MissingProductDataError):
+            term_aliases_path_for_project("lnkcard", SKILL_ROOT)
+
+
 def test_lnkvision_markdown_authority_is_returned_without_yaml_fallback(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
