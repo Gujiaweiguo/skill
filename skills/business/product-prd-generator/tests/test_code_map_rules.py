@@ -106,11 +106,12 @@ def test_scan_coverage_empty_specs_dir_reports_explicit_empty_baseline(tmp_path)
 
 
 def test_extract_lnkcard_repo_renders_populated_spec_baseline():
-    """真实 /opt/code/lnkcard（Change A/B 归档后）端到端：commit_sha=真实 HEAD、
-    4 个 spec scope（含 card-accounts-and-value-ledger）、matrix/direct 全
+    """真实 /opt/code/lnkcard（Change A/B/C 归档后）端到端：commit_sha=真实 HEAD、
+    5 个 spec scope（含 card-accounts-and-value-ledger 与
+    card-recharge-and-idempotent-recovery）、matrix/direct 全
     not-scanned——不得产出任何 LnkCRE matrix/ontology 引用。空基线渲染语义
     （commit_sha=unknown、零 capability、empty-baseline limitation）已被
-    Change A/B 的真实推进取代（2026-10-26）。"""
+    Change A/B/C 的真实推进取代（2026-10-26，fixture 随归档推进）。"""
     import unittest
     code_root = Path("/opt/code/lnkcard")
     if not code_root.is_dir():
@@ -122,6 +123,7 @@ def test_extract_lnkcard_repo_renders_populated_spec_baseline():
     spec_ids = {cap.id for cap in code_map.spec_capabilities}
     assert spec_ids == {
         "card-accounts-and-value-ledger",
+        "card-recharge-and-idempotent-recovery",
         "dev-test-environment",
         "test-gates",
         "verification-evidence",
@@ -134,7 +136,7 @@ def test_extract_lnkcard_repo_renders_populated_spec_baseline():
     assert scanners["matrix"]["status"] == "not-scanned"
     assert scanners["direct_code"]["status"] == "not-scanned"
     assert scanners["direct_tests"]["status"] == "not-scanned"
-    assert scanners["specs"]["artifact_count"] == 4
+    assert scanners["specs"]["artifact_count"] == 5
     assert scanners["specs"]["status"] == "complete"
     assert not scanners["specs"]["limitations"]
     # direct 扫描器未启用 → 整体不得报 complete
