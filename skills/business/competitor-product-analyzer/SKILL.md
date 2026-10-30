@@ -757,6 +757,7 @@ export LANLNK_BASE=/opt/code/docs/lanlnk
 - **改进建议的"客户必需"标记依赖外部输入**：本 skill 自己无法判断某项能力是否"客户必需"，必须借助 requirement-evaluator 或用户在 P0 显式提供。无外部输入时，"P0 必补"标记只能基于"购买理由级领先"的主观判断，置信度 medium。
 - **lineage 字段首版人工标注**：`derived_from`/`independence`/`applies_to` 不自动识别全部来源关系，靠人工/半自动标注。
 - **`independence=unknown` 是合法稳态**：fail closed，不参与互证升级；不填 lineage 字段即按 unknown 解释。
+- **text-sparse 页回看纪律（2026-10-30 海鼎试点实证）**：被标记页的业务语义可能与正文标签显著不同（实证：标签"线上商城商品录入"回看实为"商品数量录入单移动端，类型含库存/退还、带审批流"），不回看会错判业务域；无视觉通道的会话可用外部视觉工具辅助回看，但结果必须标注 `extraction_method=vision_assisted`（辅助转写可能有误，原图人工复核优先级更高）；回看修正主张内容，**不改变证据层级上限**（proposal 仍 medium）。回看入口优先 raw 层 `_media` 投影。
 
 ## 设计决策
 

@@ -451,6 +451,7 @@ Agent:
 - markitdown 对损坏 OOXML 会静默当纯文本转换 → convert_doc 有魔数守卫（PK / %PDF-），但裸 `uv run markitdown` 回退路径无守卫
 - OCR（DeepSeek-OCR-2）依赖用户级 GPU 环境，不在 skill venv 内；缺 GPU 时 ocr_extract.py 不可用
 - `text-sparse` 阈值常量（≤50 字 + ≥1 图）对封面/目录/章节分隔页有**预期误报**；v1 不做页型豁免，信号仅为回看提示、不阻断流程
+- **text-sparse 实测基线（2026-10-30 海鼎试点）**：81 页混合型方案 PPT 检出 17 页（21%），其中真实"界面截图+标签文字"页约 2/3、封面/分隔/致谢预期误报约 1/3；text-sparse 页回看可能**修正业务语义**（实证：正文标签"线上商城商品录入"回看实为"商品数量录入单含审批流"），但回看不改变证据层级上限（proposal 仍 medium）。回看入口优先用既有 `_media` 投影（`image_s<N>_*`），原件 python-pptx 提取为备选
 - 检测失败语义 = `undetermined (detect-error: 原因)`，与 `none`（成功无发现）严格区分；v1 及更早转换的旧 raw 产物没有 `pptx_text_sparse` 行仍是合法产物（不回填、不重转），该行只出现在 v2 起重新转换的文件
 - 更多坑位与修复规则见 `references/troubleshooting.md`
 
