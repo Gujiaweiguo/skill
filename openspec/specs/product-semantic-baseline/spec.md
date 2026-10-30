@@ -1,8 +1,10 @@
 # product-semantic-baseline Specification
 
 ## Purpose
-TBD - created by archiving change product-semantic-prd-handoff. Update Purpose after archive.
+Defines the semantic contract by which skills consume product configurations: each product declares its canonical product ID, product class, ontology profile, authoritative ontology/PRD/code source paths, stable identifier namespace, and owning repository, with business products (lnkcre, lnkcrm) and tool products (lnkchatbi, lnkreport, lnkvision, lnkgateway, lnkchat) each resolving their own ontology profile instead of sharing a business-domain model. It binds per-product adapters so a tool product's terms load from its own adapter, treats semantic releases as versioned and traceable consumption slices (raw planning material is not an AI-consumable contract until accepted and version-pinned), requires each layer's authority to be explicit, non-substitutable, and reported as unresolved rather than silently replaced by another product's source, and keeps product lifecycle completeness, skill adapter maturity, and per-change governance flow direction recorded independently.
+
 ## Requirements
+
 ### Requirement: Product semantic baselines SHALL declare their model kind and ownership
 Each product configuration consumed by the skills SHALL declare its canonical product ID, product class, ontology profile, authoritative source paths for ontology, PRD, and code, stable identifier namespace, and owning product/repository. Business ontology and tool/product ontology profiles SHALL be supported without requiring tool products to use business-domain entities. The initial governance scope SHALL include business products `lnkcre` and `lnkcrm`, and tool products `lnkchatbi`, `lnkreport`, `lnkvision`, `lnkgateway`, and `lnkchat`. Website/CMS operations product `lnkwebsite` is outside this software product governance scope.
 

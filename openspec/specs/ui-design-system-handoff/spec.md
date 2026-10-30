@@ -1,7 +1,7 @@
 # ui-design-system-handoff Specification
 
 ## Purpose
-TBD - created by archiving change product-semantic-prd-handoff. Update Purpose after archive.
+Defines how UI-related product changes are handed off and verified as a traceable design-system model rather than ad-hoc styling work: each UI change references a design-system version, design tokens, shared components, page patterns, a route/page inventory, viewport metadata, and visual acceptance checks, and the return package carries functional verification plus visual evidence status including tested viewports and screenshot/diff references. UI consistency decomposes into reusable layers (design tokens, shared components, page patterns, individual page migrations) so a product-wide UI refresh is never represented as one unbounded implementation change, and when a visual baseline is missing or stale the result reports visual verification as unavailable instead of claiming visual conformance.
 ## Requirements
 ### Requirement: UI changes SHALL be represented as a traceable design-system model
 UI-related product changes SHALL be able to reference a design-system version, design tokens, shared components, page pattern, route/page inventory, visual evidence, viewport metadata, and visual acceptance checks.

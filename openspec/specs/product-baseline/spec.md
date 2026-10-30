@@ -1,7 +1,7 @@
 # product-baseline Specification
 
 ## Purpose
-TBD - created by archiving change simplify-product-baseline-to-three-layers. Update Purpose after archive.
+Defines how the skills present and govern a product's baseline: every registered product is organized strictly as three user-visible layers — ontology (the product's objects, terms, rules, and capabilities), PRD (product goals and current change scope), and code (implementation facts). Artifacts that are not independent layers (OpenSpec changes, tests, verification returns, semantic releases, UI design-system constraints, competitor and customer analyses) are classified into one of the three layers' work products instead of becoming new architecture layers. The spec also binds the product registry: it covers all registered products with confirmed paths on disk and explicit null for unconfirmed ones, unknown or unregistered products degrade explicitly instead of silently reusing the business-management ontology, and legacy model_kind values remain schema-parseable so existing artifacts survive terminology convergence.
 ## Requirements
 ### Requirement: 产品基线 SHALL 只暴露三层用户可见分层
 Skill 的产品基线入口 SHALL 只以三层呈现：本体（ontology，产品世界的对象/术语/规则/能力）、PRD（产品目标与本轮变更）、代码（codebase，当前实现事实）。产品本体层内部允许由多个文件组成，但概念上 SHALL 保持一层；任何 model_kind 式分类 SHALL 仅作为可选内部提示，不得作为用户入口概念。

@@ -1,7 +1,7 @@
 # strategy-output-layout Specification
 
 ## Purpose
-TBD - created by archiving change strategy-output-layout-flattening. Update Purpose after archive.
+Defines the flattened output layout for strategy analysis so every theme produces a readable, git-distributable deliverable set without per-theme pipeline directories: the strategy root resolves from company.yaml (`strategy.root`), the four anchors stay fixed at the company base (incoming/raw/materials/out), and no input/parsed/review/output subdirectories are created under the theme. Reusable products (competitor capability matrices, policy and market signals, methodology summaries) enter the materials library directly with frontmatter whose status honestly reflects verification depth, instead of being staged for manual copying. Final outputs land flat in the strategy root with evidence-ledger.json as the only non-markdown exception, internal links must resolve from the final file locations without pointing at raw working notes, and legacy five-level themes remain readable without forced migration.
 ## Requirements
 ### Requirement: 配置驱动路径解析
 
