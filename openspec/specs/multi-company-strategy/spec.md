@@ -1,7 +1,7 @@
 # multi-company-strategy Specification
 
 ## Purpose
-TBD - created by archiving change company-agnostic-skills. Update Purpose after archive.
+Defines strategy-brief-generator as a company-agnostic strategy engine: the strategy root, default topic, methodology source, and self-inventory inputs all resolve from the current company's company.yaml, with no company, product, or domain names hardcoded in SKILL.md. The generic four-look framework stays honest about industry shape — the market look always carries a policy-and-regulation sub-dimension, and policy-driven companies (`industry_profile.policy_driven: true`) additionally get a dedicated, sourced policy-signal digest and a standalone policy section in the brief, while non-policy-driven companies keep policy as a regular market sub-item. Company-specific writing constraints are loaded externally from `<company>/config/sales-playbook/strategy-brief.md` when present (lanlnk's B/D-route and delivery-pitch narrative migrated there verbatim, leaving SKILL.md a generic engine), input directories keep the fixed five-category abstraction while second-level structure is owned by company domain knowledge rather than the skill, and every run closes with a 产品机会清单 whose entries link back to the evidence ledger and carry executable `onboard.sh product` instructions so confirmed opportunities feed back into company.yaml registration.
 ## Requirements
 ### Requirement: company.yaml 驱动的路径解析
 strategy-brief-generator SHALL 从当前公司 company.yaml 解析：战略根（`strategy.root`，拼接分析主题，主题默认「<domain>战略」可由用户指定）、方法论源（`strategy.methodology_ref`）、自身盘点输入（products[].code_root 非空读源码路径、空则引用 materials 素材）。MUST NOT 在 SKILL.md 中写死任何公司名、产品名或「商业地产信息化战略」类域名。

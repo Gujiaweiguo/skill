@@ -1,7 +1,7 @@
 # multi-company-import Specification
 
 ## Purpose
-TBD - created by archiving change company-agnostic-skills. Update Purpose after archive.
+Defines how material-importer works as a multi-company skill instead of a lanlnk-only tool. Every script entry point resolves the company base through `COMPANY_BASE || LANLNK_BASE` and verifies `<base>/config/company.yaml` before doing any work, failing loudly with an export hint rather than silently falling back to a hardcoded default company, with explicit CLI path parameters taking precedence over env derivation. Company-specific structure comes from configuration instead of being baked in: competitor import subpaths default from the company's single prd_ready product and demand explicit parameters when ambiguous (legacy lanlnk invocations stay behavior-identical), P2 classification prefers the company-level domain-tags file declared in company.yaml and degrades to the skill's built-in tags when it is absent, and SKILL.md routes the agent to determine the company first (cwd inference, user naming, asking — never guessing a default) while pointing at each company's `config/company.yaml` in place of the old dangling skill-local config reference.
 ## Requirements
 ### Requirement: 公司基座解析与无静默默认
 material-importer 的所有脚本（batch_competitor_import.py / case_matcher.py / scan_raw_index.py 及后续新增入口）SHALL 按 `COMPANY_BASE || LANLNK_BASE` 顺序解析公司根目录，解析后 MUST 校验 `<base>/config/company.yaml` 存在；未设变量或校验失败时 MUST 以非零码退出并输出修复提示（含 export 示例），MUST NOT 回退到任何硬编码默认公司路径。CLI 显式路径参数（如 --raw-dir）优先于 env 推导。
