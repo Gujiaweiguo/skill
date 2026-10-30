@@ -73,17 +73,7 @@ used by coverage-validate mode.
 
 ### Requirement: Path resolution helpers
 
-The skill SHALL expose two public helper functions in `product_prd_generator/_paths.py`:
-
-- `ontology_path_for_project(project: str) -> Path`
-- `term_aliases_path_for_project(project: str, skill_root: Path) -> Path`
-
-Both MUST:
-
-- Return a `Path` object (never raise on missing project-specific file)
-- Implement three-tier fallback semantics (document-control-plane `30-products/` → legacy `out/prd/` → default)
-- Be importable from outside the module without side effects
-- Resolve `$LANLNK_BASE` at call time (not import time) via `os.environ.get("LANLNK_BASE", "/opt/code/docs/lanlnk")`
+The skill SHALL expose `ontology_path_for_project(project: str) -> Path` and `term_aliases_path_for_project(project: str, skill_root: Path) -> Path` in `product_prd_generator/_paths.py`. Both MUST return a `Path` (never raise on a missing project-specific file), implement three-tier fallback (document-control-plane `30-products/` -> legacy `out/prd/` -> default), be importable without side effects, and resolve `$LANLNK_BASE` at call time from `os.environ` with default `/opt/code/docs/lanlnk`.
 
 #### Scenario: project-specific ontology exists in 30-products (migrated path)
 
@@ -167,15 +157,14 @@ yaml is missing.
 
 ### Requirement: Code-map rules yaml schema
 
-The skill SHALL recognize a yaml schema for `references/code-map-rules-<project>.yaml` with the following
-top-level keys:
+The skill SHALL recognize this top-level yaml schema for `references/code-map-rules-<project>.yaml`:
 
 - `project`: string (project name)
 - `description`: string (short description)
-- `specs`: object with `path` (string, relative to code_root)
-- `matrix`: object with `enabled` (bool) and `path` (string, only when enabled)
-- `future_scanners`: object (optional, for future scanner placeholders; all entries `enabled: false` in Phase B)
-- `exclude_paths`: list of strings (glob patterns, applied to all scanners)
+- `specs`: object with `path` (relative to code_root)
+- `matrix`: object with `enabled` (bool) and `path` (only when enabled)
+- `future_scanners`: optional object of placeholders (all `enabled: false` in Phase B)
+- `exclude_paths`: list of glob patterns applied to all scanners
 
 #### Scenario: minimal valid yaml
 
@@ -307,7 +296,7 @@ The docs repo 复利工程 更新日志 SHALL include an entry summarizing the 4
   - future_scanners 占位 schema 模式
 
 ### Requirement: Full and incremental PRDs SHALL preserve distinct inputs and semantic provenance
-The skill SHALL support a first/full PRD as a versioned product-planning baseline and an incremental PRD as a delta against an identified prior PRD baseline. Both modes SHALL preserve customer requirements, competitor evidence, current code facts, ontology references, and owner/OPC product judgments as distinct input classes with source references, timestamps or revisions where available, confidence/review state, and stable trace identifiers for actionable items. The skill SHALL accept a subset of input classes when that matches the task and SHALL NOT force every upstream skill to run for every request.
+The skill SHALL support first/full PRDs as versioned baselines and incremental PRDs as deltas against a prior baseline. Both modes SHALL preserve customer requirements, competitor evidence, code facts, ontology references, and owner/OPC judgments as distinct input classes with source references, revisions, confidence/review state, and stable trace identifiers for actionable items. It SHALL accept a subset of input classes matching the task and SHALL NOT force every upstream skill to run.
 
 #### Scenario: First/full PRD combines available inputs
 - **WHEN** an owner requests a first/full PRD for an in-scope product

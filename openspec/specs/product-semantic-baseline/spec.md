@@ -6,9 +6,7 @@ Defines the semantic contract by which skills consume product configurations: ea
 ## Requirements
 
 ### Requirement: Product semantic baselines SHALL declare their model kind and ownership
-Each product configuration consumed by the skills SHALL declare its canonical product ID, product class, ontology profile, authoritative source paths for ontology, PRD, and code, stable identifier namespace, and owning product/repository. Business ontology and tool/product ontology profiles SHALL be supported without requiring tool products to use business-domain entities. The initial governance scope SHALL include business products `lnkcre` and `lnkcrm`, and tool products `lnkchatbi`, `lnkreport`, `lnkvision`, `lnkgateway`, and `lnkchat`. Website/CMS operations product `lnkwebsite` is outside this software product governance scope.
-
-Registry metadata SHALL distinguish product lifecycle/completeness from skill adapter maturity. Governance flow direction is per change/return, not a product-level classification. OPC SHALL be the approval owner for product and ontology decisions; code evidence SHALL retain technical provenance and verification independently.
+Each product configuration SHALL declare its canonical product ID, product class, ontology profile, authoritative ontology/PRD/code paths, identifier namespace, and owning repository. Business and tool/product profiles SHALL be supported, and tool products SHALL NOT be forced into business-domain entities. Product completeness, adapter maturity, and flow direction SHALL be recorded independently; OPC SHALL own product and ontology decisions; code evidence SHALL keep its technical provenance.
 
 #### Scenario: A business product uses multiple semantic artifacts
 - **WHEN** the skills process an `lnkcre` or `lnkcrm` product configuration

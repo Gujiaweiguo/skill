@@ -4,7 +4,7 @@
 Defines the traceability contract for actionable capability and PRD handoff records across the evidence → ontology → PRD → target-repository chain: every new or revised actionable item carries a stable trace ID, canonical product, source references, ontology and PRD basis, target repository, implementation status, and evidence state, with customer evidence, competitor evidence, code facts, ontology assertions, and owner judgments kept as distinct provenance classes. Evidence states (observed, inferred, not_found, not_scanned, inaccessible, conflicting) stay separate from implementation statuses so an unscanned or inaccessible area is never reported as a missing capability, and first/full or incremental PRD handoffs identify their baseline and delta, acceptance scenarios, and target-repository consumption plus return obligations, with the target repository owning its local OpenSpec changes, implementation, and verification.
 ## Requirements
 ### Requirement: Actionable capability records SHALL carry traceable source and implementation identity
-Each new or revised actionable capability/requirement SHALL carry a stable `trace_id`, canonical product ID, source references, ontology profile/version or explicit unresolved state, PRD baseline/version, target product/repository, implementation status, evidence state, and links to downstream PRD/OpenSpec/verification/reconciliation records when available. Customer evidence, competitor evidence, code facts, ontology assertions, and owner/OPC product judgments SHALL retain their distinct provenance class. Ontology-generation and ontology-delta records SHALL retain trace links to the input items and reviewed decisions from which they were synthesized.
+Each new or revised capability SHALL carry a stable `trace_id`, canonical product ID, source references, ontology profile/version or explicit unresolved state, PRD baseline/version, target repository, implementation status, evidence state, and downstream PRD/OpenSpec/verification links. Customer, competitor, code, ontology, and owner/OPC inputs SHALL keep distinct provenance classes. Ontology-generation and ontology-delta records SHALL trace back to their inputs and reviewed decisions.
 
 #### Scenario: Competitor evidence becomes an incremental PRD item
 - **WHEN** a competitor capability is selected for product improvement
@@ -34,7 +34,7 @@ The skills SHALL represent `observed`, `inferred`, `not_found`, `not_scanned`, `
 - **THEN** the result SHALL be not scanned/unknown and SHALL NOT create a missing implementation gap without further evidence
 
 ### Requirement: Incremental PRD handoffs SHALL include target-repository consumption and return sections
-First/full PRD implementation handoffs and incremental PRD handoffs SHALL identify the PRD baseline/version and ontology basis, source/current-state evidence, goals and non-goals, acceptance scenarios, proposed OpenSpec split where applicable, target-repository gates, open decisions, consumption instructions, and write-back requirements. Incremental handoffs SHALL additionally identify the baseline delta. The target repository SHALL own its local OpenSpec changes, implementation, and verification.
+First/full and incremental PRD implementation handoffs SHALL identify the PRD baseline/version and ontology basis, source/current-state evidence, goals and non-goals, acceptance scenarios, proposed OpenSpec split where applicable, target-repository gates, open decisions, consumption instructions, and write-back requirements. Incremental handoffs SHALL additionally identify the baseline delta. The target repository SHALL own its local OpenSpec changes, implementation, and verification.
 
 #### Scenario: Target repository consumes a PRD handoff
 - **WHEN** a target repository receives a first/full or incremental PRD implementation handoff
@@ -45,7 +45,7 @@ First/full PRD implementation handoffs and incremental PRD handoffs SHALL identi
 - **THEN** the return package SHALL record the false positive and identify the code/spec evidence needed for docs-side reconciliation
 
 ### Requirement: Documentation write-back SHALL be explicit and reviewed
-The skills SHALL generate structured proposed write-back records for ontology-to-PRD, PRD-to-code, and ontology-to-code reconciliation, PRD/capability status, implementation return evidence, and ontology change candidates without silently overwriting authoritative product documents. A return record SHALL identify the originating trace IDs, product, source and target layer revisions, OpenSpec change and verification evidence where applicable, findings/false positives, proposed destination updates, decision owner, and review status. Canonical updates SHALL occur only after the destination layer's owner reviews and accepts the proposal.
+The skills SHALL generate structured proposed write-back records for ontology-to-PRD, PRD-to-code, and ontology-to-code reconciliation, PRD/capability status, implementation return evidence, and ontology change candidates without silently overwriting authoritative product documents. Canonical updates SHALL occur only after the destination layer's owner reviews and accepts the proposal.
 
 #### Scenario: Verified implementation is returned
 - **WHEN** a target repository returns a verified implementation package
@@ -62,4 +62,8 @@ The skills SHALL generate structured proposed write-back records for ontology-to
 #### Scenario: An implementation return is incomplete
 - **WHEN** a target repository returns without required revision, verification, or trace references
 - **THEN** the return SHALL remain incomplete/pending and SHALL NOT be treated as verified synchronization
+
+#### Scenario: Return record carries trace, revision, and decision fields
+- **WHEN** a write-back or implementation return record is generated
+- **THEN** it SHALL identify the originating trace IDs, product, source and target layer revisions, OpenSpec change and verification evidence where applicable, findings/false positives, proposed destination updates, decision owner, and review status
 

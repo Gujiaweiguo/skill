@@ -23,7 +23,7 @@ The Skill SHALL validate a Case payload before CMS import. The payload SHALL con
 
 ### Requirement: Product payloads conform to the draft-import contract
 
-The Skill SHALL validate a Product payload before CMS import. The payload SHALL contain non-empty `product_type`, `slug`, `title`; it MAY contain `headline`, `description`, `seo_title`, `seo_description`, `image`, and `details` (JSON). The Skill SHALL reject payloads with forbidden brand terms. If the product references AI Vision (`slug` contains `mallsense` or `vision`; e.g. legacy `mallsense-ai`, current `lnkvision`), `details.capabilities` SHALL only claim MVP items (通道拥堵, 火灾烟雾, 地面脏污); roadmap items MUST be absent from `capabilities`.
+The Skill SHALL validate a Product payload before CMS import. The payload SHALL contain non-empty `product_type`, `slug`, `title`; it MAY contain `headline`, `description`, `seo_title`, `seo_description`, `image`, and `details` (JSON). The Skill SHALL reject payloads with forbidden brand terms. For products that reference AI Vision (their `slug` carries the `vision`/`mallsense` lineage), `details.capabilities` SHALL claim MVP items only; roadmap items MUST be absent from `capabilities`.
 
 #### Scenario: Valid product payload is accepted
 - **WHEN** a Product payload has all required fields, valid product_type, and no forbidden terms
@@ -34,8 +34,9 @@ The Skill SHALL validate a Product payload before CMS import. The payload SHALL 
 - **THEN** the Skill SHALL reject the payload
 
 #### Scenario: AI Vision product claims non-MVP capability
-- **WHEN** a Product payload has slug="mallsense-ai" or slug="lnkvision" and details.capabilities includes "精准客流"
+- **WHEN** a Product payload has slug="mallsense-ai" (legacy) or slug="lnkvision" and details.capabilities includes "精准客流"
 - **THEN** the Skill SHALL reject the payload (roadmap item in capabilities)
+- **AND** the accepted MVP items for these products SHALL be limited to 通道拥堵, 火灾烟雾, and 地面脏污
 
 ### Requirement: The Skill creates drafts only
 

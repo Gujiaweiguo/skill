@@ -4,7 +4,7 @@
 Defines product ontology profiles (business vs tool), first-version synthesis and incremental deltas with classified provenance, OPC-owned review and release gates, and forward/reverse flow governance for the seven in-scope software products.
 ## Requirements
 ### Requirement: Product ontologies SHALL declare their profile and authority
-For each in-scope product, governance records SHALL identify whether its semantic model is a business ontology or a tool/product ontology, its owner, canonical authority, stable identifier namespace, and relationship to PRD and code authorities. Business ontology profiles MAY model business objects, relationships, lifecycles, rules, and domain terms. Tool ontology profiles MAY model product concepts such as capabilities, workflows, datasets, charts, executions, or integrations and SHALL NOT be forced into a business-entity taxonomy.
+For each in-scope product, governance records SHALL identify whether its model is a business or tool/product ontology, plus its owner, canonical authority, identifier namespace, and relationship to PRD and code authorities. Business profiles MAY model business objects, relationships, lifecycles, rules, and domain terms; tool profiles MAY model product concepts (capabilities, workflows, datasets, charts, executions, integrations) and SHALL NOT be forced into a business-entity taxonomy.
 
 #### Scenario: Business product authority is resolved
 - **WHEN** a skill processes `lnkcre` or `lnkcrm`
@@ -26,7 +26,7 @@ Ontology changes SHALL be represented as candidates with stable identifiers, aff
 - **THEN** its lifecycle state and owner decision SHALL be recorded, and the canonical ontology SHALL remain unchanged until approval
 
 ### Requirement: First-version ontology generation SHALL synthesize a reviewable baseline from available inputs
-When no canonical ontology baseline exists for an in-scope product, the ontology workflow SHALL be able to synthesize a first-version ontology draft from available customer requirements, competitor information, code/spec/test facts, and OPC/product-owner ideas. It SHALL classify each input by provenance and distinguish observed evidence, inference, and product judgment. It SHALL preserve source references and unresolved questions for each proposed concept, relationship, lifecycle, rule, capability, or term. Generated content SHALL remain a draft until reviewed and approved by the product's designated ontology owner.
+When no canonical baseline exists for an in-scope product, the workflow SHALL synthesize a first-version draft from customer requirements, competitor information, code/spec/test facts, and OPC ideas, classifying inputs by provenance (observed evidence, inference, product judgment) and retaining source references and unresolved questions per proposed concept, relationship, lifecycle, rule, capability, or term. The draft SHALL remain unaccepted until the designated ontology owner approves it.
 
 #### Scenario: First ontology version is generated for a business product
 - **WHEN** an owner requests an initial ontology for `lnkcre` or `lnkcrm` and no accepted baseline exists
@@ -72,11 +72,12 @@ An ontology release intended for downstream consumption SHALL identify the produ
 - **THEN** the system SHALL mark affected PRD/reconciliation records as requiring comparison and SHALL NOT silently rewrite the existing PRD baseline
 
 ### Requirement: Incremental ontology modification SHALL be expressed as a delta against a named baseline
-When a canonical ontology baseline exists, the workflow SHALL compare newly supplied customer requirements, competitor information, code/spec/test facts, and OPC/product-owner ideas against a named ontology version. It SHALL produce a reviewable change set that identifies additions, modifications, deprecations, and relationship changes, with rationale, provenance, affected concepts, compatibility/impact notes, and related PRD/code trace identifiers. Inputs SHALL remain distinct: a customer request or competitor capability SHALL NOT by itself become an approved product ontology assertion, and an OPC idea SHALL be recorded as product judgment rather than external evidence. Only owner-approved changes SHALL be promoted into a new canonical ontology version/release.
+When a canonical baseline exists, the workflow SHALL compare newly supplied customer, competitor, code/spec/test, and OPC inputs against a named ontology version and produce a reviewable change set. Provenance SHALL stay distinct: customer and competitor inputs SHALL NOT by themselves become approved assertions, and OPC ideas SHALL be product judgment, not external evidence. Only owner-approved changes SHALL be promoted into a new canonical version.
 
 #### Scenario: New customer input proposes an ontology change
 - **WHEN** a customer requirement introduces a potentially reusable business or product concept not represented in the named ontology baseline
 - **THEN** the workflow SHALL propose a delta linked to the requirement and explain why it is a candidate ontology concept rather than silently adding it to the baseline
+- **AND** the change set SHALL list additions, modifications, deprecations, and relationship changes with rationale, provenance, affected concepts, compatibility/impact notes, and related PRD/code trace identifiers
 
 #### Scenario: Competitor information proposes an ontology change
 - **WHEN** competitor information reveals a potentially relevant concept, relationship, state, rule, or capability
@@ -110,7 +111,7 @@ For new products and future incremental changes, the workflow SHALL assess impac
 - **THEN** the workflow SHALL create a reviewable ontology candidate and trace the PRD delta to the accepted ontology baseline or the pending candidate before handing the change to code implementation
 
 ### Requirement: Existing code facts MAY be synchronized in reverse only as reviewed candidates
-When existing code/spec/test evidence leads documentation, the workflow MAY inspect the implementation to recover as-is facts. Each fact SHALL identify target repository revision and scan coverage. Reverse synchronization SHALL create reconciliation findings or proposed ontology/PRD updates only; it SHALL NOT convert implementation facts directly into product intent or mutate canonical ontology/PRD. OPC is the product and ontology decision owner; approval records SHALL identify OPC. OPC approval does not replace code verification evidence.
+When code/spec/test evidence leads documentation, the workflow MAY recover as-is facts, each carrying its target repository revision and scan coverage. Reverse synchronization SHALL produce reconciliation findings or proposed ontology/PRD updates only; it SHALL NOT convert implementation facts into product intent or mutate canonical ontology/PRD. OPC owns product and ontology decisions: approval records SHALL identify OPC, and OPC approval SHALL NOT replace code verification evidence.
 
 #### Scenario: Code evidence suggests an ontology or PRD update
 - **WHEN** a reverse scan finds a behavior or capability absent from ontology/PRD
