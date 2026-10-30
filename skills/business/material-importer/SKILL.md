@@ -40,6 +40,11 @@ compatibility: >
     PEP 723 inline deps in the script header document requirements but are not the primary run path.
   Cert expiry: pytesseract (optional, CPU-only, lightweight).
 change: >
+  v6 — 2026-10-30
+  • convert_doc.py v2：pptx 新增页级 text-sparse 复核信号（同 slide 正文 ≤50 字且 ≥1 图，
+    规则集 ppt-evidence-ruleset-v1，常量不建配置系统）
+  • 检测信号三态语义：pptx_suspects / pptx_text_sparse 各支持 发现 / none /
+    undetermined (detect-error)；检测失败不再渲染成 none（修复 v1 混淆），advisory 不阻断转换
   v5 — 2026-08-07
   • 新增 scripts/sanitize_markdown.py：规范化 OCR/markitdown 产出的 Markdown
   • ocr_extract.py write_markdown_summary + batch_competitor_import.py process_vendor
@@ -130,7 +135,7 @@ incoming/ 里的原始文件（PPTX/DOCX/XLSX/图片）
 P0: 环境检测 + 素材盘点（检查依赖 + 扫描已有素材）
     ↓
 P1: 文档转换（按格式分流）
-    ├── PPTX/DOCX/PDF → convert_doc.py（markitdown + 溯源头；pptx 自动跑 guard 检测）→ raw/*.md
+    ├── PPTX/DOCX/PDF → convert_doc.py（markitdown + 溯源头；pptx 自动跑 guard 表格检测 + 页级 text-sparse 扫描，均 advisory）→ raw/*.md
     │     └── pptx 可疑表格（合并/超宽/表头空置）→ pptx_table_guard.py escalate 定向渲染 + OCR 重读原件
     ├── XLSX/XLS  → convert_excel.py 按复杂度分流 → raw/*.md | raw/csv/*.csv
     └── 图片      → extract_images.py 提取图片 → raw/*_media/
@@ -184,6 +189,26 @@ uv run markitdown "incoming/原始文件.pptx" > "raw/原始文件.pptx.md"  # �
 uv run {baseDir}/scripts/extract_images.py incoming/   # 批量处理
 uv run {baseDir}/scripts/extract_images.py incoming/ --json  # Agent 程序化读取
 ```
+
+> **text-sparse 页级复核信号（convert_doc.py v2 起，仅 pptx）**：
+> - **语义 = 「建议回看原件该页」的人工复核提示**：不代表已识别图示/流程/箭头/业务含义，
+>   不自动触发 OCR（是否 OCR 由人工决定）；素材导入层只产信号，不做竞品业务解释
+> - **判定仅基于同一 slide**：正文可见字符（非空白）≤ 50 且图片形状 ≥ 1
+>   （常量 `TEXT_SPARSE_MAX_VISIBLE_CHARS` / `TEXT_SPARSE_MIN_PICS`，规则集
+>   `ppt-evidence-ruleset-v1`）；不计 slide number 注释、图片文件名、provenance 注释与
+>   suspects 元数据，与整份 PPT 文本总量无关
+> - **三态信号**（`pptx_suspects` 与 `pptx_text_sparse` 两行各自独立，互不影响）：
+>   发现 → `pptx_text_sparse: slide N (text-sparse)`；
+>   成功无发现 → `pptx_text_sparse: none`；
+>   检测失败 → `pptx_text_sparse: undetermined (detect-error: 原因)`。
+>   **失败永不渲染成 none**——下游必须区分「未判定」与「无发现」
+> - **误报边界**：封面、目录、章节分隔页（少文有图）按正常稀疏页对待，被标记属预期误报；
+>   信号只提示回看，不阻断任何流程；正文/边界提取失败保持 undetermined，绝不判 sparse
+> - 检测是 advisory：失败时文本转换产物照常写出（source/source_sha256/extracted_by/fidelity
+>   provenance 不受影响），原因进信号行 + stderr
+> - **下游使用方式**：引用被标记页时锚点写 `source_sha256 + slide N`（页级锚点），
+>   不能只用 md 行号（行号随重转换漂移）；OCR/图片投影是原件的派生投影，
+>   **不能替代回看原始 PPT**；该页是否真有业务图示由下游人工/竞品分析回看判定
 
 > **转换陷阱（2026-08-19 实测）**：
 > 1. **PDF 转换必须用 `uv run markitdown`**（skill venv 内）。系统 PATH 上的 markitdown 通常缺 PDF 后端（pdfminer），对 PDF 返回 rc!=0 或空输出；venv 内版本正常。
@@ -425,6 +450,8 @@ Agent:
 - `.ppt`（旧二进制）python-pptx 不支持 → pptx_table_guard 报 skipped；`.doc/.xls` 需 libreoffice 预转换
 - markitdown 对损坏 OOXML 会静默当纯文本转换 → convert_doc 有魔数守卫（PK / %PDF-），但裸 `uv run markitdown` 回退路径无守卫
 - OCR（DeepSeek-OCR-2）依赖用户级 GPU 环境，不在 skill venv 内；缺 GPU 时 ocr_extract.py 不可用
+- `text-sparse` 阈值常量（≤50 字 + ≥1 图）对封面/目录/章节分隔页有**预期误报**；v1 不做页型豁免，信号仅为回看提示、不阻断流程
+- 检测失败语义 = `undetermined (detect-error: 原因)`，与 `none`（成功无发现）严格区分；v1 及更早转换的旧 raw 产物没有 `pptx_text_sparse` 行仍是合法产物（不回填、不重转），该行只出现在 v2 起重新转换的文件
 - 更多坑位与修复规则见 `references/troubleshooting.md`
 
 ## 设计决策
@@ -434,6 +461,9 @@ Agent:
 - **CSV vs MD 路由**：文件级判定（单 visible sheet + ≤8 列 + 无合并 → MD，否则 CSV）；MD 宽表在渲染器里不可读，CSV 可被 DictReader 直接消费；一个源文件只产出一种格式
 - **表头扫描默认开启**：真实凭证表普遍带标题前言区，默认开避免人工指定 `--header-row`；前言进 `.notes.md` 顶部，永不丢弃
 - **pptx guard 只升级不预跑 OCR**：convert_doc 对 pptx 自动跑 detect（轻量、纯 python-pptx），命中才 escalate 渲染 PNG + OCR（重、需 GPU）——按需付费
+- **text-sparse 在 convert_doc.py 内直接用 python-pptx 逐 slide 计算**：不扩展 pptx_table_guard.py（guard「报告工具恒 exit 0」哲学与三态语义改造正交）；也不解析转换后 md 推断稀疏页（markitdown 的 slide 分界不可靠，且拿不到「同一 slide 的图片存在情况」）
+- **检测三态语义（v2）**：`none` 仅表示「检测成功且无发现」；检测失败渲染 `undetermined (detect-error: 原因)`——修复 v1 把 guard 失败渲染成 `pptx_suspects: none` 的语义混淆；检测是 advisory，失败不阻断转换产物
+- **EXTRACTOR_VERSION 1→2**：输出新增 text-sparse/ruleset 注释行，按维护规则 bump 代际（manifest 溯源依赖它区分产物代际）；旧 raw 产物不回填不重转
 - **扫描行宽基准**：表头占比用尾部裁剪后的行宽计算（香格里拉 257 列事故），`_trim_trailing` 必须先于 `_detect_preface`
 
 ## 维护规则

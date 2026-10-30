@@ -59,6 +59,8 @@
 | `quality_assessment` | enum | 是 | `Leading` / `Competitive` / `Behind` / `Missing` |
 | `notes` | string | 否 | 自由备注（脱敏后的观察）|
 
+> `evidence_state`/`confidence` 的 capability 级取值表达「该能力的观察状态」，与成员 evidence 原值冲突时以成员原值为准，并进 pending-items。capability 摘要必须可回溯到原始 claim 与来源证据；`standard_term`/`target_product` 目标产品映射不得替代原始主张。
+
 ## capability_type 取值
 
 | 取值 | 含义 | 典型场景 |
@@ -109,6 +111,10 @@
 7. `standard_term=null` 时必须进 `review/pending-items.md`
 8. `evidence_state=not_scanned|inaccessible|not_found` 时不得把 `implementation_status` 自动设为 `missing`
 9. 新增或修订能力必须有 `trace_id`、`target_product` 和至少一个 `source_ref`
+10. 摘要/归并/`standard_term` 映射不得修改任何成员 evidence 的 `evidence_state`/`confidence` 原值；冲突以成员原值为准并进 pending-items
+11. 断链或缺 `evidence_id`/`trace_id` 的观察不得导出为 verified；禁止伪造或静默补齐 ID，显式标待核实
+12. 同一来源链（同一原件的转换文本/OCR/能力模型/交接包）互证只计一次；`independence=unknown` 不得参与互证
+13. `standard_term`/`target_product` 目标产品映射是描述性参考，**不是需求授权**；采纳与否由 owner decision 决定
 
 ## 去重规则
 
@@ -118,6 +124,8 @@
 - 未归一时用 `(module, original_term)`
 
 **不用 `original_term` 单独做 key**：不同厂商/不同手册可能用同一名指代不同业务能力。
+
+**合并去重只合并 capability 表达，不合并证据计数**：同链 evidence 互证只计一次（见 `evidence-ledger.md`「来源谱系」），各 evidence 条目保留 evidence_id；evidence 数组累加规则不变。
 
 ## 与 product-prd-generator 的兼容
 
@@ -136,5 +144,6 @@
 - `capability_id`、`trace_id`、`target_product` 原值透传到共享 source-reference 的同名字段；`capability-map.json` 仍是这些 ID 的唯一权威记录，共享 schema 只链接不取代
 - `evidence[].source_ref` 透传为共享 `source_ref`（公司根相对路径，如 `materials/13-competitors/<vendor>/…`；外部 URL 与代码仓引用除外），并由消费方回链 `evidence_id` 指向 `evidence-ledger.json` 的台账条目
 - 竞品能力观察导出为 `competitor_observation` 类型的 source reference；`evidence_state`、`confidence` 按本 schema 记录的原值填写
+- 交接导出每条竞品观察须保留 evidence_id、capability_id、trace_id、source_ref、slide/page 锚点、claim_type、evidence_state、confidence、谱系关联（derived_from/independence/applies_to）与 pending/review 状态；缺失或断链显式待核实；旧条目缺 lineage 字段按 unknown 解释（向后兼容）
 
 `standard_term=null` 的术语要进 ontology 治理流程，只能作为共享 `ontology-change-set` 的 `draft` 提案输入（`changes[].source_ids` 指向上述 source reference）。提案不会自动晋升 canonical ontology，也不构成 PRD 必须实现的 feature；采纳与否由单独记录的 owner decision 决定（来源边界详见 `evidence-ledger.md`）。

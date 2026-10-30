@@ -132,8 +132,13 @@ strategy-brief-generator（战略定位 / 竞对打法）     ←─ 你的能�
 - 禁止把方案汇报 PPT 的功能列表等同于实际能力（汇报材料会夸大）
 - 禁止无来源的能力断言
 - 禁止把竞品宣传话术直接抄进蓝联产品建议
+- 禁止把同一原件的派生产物（转换文本/OCR/能力模型/摘要/交接包）当多份独立证据累计——同源只计一次（来源链）
+- 独立性未知（`independence=unknown`）不得默认独立，不得据此提升 confidence
+- 缺 SHA/页码锚点/evidence ID/证据状态/来源类型/版本 → 失败关闭：`claim_type=假设` + confidence 降级 + 进 pending 待核实，禁静默补齐
+- 来源类型默认解释：PPT 方案=厂商声称、操作手册=文档记载、Demo=被观察环境、SQL/数据字典=结构线索、客户蓝图不泛化为标准产品能力
+- material-importer 的 `text-sparse` 页级信号（`pptx_text_sparse: slide N (text-sparse)`）= 回看该页原件的复核提示；按需回看该页原图，不自动全量 OCR；`undetermined`（检测失败）≠ `none`（成功无发现）
 
-详细规则见 `references/evidence-ledger.md`。
+详细规则见 `references/evidence-ledger.md`（来源谱系/升级留痕/失败关闭）。
 
 ### 能力身份与状态纪律
 
@@ -158,7 +163,7 @@ demo 账号看不到、目标仓代码扫描器未覆盖或资料缺页，只能
 | `trace_id` | `trace_id` | 竞品分析、增量 PRD、OpenSpec change、实施回写全程复用同一 ID |
 | `source_ref` | `source_ref` | 公司根相对路径（如 `materials/13-competitors/<vendor>/05-实施与服务/…`）；外部 URL 与代码仓引用除外 |
 
-导出时每条竞品观察对应一条 `competitor_observation` 类型的共享 source reference，`evidence_id`/`capability_id`/`trace_id` 按上表透传，`evidence_state` 与 `confidence` 按本 skill 台账原值填写。
+导出时每条竞品观察对应一条 `competitor_observation` 类型的共享 source reference，`evidence_id`/`capability_id`/`trace_id` 按上表透传，`evidence_state` 与 `confidence` 按本 skill 台账原值填写。交接导出保留谱系（lineage：derived_from/independence/applies_to）关联与验证范围；断链/缺 ID 显式待核实、禁伪造 ID；摘要/归并/映射不改变证据状态。
 
 **来源边界（provenance boundary）**：
 
@@ -179,6 +184,8 @@ OPC/产品 owner 的决策**不是竞品证据**。roadmap 方向、改进建议
 ### 与增量 PRD 的交接
 
 `lanlnk-product-improvement-recommendations.md` 的 P0/P1/P2 项进入 `product-prd-generator` 后，必须携带原始 evidence IDs 和 trace IDs。每个 Gap 应提供目标仓库可复核的反证入口（OpenSpec spec、代码路径、路由、表或符号），避免把 code-map 漏扫写成新需求。实施完成后由目标仓库返回回写包，docs 侧再更新能力基线。交接载体按上节「共享产品治理契约集成」的 source-reference 映射执行，evidence IDs 与 trace IDs 原值透传。
+
+链路边界：**竞品观察 → PRD 分析输入 → 产品决策 → 正式需求**。竞品分析结果不构成 PRD 需求授权，不得自动变成正式 PRD 需求；采纳与否由既有 owner decision 流程决定。
 
 ### 合规与凭据安全（红线）
 
@@ -748,6 +755,8 @@ export LANLNK_BASE=/opt/code/docs/lanlnk
 - **iframe 内 evaluate 高风险**：在 iframe.contentDocument 里调用 element.click() 可能触发跳转或打开新窗口，导致整个 Playwright page 的 URL 被重置为 about:blank，会话失效。**iframe 内只读 DOM，交互操作放回主 document 上下文**。
 - **权重来源降级可能误导**：当 requirement-evaluator 输入缺失时，权重只能从功能清单 missing 分布推导，这是反向推断不是客户真实优先级。报告必须显式标注权重来源。
 - **改进建议的"客户必需"标记依赖外部输入**：本 skill 自己无法判断某项能力是否"客户必需"，必须借助 requirement-evaluator 或用户在 P0 显式提供。无外部输入时，"P0 必补"标记只能基于"购买理由级领先"的主观判断，置信度 medium。
+- **lineage 字段首版人工标注**：`derived_from`/`independence`/`applies_to` 不自动识别全部来源关系，靠人工/半自动标注。
+- **`independence=unknown` 是合法稳态**：fail closed，不参与互证升级；不填 lineage 字段即按 unknown 解释。
 
 ## 设计决策
 
