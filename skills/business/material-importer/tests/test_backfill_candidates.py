@@ -1,10 +1,12 @@
 """Tests for backfill_candidates (phase-1 analysis, read-only vs base)."""
 
 import json
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
@@ -160,6 +162,82 @@ class AnalyseTest(unittest.TestCase):
         self.assertEqual(rows["b.md"], ("REVIEW", "mid"))
         self.assertEqual(rows["c.md"], ("NONE", "authored"))
         self.assertEqual(rows["d.md"], ("REVIEW", "review"))
+
+
+class WalkErrorReportingTest(unittest.TestCase):
+    """os.walk + explicit onerror discipline (AGENTS.md「os.walk 静默跳过陷阱」,
+    2026-10-02): unreadable directories must be recorded into discovery_errors
+    and carried into the report JSON, never silently skipped."""
+
+    def _base(self, tmp):
+        base = Path(tmp)
+        orig = base / "incoming" / "hd" / "会员系统方案.pptx"
+        orig.parent.mkdir(parents=True)
+        orig.write_text("x", encoding="utf-8")
+        return base
+
+    @unittest.skipIf(os.geteuid() == 0, "chmod-based unreadable dir does not block root")
+    def test_unreadable_dir_recorded_not_silent(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            base = self._base(tmp)
+            secret = base / "30-products" / "secret"
+            secret.mkdir(parents=True)
+            (secret / "机密.docx").write_text("x", encoding="utf-8")
+            secret.chmod(0o000)
+            try:
+                errors = []
+                idx = bc.build_index(base, errors)
+                # traversal continues past the unreadable dir
+                self.assertIn("会员系统方案", idx)
+                self.assertEqual(len(errors), 1)
+                self.assertIn("secret", errors[0])
+            finally:
+                secret.chmod(0o755)
+
+    def test_walk_onerror_invoked_and_traversal_continues(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            base = self._base(tmp)
+            real_walk = os.walk
+
+            def fake_walk(top, onerror=None, **kwargs):
+                if onerror is None:
+                    raise AssertionError("os.walk must be given an explicit onerror")
+                onerror(OSError(13, "Permission denied", str(base / "secret")))
+                return real_walk(top, onerror=onerror, **kwargs)
+
+            with mock.patch("os.walk", side_effect=fake_walk):
+                errors = []
+                idx = bc.build_index(base, errors)
+            self.assertIn("会员系统方案", idx)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("secret", errors[0])
+
+    def test_main_report_json_contains_discovery_errors(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            base = self._base(tmp)
+            (base / "raw").mkdir()
+            (base / "raw" / "_backfill_report.json").write_text(
+                json.dumps({"unmatched": [
+                    {"file": "materials/05-competitors/会员系统方案v2.md",
+                     "reason": "no-unique-hint"}]}), encoding="utf-8")
+            real_walk = os.walk
+
+            def fake_walk(top, onerror=None, **kwargs):
+                if onerror is None:
+                    raise AssertionError("os.walk must be given an explicit onerror")
+                onerror(OSError(13, "Permission denied", str(base / "secret")))
+                return real_walk(top, onerror=onerror, **kwargs)
+
+            rep_path = base / "cand.json"
+            prop_path = base / "prop.tsv"
+            with mock.patch("os.walk", side_effect=fake_walk), \
+                 mock.patch.object(sys, "argv", [
+                     "backfill_candidates.py", str(base),
+                     "--report", str(rep_path), "--proposal", str(prop_path)]):
+                self.assertEqual(bc.main(), 0)
+            rep = json.loads(rep_path.read_text(encoding="utf-8"))
+            self.assertEqual(len(rep["discovery_errors"]), 1)
+            self.assertIn("secret", rep["discovery_errors"][0])
 
 
 if __name__ == "__main__":

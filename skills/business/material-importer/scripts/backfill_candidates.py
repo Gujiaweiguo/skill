@@ -27,6 +27,7 @@ Usage:
 import argparse
 import difflib
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -60,14 +61,26 @@ def is_authored_guess(rel_posix: str, stem_lower: str) -> bool:
     return any(h in rel_posix for h in AUTHORED_DIR_HINTS)
 
 
-def iter_index_files(base: Path):
+def iter_index_files(base: Path, discovery_errors=None):
     """Yield candidate original files under base, excluding projection trees.
 
     Whole-base walk EXCLUDING top-level raw/, materials/, out/, .git (and
     known junk dir names anywhere). incoming/, 10-strategy/, 30-products/,
     00-90 trees are all included.
+
+    Uses os.walk (Python 3.10+; Path.walk requires 3.12) with an explicit
+    onerror hook: os.walk silently skips unreadable directories by default,
+    and a skipped directory must surface as a recorded discovery error
+    rather than an invisible "not found" (AGENTS.md os.walk 静默跳过陷阱,
+    2026-10-02).
     """
-    for root, dirs, files in base.walk():
+    if discovery_errors is None:
+        discovery_errors = []
+
+    def _on_error(exc: OSError):
+        discovery_errors.append(f"{exc.filename or base}: {exc.strerror or exc}")
+
+    for root, dirs, files in os.walk(base, onerror=_on_error):
         rel_parts = Path(root).relative_to(base).parts
         if not rel_parts:
             dirs[:] = [d for d in dirs
@@ -84,10 +97,10 @@ def iter_index_files(base: Path):
             yield p
 
 
-def build_index(base: Path):
+def build_index(base: Path, discovery_errors=None):
     """stem(lower) -> sorted list of relative posix paths."""
     by_stem = {}
-    for p in iter_index_files(base):
+    for p in iter_index_files(base, discovery_errors):
         by_stem.setdefault(p.stem.lower(), []).append(p.relative_to(base).as_posix())
     # representative order: prefer non-legacy copies (90-legacy is a read-only
     # historical snapshot; incoming/30-products copies are canonical), then
@@ -140,14 +153,14 @@ def raw_suffix_keys(md_name: str):
     return keys
 
 
-def analyse(base: Path, report_in: Path, floor: float):
+def analyse(base: Path, report_in: Path, floor: float, discovery_errors=None):
     try:
         rep = json.loads(report_in.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as e:
         print(f"cannot read input report {report_in}: {e}", file=sys.stderr)
         return None, None
     unmatched = rep.get("unmatched", [])
-    by_stem = build_index(base)
+    by_stem = build_index(base, discovery_errors)
 
     results = []
     for entry in unmatched:
@@ -215,7 +228,8 @@ def main():
     base = Path(args.base).resolve()
     report_in = base / "raw" / "_backfill_report.json"
 
-    results, by_stem = analyse(base, report_in, args.ratio)
+    discovery_errors = []
+    results, by_stem = analyse(base, report_in, args.ratio, discovery_errors)
     if results is None:
         return 1
 
@@ -235,6 +249,10 @@ def main():
     for r in sorted(results, key=lambda x: -(x["best"]["ratio"] if x["best"] else 0))[:10]:
         if r["best"]:
             print(f"  {r['best']['ratio']:.3f}  {r['file']}  ->  {r['best']['path']}")
+    if discovery_errors:
+        print(f"\ndiscovery errors (unreadable paths skipped): {len(discovery_errors)}")
+        for e in discovery_errors:
+            print(f"  {e}")
     print("\nauthored guesses (ratio below floor):")
     for r in results:
         if r["class"] == "authored":
@@ -244,7 +262,8 @@ def main():
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(
         json.dumps({"floor": args.ratio, "accept": args.accept,
-                    "buckets": buckets, "results": results},
+                    "buckets": buckets, "results": results,
+                    "discovery_errors": discovery_errors},
                    ensure_ascii=False, indent=2), encoding="utf-8")
     proposal_path = Path(args.proposal)
     proposal_path.parent.mkdir(parents=True, exist_ok=True)

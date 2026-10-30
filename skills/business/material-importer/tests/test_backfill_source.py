@@ -3,11 +3,13 @@ containment rescue, mapping application (authored->none, missing-target skip),
 and whole-base index construction."""
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
@@ -233,6 +235,88 @@ class LegacyFilterTest(unittest.TestCase):
                 tsv.read_text(encoding="utf-8"),
                 "file\tproposed_source\tbucket\n"
                 "materials/a.md\t90-legacy/x/a.md\taccept\n")
+
+
+class WalkErrorReportingTest(unittest.TestCase):
+    """os.walk + explicit onerror discipline (AGENTS.md「os.walk 静默跳过陷阱」,
+    2026-10-02): unreadable directories must be recorded and surfaced in the
+    report, never silently skipped; "not discovered" must not be conflated
+    with "does not exist"."""
+
+    def _base(self, tmp):
+        base = Path(tmp)
+        orig = base / "incoming" / "hd" / "方案.pptx"
+        orig.parent.mkdir(parents=True)
+        orig.write_text("x", encoding="utf-8")
+        return base
+
+    def test_deep_subdirectory_recursion(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            base = self._base(tmp)
+            deep = base / "30-products" / "lnkcre" / "ontology" / "refs" / "深层数据字典.xlsx"
+            deep.parent.mkdir(parents=True)
+            deep.write_text("x", encoding="utf-8")
+            by_basename, _ = bs.build_base_index(base)
+            self.assertIn(deep, by_basename.get(deep.name.lower(), []))
+
+    @unittest.skipIf(os.geteuid() == 0, "chmod-based unreadable dir does not block root")
+    def test_unreadable_dir_recorded_not_silent(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            base = self._base(tmp)
+            secret = base / "30-products" / "secret"
+            secret.mkdir(parents=True)
+            (secret / "机密.docx").write_text("x", encoding="utf-8")
+            secret.chmod(0o000)
+            try:
+                errors = []
+                by_basename, _ = bs.build_base_index(base, errors)
+                # traversal continues past the unreadable dir
+                self.assertIn("方案.pptx", by_basename)
+                self.assertEqual(len(errors), 1)
+                self.assertIn("secret", errors[0])
+            finally:
+                secret.chmod(0o755)
+
+    def test_walk_onerror_invoked_and_traversal_continues(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            base = self._base(tmp)
+            real_walk = os.walk
+
+            def fake_walk(top, onerror=None, **kwargs):
+                if onerror is None:
+                    raise AssertionError("os.walk must be given an explicit onerror")
+                onerror(OSError(13, "Permission denied", str(base / "secret")))
+                return real_walk(top, onerror=onerror, **kwargs)
+
+            with mock.patch("os.walk", side_effect=fake_walk):
+                errors = []
+                by_basename, _ = bs.build_base_index(base, errors)
+            self.assertIn("方案.pptx", by_basename)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("secret", errors[0])
+
+    def test_main_report_json_contains_discovery_errors(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            base = self._base(tmp)
+            for d in ("raw", "materials"):
+                (base / d).mkdir()
+            real_walk = os.walk
+
+            def fake_walk(top, onerror=None, **kwargs):
+                if onerror is None:
+                    raise AssertionError("os.walk must be given an explicit onerror")
+                onerror(OSError(13, "Permission denied", str(base / "secret")))
+                return real_walk(top, onerror=onerror, **kwargs)
+
+            rep_path = base / "rep.json"
+            with mock.patch("os.walk", side_effect=fake_walk), \
+                 mock.patch.object(sys, "argv", [
+                     "backfill_source.py", str(base), "--dry-run",
+                     "--json-report", str(rep_path)]):
+                bs.main()
+            rep = json.loads(rep_path.read_text(encoding="utf-8"))
+            self.assertEqual(len(rep["discovery_errors"]), 1)
+            self.assertIn("secret", rep["discovery_errors"][0])
 
 
 if __name__ == "__main__":

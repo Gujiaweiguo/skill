@@ -15,6 +15,7 @@ import argparse
 import datetime
 import hashlib
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -54,12 +55,25 @@ def build_raw_index(raw: Path):
     return raw_by_orig
 
 
-def iter_index_files(base: Path):
+def iter_index_files(base: Path, discovery_errors=None):
     """Yield original-candidate files over the WHOLE base, excluding the
     projection/state trees raw/, materials/, out/, .git (mirrors
     backfill_candidates.build_index — originals sometimes live in
-    10-strategy/, 30-products/, incoming/ ...)."""
-    for root, dirs, files in base.walk():
+    10-strategy/, 30-products/, incoming/ ...).
+
+    Uses os.walk (Python 3.10+; Path.walk requires 3.12) with an explicit
+    onerror hook: os.walk silently skips unreadable directories by default,
+    and a skipped directory must surface as a recorded discovery error
+    rather than an invisible "not found" (AGENTS.md os.walk 静默跳过陷阱,
+    2026-10-02).
+    """
+    if discovery_errors is None:
+        discovery_errors = []
+
+    def _on_error(exc: OSError):
+        discovery_errors.append(f"{exc.filename or base}: {exc.strerror or exc}")
+
+    for root, dirs, files in os.walk(base, onerror=_on_error):
         if Path(root) == base:
             dirs[:] = [d for d in dirs
                        if d not in EXCLUDED_ROOT_DIRS and not d.startswith(".")
@@ -83,11 +97,11 @@ def _rep_sorted(paths, base: Path):
     return rels
 
 
-def build_base_index(base: Path):
+def build_base_index(base: Path, discovery_errors=None):
     """Whole-base index: basename/stem (lower) -> [abs Path], representative
     first (non-legacy preferred)."""
     by_basename, by_stem = {}, {}
-    for p in iter_index_files(base):
+    for p in iter_index_files(base, discovery_errors):
         if not p.is_file():
             continue
         by_basename.setdefault(p.name.lower(), []).append(p)
@@ -292,10 +306,12 @@ def main():
 
     by_basename, by_stem = build_incoming_index(incoming)
     raw_by_orig = build_raw_index(raw)
-    base_by_basename, base_by_stem = build_base_index(base)
+    discovery_errors = []
+    base_by_basename, base_by_stem = build_base_index(base, discovery_errors)
 
     report = {"matched": [], "unmatched": [], "skipped": [], "written": 0,
-              "mapping_missing": mapping_missing}
+              "mapping_missing": mapping_missing,
+              "discovery_errors": discovery_errors}
     today = datetime.date.today().isoformat()
 
     # --- materials ---
@@ -406,6 +422,10 @@ def main():
         print(f"  rule {rule}: {n}")
     if mapping_missing:
         print(f"mapping targets missing (skipped): {len(mapping_missing)}")
+    if discovery_errors:
+        print(f"discovery errors (unreadable paths skipped): {len(discovery_errors)}")
+        for e in discovery_errors:
+            print(f"  {e}")
     if total:
         print(f"unmatched ratio: {len(report['unmatched'])/total:.1%}")
     print(f"written: {report['written']} {'(DRY RUN)' if args.dry_run else ''}")
