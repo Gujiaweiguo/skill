@@ -456,28 +456,39 @@ class LanlnkEightProductIntegrationTest(unittest.TestCase):
         with self.assertRaises(ResolutionError):
             self._resolve("nonexistent-product-x")
 
-    def test_lnkcard_empty_skeleton_code_is_not_complete(self) -> None:
-        """lnkcard（2026-10-26 onboarding）：空骨架仓不得报 code complete。
+    def test_lnkcard_populated_baseline(self) -> None:
+        """lnkcard populated 基线（2026-10-31 随归档推进改写）。
 
-        code_root 目录存在 ≠ 代码实现基线成立：/opt/code/lnkcard 是无提交 git 仓
-        （HEAD 不存在）、openspec/specs 为空、无业务代码/测试 → code authority
-        必须 present-unconfirmed（不得 complete）；repo_revision=None +
-        openspec_scopes=() 是下游判断"空基线"的显式信号，绝不能据此推导
-        PRD capabilities 全部 missing，也不能把空集标成 complete。
+        演进史：2026-10-26 onboarding 时空骨架（本测试前身
+        test_lnkcard_empty_skeleton_code_is_not_complete：无提交 git 仓、specs 空、
+        三层 authority 全 unresolved，警戒"目录存在 ≠ code complete"）；其后
+        Change A-N 相继归档，ontology（ontology.yaml）/prd（产品PRD.md）/代码仓
+        （真实提交 + 13+ spec scope）全部建立 → 五层 resolution 全 complete。
+
+        本版锚定语义而非精确计数（对方会话持续推进，scope 数只增）：
+        - 三层 authority 均 complete 且 evidence 指向真实文件；
+        - code complete 必须以真实 git HEAD 为据（repo_revision 非 None 且与
+          code authority revision 一致）——保留前身警戒语义的 populated 变体：
+          complete 不能凭目录存在，要凭提交存在。
         """
         product = self._resolve("lnkcard")
         self.assertEqual(product.layers["docs_root"], _LANLNK_BASE / "30-products" / "lnkcard")
-        self.assertEqual(product.authority["ontology"].status, "unresolved")
-        self.assertIsNone(product.layers["ontology_entry"])
-        self.assertEqual(product.authority["prd"].status, "unresolved")
+        self.assertEqual(product.authority["ontology"].status, "complete")
+        self.assertEqual(
+            product.layers["ontology_entry"],
+            _LANLNK_BASE / "30-products" / "lnkcard" / "ontology" / "ontology.yaml",
+        )
+        self.assertEqual(product.authority["prd"].status, "complete")
         self.assertEqual(product.layers["code_root"], Path("/opt/code/lnkcard"))
-        self.assertNotEqual(product.authority["code"].status, "complete")
-        self.assertIn(product.authority["code"].status, {"present-unconfirmed", "unresolved"})
-        self.assertIsNone(product.repo_revision)
-        self.assertEqual(product.openspec_scopes, ())
+        self.assertEqual(product.authority["code"].status, "complete")
+        # code complete 以真实提交为据（populated 版警戒：complete ≠ 目录存在）
+        self.assertIsNotNone(product.repo_revision)
+        self.assertEqual(product.repo_revision, product.authority["code"].revision)
+        # scope 非空但不锚精确数（随归档推进只增）
+        self.assertGreaterEqual(len(product.openspec_scopes), 1)
         payload = product.as_dict()
-        self.assertIsNone(payload["repo_revision"])
-        self.assertEqual(payload["openspec"]["scope_count"], 0)
+        self.assertIsNotNone(payload["repo_revision"])
+        self.assertGreaterEqual(payload["openspec"]["scope_count"], 1)
 
 
 if __name__ == "__main__":
