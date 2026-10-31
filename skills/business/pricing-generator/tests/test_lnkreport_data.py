@@ -229,6 +229,7 @@ def test_capability_other_products_untouched():
     PRICING-FINAL 终裁同批修订（not-sold-independently，2026-10-05，
     references/adapter-capability-owner-decision-pricing-final-2026-10-05.md；
     shared 钉线同 commit）。
+    lnkcard 新增为 LNKCARD-ONBOARD 同批修订（registration-only，2026-10-26；shared 钉线同 08e2c4c）。
     """
     caps = _capabilities()
     statuses = {c["product_id"]: c["status"] for c in caps["capabilities"]}
@@ -241,4 +242,5 @@ def test_capability_other_products_untouched():
         "lnkvision": "not-applicable",
         "lnkgateway": "not-applicable",
         "lnkwebsite": "not-applicable",
+        "lnkcard": "onboarding",
     }
