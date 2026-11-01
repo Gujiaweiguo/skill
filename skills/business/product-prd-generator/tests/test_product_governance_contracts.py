@@ -567,6 +567,24 @@ def test_implementation_return_requires_verification_for_absorbed_status() -> No
     }) == []
 
 
+def test_implementation_return_accepts_cre_association_platform() -> None:
+    association_return: dict[str, JsonValue] = {
+        "schema_version": "1.0",
+        "return_id": "cre-association-platform-scaffold-20261028",
+        "product_id": "cre-association-platform",
+        "origin_flow": "implementation-package-execution",
+        "review_status": "absorbed",
+        "open_spec_change_id": "association-project-scaffold",
+        "source_revision": "2ca6ba595dcb5f7c06062a27067157a39d9b01a2",
+        "verification_refs": [
+            "docs/verification/verification-report-association-project-scaffold-20261028.md"
+        ],
+        "review_owner": "广东省商业地产投资协会项目 Owner",
+    }
+
+    assert _validate("implementation-return.schema.json", association_return) == []
+
+
 def test_implementation_return_phase_record_optional_and_structured() -> None:
     # 2026-10-26 implementation-package v2.0 契约缺口补齐：plan-and-apply 回执
     # changes[].phase_record 记 created/planned/validated/implemented 四阶段。

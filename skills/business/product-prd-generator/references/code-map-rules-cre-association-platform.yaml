@@ -1,0 +1,49 @@
+# code-map-rules-cre-association-platform.yaml
+#
+# Code scanning rules for cre-association-platform（协会会员服务平台，全新独立项目）。
+#
+# 基线状态（2026-10-28）：项目已初始化目录与治理配置，但尚无业务代码、测试或归档 spec。
+# 当前存在 app/{api,auth,core,db,mcp,models,schemas,services,audit} 与 tests 占位目录；
+# scanners 保持关闭，避免将空 __init__.py 或目录骨架作为实现证据。
+#
+# 技术基线：FastAPI(Python) 模块化单体 + PostgreSQL；REST/MCP 共用业务服务与
+# 权限校验；MCP 不直连数据库。
+
+project: cre-association-platform
+description: 协会会员服务平台（独立部署）代码扫描规则。当前代码仓为空，规则为 onboarding 占位。
+
+specs:
+  path: openspec/specs
+  note: "OpenSpec 已初始化；specs 为空时表示尚无归档能力，不代表代码缺失"
+
+matrix:
+  enabled: false
+  # 独立项目，无商管-style product-definition-matrix。
+
+future_scanners:
+  fastapi_routers:
+    enabled: false
+    include_patterns:
+      - "app/api/**/*.py"
+    note: "FastAPI 路由目录已确定；启用前须有真实路由并明确 capability terms"
+  mcp_tools:
+    enabled: false
+    include_patterns:
+      - "app/mcp/**/*.py"
+    note: "MCP 适配目录已确定；启用前须有真实工具并检查仅调用 app/services"
+  audit_trail:
+    enabled: false
+    include_patterns:
+      - "app/audit/**/*.py"
+    note: "审计目录已确定；启用前须有真实实现并明确关键业务事件 capability terms"
+
+exclude_paths:
+  - "**/__pycache__/**"
+  - "**/*.pyc"
+  - ".venv/**"
+  - "**/.venv/**"
+  - "migrations/versions/**"
+  - "artifacts/**"
+
+# direct_code / direct_tests 通用扫描未 opt-in；当前项目目录与测试均为初始化占位。
+# 只有 owner 批准具体扫描范围、extensions、exclude_paths 和 capability terms 后才能启用。

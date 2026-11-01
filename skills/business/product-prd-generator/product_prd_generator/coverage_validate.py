@@ -1135,10 +1135,14 @@ def _write_suggested_changes_yaml(output_dir: Path, rows: list[CapabilityRow]) -
     return path
 
 
-def _write_mi_consumption_prompt(output_dir: Path, suggested_path: Path) -> Path:
-    prompt = f"""# LnkCRE / 目标项目消费提示词（coverage-validate 增量）
+def _write_mi_consumption_prompt(
+    output_dir: Path,
+    suggested_path: Path,
+    project: str = "商管系统",
+) -> Path:
+    prompt = f"""# {project} / 目标项目消费提示词（coverage-validate 增量）
 
-在目标项目目录（如 `/opt/code/lnkcre`）启动 OpenCode 后使用。
+在目标项目代码仓目录启动 OpenCode 后使用。
 
 ```text
 请先读取当前项目 AGENTS.md、openspec/specs/、相关代码和测试基线，再消费 PRD 覆盖度校验结果，不要直接创建 change。
@@ -1301,7 +1305,11 @@ def main(argv: list[str] | None = None) -> int:
 
     suggested_path = _write_suggested_changes_yaml(output_dir, rows)
     print(f"  → {suggested_path}")
-    prompt_path = _write_mi_consumption_prompt(output_dir, suggested_path)
+    prompt_path = _write_mi_consumption_prompt(
+        output_dir,
+        suggested_path,
+        project=args.project,
+    )
     print(f"  → {prompt_path}")
 
     # 4. Update baseline

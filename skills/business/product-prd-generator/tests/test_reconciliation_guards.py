@@ -12,6 +12,7 @@ from product_prd_generator._paths import (
 from product_prd_generator.coverage_validate import (
     CapabilityRow,
     _build_suggested_changes,
+    _write_mi_consumption_prompt,
     _write_suggested_changes_yaml,
 )
 from product_prd_generator.doc_map import SourceType, _classify_source_type
@@ -96,6 +97,16 @@ def test_coverage_suggested_changes_yaml_does_not_collide_with_handoff(tmp_path:
     assert written.name == "coverage-suggested-openspec-changes.yaml"
     assert not (tmp_path / "suggested-openspec-changes.yaml").exists()
     assert (tmp_path / "coverage-suggested-openspec-changes.yaml").exists()
+
+
+def test_coverage_consumption_prompt_uses_project_name(tmp_path: Path) -> None:
+    suggested = tmp_path / "suggested.yaml"
+
+    written = _write_mi_consumption_prompt(tmp_path, suggested, project="cre-association-platform")
+
+    prompt = written.read_text(encoding="utf-8")
+    assert prompt.startswith("# cre-association-platform / 目标项目消费提示词")
+    assert "/opt/code/lnkcre" not in prompt
 
 
 @pytest.mark.parametrize(

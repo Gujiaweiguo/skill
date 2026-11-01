@@ -641,7 +641,7 @@ def _render_prd_handoff(inputs: RenderInputs, output_dir: Path, code_root: str) 
 def _render_mi_consumption_prompt(project: str, output_dir: Path, code_root: str) -> str:
     handoff = (output_dir / "PRD实施交接包.md").resolve()
     changes = (output_dir / "suggested-openspec-changes.yaml").resolve()
-    return f"""# LnkCRE / 目标项目消费提示词
+    return f"""# {project} / 目标项目消费提示词
 
 在目标项目目录（如 `{code_root}`）启动 OpenCode 后使用。
 
