@@ -220,6 +220,25 @@ if git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
       P1_PASS=$((P1_PASS+1))
     fi
   done < <(grep -oE 'references/scripts/[A-Za-z0-9._-]+\.sh' "$REPO_ROOT/AGENTS.md" | sort -u)
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # P1-8 (.opencode/skills 真实目录 tracked 完整性): upstream skill 磁盘存在 ≠ 入库
+  # 2026-11-01 复利：.opencode/ 进 gitignore 后新增的 upstream skill（openspec-propose /
+  # openspec-update-change）长期只在磁盘存在，fresh clone 引用悬空（803f732 提交的
+  # explore/onboard 文档指向 /openspec-propose 而库中无此 skill，6c5c5b3 同类）。
+  # 真实目录（-type d，非软链）必须至少有一个 tracked 文件；custom skill 软链不在此列
+  # （fresh clone 由 setup_skill_symlinks.sh 重建）。
+  # ───────────────────────────────────────────────────────────────────────────
+  while IFS= read -r real_dir; do
+    [ -n "$real_dir" ] || continue
+    skill_name=$(basename "$real_dir")
+    if [ -z "$(git -C "$REPO_ROOT" ls-files -- ".opencode/skills/$skill_name/")" ]; then
+      print_check P1 FAIL "upstream skill dir on disk but NOTHING git-tracked (fresh clone would lose it): .opencode/skills/$skill_name/"
+      P1_FAIL=$((P1_FAIL+1))
+    else
+      P1_PASS=$((P1_PASS+1))
+    fi
+  done < <(find "$SYMLINK_DIR" -mindepth 1 -maxdepth 1 -type d | sort)
 else
   print_check WARN n-a "Not a git repo — skipping tracked-view checks (P1-7)"
 fi
