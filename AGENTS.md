@@ -253,7 +253,7 @@ AI agents don't have cross-session memory. All "memory" lives in files that are 
 |---|---|---|---|
 | **Complex** (multi-module package) | product-prd-generator, bid-doc-master, doc-generator | 「已知限制」+「设计决策」+「维护规则」 | Required |
 | **Medium** (single script / template engine) | material-importer, word-master, ppt-master, company-intro-generator | 「已知限制」 | Optional |
-| **Simple** (thin wrapper) | winshang-crawler, crela-daily-skill | — | — |
+| **Simple** (thin wrapper) | winshang-crawler | — | — |
 
 ### Layering — where knowledge goes
 
@@ -321,7 +321,6 @@ pdf-toc-master ───── 独立（pypdf + easyocr，自带 PEP 723 依赖�
 mckinsey-pptx ────── 独立（PptxGenJS），与 ppt-master 平级（不同视觉规范）
 frontend-slides ──── 独立（PptxGenJS），技术分享场景，与 ppt-master 平级
 psql-access ──────── 独立（纯提示词，WSL2 主机 PostgreSQL 访问约定，主机级环境事实非项目代码）
-crela-daily-skill ── 独立（websearch + 文本格式化）
 winshang-crawler ─── 独立（自含 src/ + pyproject.toml，独立 git history）
 content-operations ─ 独立（lnkwebsite 内容研究→生成→校验→CMS 草稿导入）
 content-distribution ─ 消费 content-operations 产出的已发布 article（多渠道适配分发：掘金/GitHub Docs/知乎，adapter pattern，2026-10 由 juejin-publish 重构更名）
