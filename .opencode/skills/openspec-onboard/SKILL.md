@@ -501,6 +501,7 @@ This same rhythm works for any size change—a small fix or a major feature.
 
  | Command          | What it does                               |
  |------------------|--------------------------------------------|
+ | `/openspec-propose` | Create a change and generate all artifacts |
  | `/openspec-explore` | Think through problems before/during work  |
  | `/openspec-apply-change`   | Implement tasks from a change              |
  | `/openspec-archive-change` | Archive a completed change                 |
@@ -513,7 +514,7 @@ This same rhythm works for any size change—a small fix or a major feature.
 
 ## What's Next?
 
-Try this on something you actually want to build. You've got the rhythm now!
+Try `/openspec-propose` on something you actually want to build. You've got the rhythm now!
 ```
 
 ---
@@ -547,6 +548,7 @@ If the user says they just want to see the commands or skip the tutorial:
 
  | Command                  | What it does                               |
  |--------------------------|--------------------------------------------|
+ | `/openspec-propose <name>`  | Create a change and generate all artifacts |
  | `/openspec-explore`         | Think through problems (no code changes)   |
  | `/openspec-apply-change <name>`    | Implement tasks                            |
  | `/openspec-archive-change <name>`  | Archive when done                          |
@@ -555,7 +557,7 @@ If the user says they just want to see the commands or skip the tutorial:
  | `/openspec-ff-change <name>`       | Fast-forward: all artifacts at once        |
  | `/openspec-verify-change <name>`   | Verify implementation                      |
 
-Ask me to start your first change whenever you are ready.
+Try `/openspec-propose` to start your first change.
 ```
 
 Exit gracefully.
