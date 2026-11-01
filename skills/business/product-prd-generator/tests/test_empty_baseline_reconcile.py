@@ -411,6 +411,130 @@ def test_reconcile_applies_ontology_coverage_ledger(monkeypatch, tmp_path) -> No
     assert any("roadmap" in g for g in untouched.gaps)
 
 
+ONT_MULTI_SCOPE_COVERAGE = {
+    **ONT_INPUT,
+    "coverage": {
+        # Change C：先声明 partial（note A）
+        "change-c-scope": {
+            "change": "change-c",
+            "commit": "c1c1c1",
+            "capabilities": [
+                {"id": "card-trade-reversal", "coverage": "partial", "note": "note-A: 冲正仅支持当日交易"},
+            ],
+        },
+        # Change D：后续 scope 更新同一 capability 的 partial note
+        "change-d-scope": {
+            "change": "change-d",
+            "commit": "d2d2d2",
+            "capabilities": [
+                {"id": "card-trade-reversal", "coverage": "partial", "note": "note-B: 冲正仅支持当日跨日后冲正未实现"},
+            ],
+        },
+    },
+}
+
+
+def test_coverage_ledger_later_scope_updates_prior_ledger_claim(monkeypatch, tmp_path) -> None:
+    """同 cap 两个已扫描 scope：先 partial note A，后 partial note B → 最终 note B。
+
+    2026-10-27 lnkcard incident：Change C 先把 roadmap 项升级为 partial，
+    Change D 更新 note 时旧逻辑因 roadmap_seeded 已 False 而 continue，
+    note A 永久滞留。修复后：纯台账证据（ontology doc + coverage-ledger
+    spec）允许被后续台账条目改级。
+    """
+    _patch_ontology(monkeypatch, tmp_path, ONT_MULTI_SCOPE_COVERAGE)
+    code_map = {
+        "project": "lnkcard",
+        "source_path": str(tmp_path),
+        "commit_sha": "abc123",
+        "scan_coverage": POPULATED_COVERAGE,
+        "ontology_roadmap_seeding": True,
+        "spec_capabilities": [
+            {"id": "change-c-scope", "status": "existing", "evidence": []},
+            {"id": "change-d-scope", "status": "existing", "evidence": []},
+        ],
+        "matrix_rows": [],
+    }
+    result = reconcile(code_map, {"features": [], "requirements": []})
+    cap = {c.id: c for c in result.capabilities}["card-trade-reversal"]
+
+    assert cap.reconciled_status == "partial"
+    assert cap.code_status == "partial"
+    # 最终 gap 为 note B（后续台账条目生效），note A 不再滞留
+    assert cap.gaps == ("note-B: 冲正仅支持当日跨日后冲正未实现",)
+    # 两个 scope 的台账 spec ref 均在证据链上
+    refs = {e.ref for e in cap.evidence if e.kind == "spec"}
+    assert refs == {"spec:change-c-scope/spec.md", "spec:change-d-scope/spec.md"}
+
+
+def test_coverage_ledger_later_scope_can_regrade_partial_to_full(monkeypatch, tmp_path) -> None:
+    """后续台账条目可改级：Change C partial → Change D full。"""
+    data = {
+        **ONT_INPUT,
+        "coverage": {
+            "change-c-scope": {
+                "change": "change-c",
+                "commit": "c1",
+                "capabilities": [
+                    {"id": "card-trade-reversal", "coverage": "partial", "note": "note-A"},
+                ],
+            },
+            "change-d-scope": {
+                "change": "change-d",
+                "commit": "d2",
+                "capabilities": [
+                    {"id": "card-trade-reversal", "coverage": "full"},
+                ],
+            },
+        },
+    }
+    _patch_ontology(monkeypatch, tmp_path, data)
+    code_map = {
+        "project": "lnkcard",
+        "source_path": str(tmp_path),
+        "commit_sha": "abc123",
+        "scan_coverage": POPULATED_COVERAGE,
+        "ontology_roadmap_seeding": True,
+        "spec_capabilities": [
+            {"id": "change-c-scope", "status": "existing", "evidence": []},
+            {"id": "change-d-scope", "status": "existing", "evidence": []},
+        ],
+        "matrix_rows": [],
+    }
+    result = reconcile(code_map, {"features": [], "requirements": []})
+    cap = {c.id: c for c in result.capabilities}["card-trade-reversal"]
+    assert cap.reconciled_status == "existing"
+    assert cap.gaps == ()
+
+
+def test_coverage_ledger_does_not_override_non_ledger_evidence(monkeypatch, tmp_path) -> None:
+    """已有非台账（code/runtime/普通 spec）证据或已确认状态 → 保守不覆盖。"""
+    _patch_ontology(monkeypatch, tmp_path, ONT_MULTI_SCOPE_COVERAGE)
+    seeded = recon.ReconciledCapability(
+        id="card-trade-reversal",
+        name="退款与冲正",
+        code_status=CapabilityStatus.PARTIAL.value,
+        doc_status=CapabilityStatus.EXISTING.value,
+        reconciled_status=CapabilityStatus.PARTIAL.value,
+        confidence="medium",
+        gaps=("direct evidence gap: 不应被台账改写",),
+        evidence=(
+            # 非 coverage-ledger 的 spec 证据（note 不是 coverage-ledger）
+            recon.EvidenceRef(kind="spec", ref="spec:change-c-scope/spec.md", note=""),
+            recon.EvidenceRef(kind="code", ref="src/reversal.py"),
+        ),
+    )
+    by_id = {"card-trade-reversal": seeded}
+    recon._apply_ontology_coverage(
+        by_id, "lnkcard", {"change-c-scope", "change-d-scope"}
+    )
+    cap = by_id["card-trade-reversal"]
+    # 非台账证据保持原状：gap/状态/evidence 均不被后续台账条目覆盖
+    assert cap.gaps == ("direct evidence gap: 不应被台账改写",)
+    assert cap.reconciled_status == "partial"
+    assert cap.evidence == seeded.evidence
+
+
 def test_reconcile_coverage_ledger_noop_without_key(monkeypatch, tmp_path) -> None:
     """ontology 无 coverage 键 → 无操作，既有 roadmap 播种行为不变。"""
     _patch_ontology(monkeypatch, tmp_path, ONT_INPUT)

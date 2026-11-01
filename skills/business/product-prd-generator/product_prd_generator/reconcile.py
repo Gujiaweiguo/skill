@@ -562,6 +562,25 @@ def _add_ontology_declared_capabilities(
         print(f"  ontology declared capabilities: +{added} missing (roadmap seeding, populated baseline)")
 
 
+def _is_ledger_only_evidence(cap: ReconciledCapability) -> bool:
+    """True when every evidence ref originates from the ontology/coverage ledger itself.
+
+    A capability whose evidence consists only of the ontology doc ref (roadmap
+    seeding) and/or coverage-ledger spec refs (note == "coverage-ledger") has no
+    independent direct evidence (code/runtime/non-ledger spec), so a later
+    ledger entry may re-grade it (full/partial/note). Anything else — code
+    evidence, runtime evidence, a plain spec ref — means the current state was
+    confirmed by non-ledger sources and must be conservatively preserved.
+    """
+    for e in cap.evidence:
+        if e.kind == "spec" and e.note == "coverage-ledger":
+            continue
+        if e.kind == "doc" and e.ref.startswith("ontology:"):
+            continue
+        return False
+    return True
+
+
 def _apply_ontology_coverage(
     by_id: dict[str, ReconciledCapability],
     project: str,
@@ -617,7 +636,13 @@ def _apply_ontology_coverage(
             if current is None:
                 print(f"  coverage ledger warning: capability '{cap_id}' not declared in ontology modules (scope {scope}), skipped")
                 continue
-            if not current.roadmap_seeded:
+            # roadmap 播种项可直接升级；已升级过的项，若其现有证据全部来自
+            # coverage 台账（ontology doc ref + coverage-ledger spec ref）且无
+            # 任何直接证据（code/runtime/非台账 spec），允许后续 scope 的台账
+            # 条目改级（full/partial/note）——2026-10-27 lnkcard incident：
+            # 同一 capability 被 Change C（partial）与 Change D（更新 note）先后
+            # 声明时，先命中条目不得阻止后续台账更新。非台账已确认能力保守不覆盖。
+            if not current.roadmap_seeded and not _is_ledger_only_evidence(current):
                 continue
             if level == "full":
                 by_id[cap_id] = ReconciledCapability(
