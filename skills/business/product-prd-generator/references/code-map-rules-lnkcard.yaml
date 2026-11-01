@@ -1,8 +1,7 @@
 project: lnkcard
 description: >-
-  LnkCard 初始产品基线。首轮代码仓仅有 onboarding/OpenSpec 空骨架；不使用
-  LnkCRE alignment matrix，也不启用直接代码或测试文件扫描，避免把无业务代码的空集
-  误读为已验证能力缺失。代码 authority 与 scan coverage 应明确标记。
+  LnkCard 产品代码基线。扫描 OpenSpec specs、归档 evidence 和受限 runtime/test
+  源码；直接扫描只提供静态代码/测试文件证据，不代表运行时验证或测试执行通过。
 specs:
   path: openspec/specs
 matrix:
@@ -13,13 +12,75 @@ future_scanners:
     note: 没有业务实现代码，首次运行禁止使用静态关键词扫描替代实现基线。
   tests:
     enabled: false
-    note: 尚无业务代码/测试，尚未实施测试扫描。
+    note: 旧版占位开关；测试源码扫描由 direct_tests 显式配置。
+direct_code:
+  enabled: true
+  include_paths:
+    - "internal/**/*.go"
+    - "cmd/**/*.go"
+  extensions: [".go"]
+  exclude_paths:
+    - "**/*_test.go"
+  capabilities:
+    card-account-ownership: ["account_owners"]
+    card-status-management: ["CardStatus", "StatusService"]
+    stored-value-balance: ["AvailableBalance"]
+    immutable-value-ledger: ["LedgerEntry"]
+    balance-integrity-and-reconciliation: ["RebuildBalance", "BalanceIntegrity"]
+    controlled-manual-adjustment: ["operationauth"]
+    online-recharge: ["RechargeService"]
+    online-pos-purchase: ["ConsumptionService"]
+    idempotent-request-recovery: ["Idempotency"]
+    linked-refund-and-void: ["original_transaction_id"]
+    transaction-state-machine: ["TransactionStatus"]
+    pos-terminal-registry: ["terminals"]
+    online-pos-api: ["consumption_api"]
+    merchant-settlement-batch: ["SettlementBatch"]
+    settlement-reconciliation: ["ReconciliationService"]
+    scoped-card-authorization: ["operationauth"]
+    sensitive-operation-audit: ["AuditEvent"]
+    member-authentication: ["memberauth"]
+    member-wallet-h5: ["memberwallet"]
+    payment-intent: ["PaymentIntent"]
+    production-db-security-and-metrics: ["domainmetrics", "UpWithMigrationDSN"]
+direct_tests:
+  enabled: true
+  include_paths:
+    - "internal/**/*_test.go"
+    - "tests/**/*.go"
+  extensions: [".go"]
+  capabilities:
+    card-account-ownership: ["account_owners"]
+    card-status-management: ["CardStatus", "StatusService"]
+    stored-value-balance: ["AvailableBalance"]
+    immutable-value-ledger: ["LedgerEntry"]
+    balance-integrity-and-reconciliation: ["RebuildBalance"]
+    controlled-manual-adjustment: ["operationauth"]
+    online-recharge: ["RechargeService"]
+    online-pos-purchase: ["ConsumptionService"]
+    idempotent-request-recovery: ["Idempotency"]
+    linked-refund-and-void: ["original_transaction_id"]
+    transaction-state-machine: ["TransactionStatus"]
+    pos-terminal-registry: ["terminals"]
+    online-pos-api: ["consumption_api"]
+    merchant-settlement-batch: ["SettlementBatch"]
+    settlement-reconciliation: ["ReconciliationService"]
+    scoped-card-authorization: ["operationauth"]
+    sensitive-operation-audit: ["AuditEvent"]
+    member-authentication: ["memberauth"]
+    member-wallet-h5: ["memberwallet"]
+    payment-intent: ["PaymentIntent"]
+    production-db-security-and-metrics: ["domainmetrics", "UpWithMigrationDSN"]
 exclude_paths:
   - "**/.git/**"
   - "**/.opencode/**"
   - "**/node_modules/**"
   - "**/.venv/**"
   - "**/__pycache__/**"
-# 早期产品开关：本体目标能力作为 roadmap 项（missing 规划项）进入功能清单；
-# 成熟产品保持默认 false，走 spec 驱动流程，避免淹没既有清单。
-ontology_roadmap_seeding: true
+  - "artifacts/**"
+  - "tmp/**"
+  - "openspec/**"
+  - "migrations/**"
+# 已进入 spec 驱动阶段；规划能力由 canonical ontology/PRD 管理，不再自动注入
+# 为 missing，避免已交付能力对账时混入早期 roadmap 空集。
+ontology_roadmap_seeding: false

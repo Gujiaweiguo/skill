@@ -177,6 +177,11 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
         by_id, project, scan_coverage, roadmap_seeding=bool(code_map.get("ontology_roadmap_seeding", False))
     )
 
+    direct_evidence = code_map.get("direct_evidence", {})
+    direct_matches = direct_evidence.get("matches", []) if isinstance(direct_evidence, Mapping) else []
+    if isinstance(direct_matches, list):
+        _add_direct_evidence_capabilities(by_id, direct_matches)
+
     spec_capability_ids = {
         str(cap.get("id", ""))
         for cap in spec_capabilities
@@ -193,9 +198,8 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
             apply_archive_evidence(by_id, archive_evidence)
 
     direct_evidence = code_map.get("direct_evidence", {})
-    direct_matches = direct_evidence.get("matches", []) if isinstance(direct_evidence, Mapping) else []
-    if isinstance(direct_matches, list):
-        for match in direct_matches:
+    direct_matches_list = direct_matches if isinstance(direct_matches, list) else []
+    for match in direct_matches_list:
             if not isinstance(match, Mapping):
                 continue
             cap_id = str(match.get("capability_id", ""))
@@ -560,6 +564,52 @@ def _add_ontology_declared_capabilities(
         print(f"  ontology declared capabilities: +{added} present-unconfirmed (empty code baseline)")
     elif added:
         print(f"  ontology declared capabilities: +{added} missing (roadmap seeding, populated baseline)")
+
+
+_DIRECT_STATIC_ONLY_GAP = (
+    "static evidence only: direct source/test match confirms code presence, "
+    "but no spec/archive coverage and runtime behavior unverified"
+)
+
+
+def _add_direct_evidence_capabilities(
+    by_id: dict[str, ReconciledCapability],
+    direct_matches: object,
+) -> None:
+    """Pre-seed capabilities hit only by direct evidence, conservatively.
+
+    2026-11-01 lnkcard fix: direct scanner matches against ontology capability
+    ids (e.g. immutable-value-ledger) used to be dropped when the capability
+    was not already in ``by_id`` — with a populated baseline and no roadmap
+    seeding, ontology capabilities never enter the inventory, so
+    ``_apply_ontology_coverage`` printed a "not declared in ontology modules"
+    warning and the static evidence was silently lost.
+
+    Seeded state is deliberately conservative: a code/test match proves static
+    presence only — it does NOT make the capability existing/verified.
+    """
+    if not isinstance(direct_matches, list):
+        return
+    added = 0
+    for match in direct_matches:
+        if not isinstance(match, Mapping):
+            continue
+        cap_id = str(match.get("capability_id", ""))
+        if not cap_id or cap_id in by_id:
+            continue
+        by_id[cap_id] = ReconciledCapability(
+            id=cap_id,
+            name=cap_id,
+            code_status=CapabilityStatus.PARTIAL.value,
+            doc_status=CapabilityStatus.MISSING.value,
+            reconciled_status=CapabilityStatus.PARTIAL.value,
+            confidence=Confidence.LOW.value,
+            gaps=(_DIRECT_STATIC_ONLY_GAP,),
+            evidence=(),
+        )
+        added += 1
+    if added:
+        print(f"  direct evidence: +{added} capabilities seeded (static evidence only)")
 
 
 def _is_ledger_only_evidence(cap: ReconciledCapability) -> bool:
