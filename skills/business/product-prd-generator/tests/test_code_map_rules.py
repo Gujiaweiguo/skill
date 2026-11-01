@@ -106,16 +106,18 @@ def test_scan_coverage_empty_specs_dir_reports_explicit_empty_baseline(tmp_path)
 
 
 def test_extract_lnkcard_repo_renders_populated_spec_baseline():
-    """真实 /opt/code/lnkcard（Change A/B/C 归档后）端到端：commit_sha=真实 HEAD、
-    5 个 spec scope（含 card-accounts-and-value-ledger 与
-    card-recharge-and-idempotent-recovery）、matrix/direct 全
+    """真实 /opt/code/lnkcard（Change A/B/C/D 及后续 2026-10-28~11-01 归档波次后）端到端：
+    commit_sha=真实 HEAD、16 个 spec scope（含 card-accounts-and-value-ledger、
+    card-recharge-and-idempotent-recovery、pos-online-consumption 与
+    payment-intent、settlement-control-plane 等后续 scope）、matrix/direct 全
     not-scanned——不得产出任何 LnkCRE matrix/ontology 引用（此处的 LnkCRE 是
     刻意提及的跨域污染守卫：rules 加载失败会静默回落商管 LnkCRE legacy 默认
     规则，matrix.enabled 默认 True 且指向 LnkCRE 专属
     product-definition-matrix.md；下述 matrix_rows==() 与 matrix not-scanned
     断言即守住该回落不得发生）。空基线渲染语义
     （commit_sha=unknown、零 capability、empty-baseline limitation）已被
-    Change A/B/C 的真实推进取代（2026-10-26，fixture 随归档推进）。"""
+    真实推进取代（2026-10-26 起持续随归档推进；最近一次 2026-11-01 归档
+    establish-production-db-security-and-metrics 后为 16 scope 基线）。"""
     import unittest
     code_root = Path("/opt/code/lnkcard")
     if not code_root.is_dir():
@@ -129,7 +131,18 @@ def test_extract_lnkcard_repo_renders_populated_spec_baseline():
         "card-accounts-and-value-ledger",
         "card-recharge-and-idempotent-recovery",
         "dev-test-environment",
+        "member-authentication",
+        "member-wallet-h5",
+        "operation-authorization-and-audit",
+        "payment-intent",
+        "pos-online-consumption",
+        "production-db-security-and-metrics",
+        "request-authentication-authorization",
+        "server-logging-and-recovery",
+        "server-timeout-and-context",
+        "settlement-control-plane",
         "test-gates",
+        "transaction-identity",
         "verification-evidence",
     }
     assert code_map.matrix_rows == ()
@@ -140,7 +153,7 @@ def test_extract_lnkcard_repo_renders_populated_spec_baseline():
     assert scanners["matrix"]["status"] == "not-scanned"
     assert scanners["direct_code"]["status"] == "not-scanned"
     assert scanners["direct_tests"]["status"] == "not-scanned"
-    assert scanners["specs"]["artifact_count"] == 5
+    assert scanners["specs"]["artifact_count"] == 16
     assert scanners["specs"]["status"] == "complete"
     assert not scanners["specs"]["limitations"]
     # direct 扫描器未启用 → 整体不得报 complete
