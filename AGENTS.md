@@ -320,6 +320,7 @@ doc-generator ─────← playwright skill (builtin)    (runtime screensh
 pdf-toc-master ───── 独立（pypdf + easyocr，自带 PEP 723 依赖）
 mckinsey-pptx ────── 独立（PptxGenJS），与 ppt-master 平级（不同视觉规范）
 frontend-slides ──── 独立（PptxGenJS），技术分享场景，与 ppt-master 平级
+psql-access ──────── 独立（纯提示词，WSL2 主机 PostgreSQL 访问约定，主机级环境事实非项目代码）
 crela-daily-skill ── 独立（websearch + 文本格式化）
 winshang-crawler ─── 独立（自含 src/ + pyproject.toml，独立 git history）
 content-operations ─ 独立（lnkwebsite 内容研究→生成→校验→CMS 草稿导入）
