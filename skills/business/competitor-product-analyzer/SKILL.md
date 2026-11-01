@@ -137,6 +137,8 @@ strategy-brief-generator（战略定位 / 竞对打法）     ←─ 你的能�
 - 缺 SHA/页码锚点/evidence ID/证据状态/来源类型/版本 → 失败关闭：`claim_type=假设` + confidence 降级 + 进 pending 待核实，禁静默补齐
 - 来源类型默认解释：PPT 方案=厂商声称、操作手册=文档记载、Demo=被观察环境、SQL/数据字典=结构线索、客户蓝图不泛化为标准产品能力
 - material-importer 的 `text-sparse` 页级信号（`pptx_text_sparse: slide N (text-sparse)`）= 回看该页原件的复核提示；按需回看该页原图，不自动全量 OCR；`undetermined`（检测失败）≠ `none`（成功无发现）
+- 判「版本演进/术语变更」必须先对照文档链当前版本——单链（仅 demo 或仅单一客户旧版实拍）判演进不可靠，客户环境用词≠产品演进（2026-10-31 海鼎实证：demo「已结束」vs 东苑 2021「已结案」，经手册 L190 纠正）
+- 厂商材料截图可见调试工具痕迹（如 vConsole 调试按钮）= 演示环境/原型证据，佐证「方案宣称≠生产交付」的认识论上限（2026-10-31 海鼎移动方案 PPT 多屏实证）
 
 详细规则见 `references/evidence-ledger.md`（来源谱系/升级留痕/失败关闭）。
 
@@ -758,6 +760,7 @@ export LANLNK_BASE=/opt/code/docs/lanlnk
 - **lineage 字段首版人工标注**：`derived_from`/`independence`/`applies_to` 不自动识别全部来源关系，靠人工/半自动标注。
 - **`independence=unknown` 是合法稳态**：fail closed，不参与互证升级；不填 lineage 字段即按 unknown 解释。
 - **text-sparse 页回看纪律（2026-10-30 海鼎试点实证）**：被标记页的业务语义可能与正文标签显著不同（实证：标签"线上商城商品录入"回看实为"商品数量录入单移动端，类型含库存/退还、带审批流"），不回看会错判业务域；无视觉通道的会话可用外部视觉工具辅助回看，但结果必须标注 `extraction_method=vision_assisted`（辅助转写可能有误，原图人工复核优先级更高）；回看修正主张内容，**不改变证据层级上限**（proposal 仍 medium）。回看入口优先 raw 层 `_media` 投影。
+- **text-sparse 回看执行细则（2026-10-31 海鼎 73 页收尾实证）**：①每页选图须剔除跨页固定装饰图（同一 media 文件逐页重复出现，如数据逻辑 PPT 的 `_44`），只取真实信息图；②信息由 PPT 动画承载的页（无静态信息图且 OCR 零命中）标 `not_scanned（图形态缺失）`，需人工播放动画记录，不得判「无信息」；③「清单型图可采信 OCR」假设被 4 页抽验推翻（所谓清单页实为操作规则/状态机/域模型图）——sparse 页内容凡需引用一律以 vision 回看为准，OCR 产物仅作页内实体名检索索引。
 
 ## 设计决策
 
