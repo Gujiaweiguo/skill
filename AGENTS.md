@@ -6,7 +6,7 @@ OpenCode skills repository for 蓝联科技 (Lanlnk). **Skill definitions** (mar
 
 Two skill types:
 - **OpenSpec skills** (12) in `.opencode/skills/openspec-*/` — REAL directories (not symlinks). Bundled upstream, **read-only**.（2026-11-01 补 track openspec-propose / openspec-update-change：`.opencode/` gitignore 后新增的 upstream skill 曾长期只在磁盘上，fresh clone 会丢，属 6c5c5b3 同类引用悬空）
-- **Custom skills** (14) in `skills/<category>/<name>/` — symlinks from `.opencode/skills/<name>`.
+- **Custom skills** (32) in `skills/<category>/<name>/` — symlinks from `.opencode/skills/<name>`.
 
 ## Critical Paths
 
@@ -421,15 +421,22 @@ subprocess.run(
 
 CLI v1.14.1 on PATH. Each change = `openspec/changes/<name>/`.
 
-Workflow entry points are the `openspec-*` skills in `.opencode/skills/`（`openspec-new-change` / `openspec-ff-change` / `openspec-apply-change` / `openspec-verify-change` / `openspec-archive-change` 等）。旧 `.opencode/command/opsx-*.md` slash 命令已随 1.14.1 upstream sync 移除；skill 触发短语仍兼容 `opsx apply` / `openspec apply` 等说法。
+Workflow entry points are the `openspec-*` skills in `.opencode/skills/`（`openspec-propose` / `openspec-new-change` / `openspec-ff-change` / `openspec-apply-change` / `openspec-verify-change` / `openspec-archive-change` 等，全量 12 个见下表）。旧 `.opencode/command/opsx-*.md` slash 命令已随 1.14.1 upstream sync 移除；skill 触发短语仍兼容 `opsx apply` / `openspec apply` 等说法。
 
 | Skill | Action |
 |-------|--------|
+| `openspec-explore` | Think through problems before/during work (no implementation) |
+| `openspec-propose` | Propose a new change with all artifacts in one step |
 | `openspec-new-change` | Start new change |
 | `openspec-ff-change` | Generate all artifacts at once |
+| `openspec-continue-change` | Continue a change by creating the next artifact |
+| `openspec-update-change` | Revise a change's artifacts, keep them coherent |
 | `openspec-apply-change` | Implement tasks from tasks.md |
 | `openspec-verify-change` | Validate implementation |
+| `openspec-sync-specs` | Sync delta specs to main specs without archiving |
 | `openspec-archive-change` | Finalize |
+| `openspec-bulk-archive-change` | Archive multiple completed changes at once |
+| `openspec-onboard` | Guided onboarding walkthrough |
 
 Transient artifacts (`proposal.md`, `design.md`, `tasks.md`, `specs/`) are gitignored. Archives go to `openspec/changes/archive/`.
 
