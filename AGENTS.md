@@ -5,7 +5,7 @@
 OpenCode skills repository for 蓝联科技 (Lanlnk). **Skill definitions** (markdown) + **rendering engines** (Python/Node.js). No runtime web app.
 
 Two skill types:
-- **OpenSpec skills** (10) in `.opencode/skills/openspec-*/` — REAL directories (not symlinks). Bundled upstream, **read-only**.
+- **OpenSpec skills** (12) in `.opencode/skills/openspec-*/` — REAL directories (not symlinks). Bundled upstream, **read-only**.（2026-11-01 补 track openspec-propose / openspec-update-change：`.opencode/` gitignore 后新增的 upstream skill 曾长期只在磁盘上，fresh clone 会丢，属 6c5c5b3 同类引用悬空）
 - **Custom skills** (14) in `skills/<category>/<name>/` — symlinks from `.opencode/skills/<name>`.
 
 ## Critical Paths
