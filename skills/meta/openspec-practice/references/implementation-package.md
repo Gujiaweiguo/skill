@@ -111,7 +111,7 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 - **push 仅当权限表显式授予**，不得由「自主执行」推断获得；默认不授予（`push_policy: explicit`）；
 - **docs 写入、产品语义 / S6 判据 / Owner 决策变更永远不因批次授权获得**——它们不在批次授权的可授予集合内，任何包都授不了。
 
-**一次性消费守卫**：项目侧执行前必须校验 `package_status = released`，并检查同 `package_id` 的 `implementation-return`。released 包预创建的 pending 空桩是合法 reservation，不构成已消费，不得因此阻断首次执行；该空桩必须同时保持 `package_consumed=false` 且不含 feature commit、verification SHA 或 archive commit/path 等执行完成证据。若回执已标记 `package_consumed=true`、已进入 `reviewed`/`absorbed` 等终态，或已包含执行完成证据，则拒绝重跑并要求重新出包授权。首次执行完成后必须回填同一回执并设置 `package_consumed=true`，此后同一包不得重复执行。
+**一次性消费守卫**：项目侧执行前必须校验 `package_status = released`，并检查同 `package_id` 的 `implementation-return`。released 包预创建的 pending 空桩是合法 reservation，不构成已消费，不得因此阻断首次执行；该空桩必须同时保持 `package_consumed=false` 且不含 feature commit、verification SHA 或 archive commit/path 等执行完成证据。**空桩的未执行字段禁止用 `null`**——共享 schema 对 string 型字段（`open_spec_change_id` / `verification_sha` / `archive_commit`）不接受 null，`gates` 需对象（`{"status":"not-run"}`）、`phase_record` 需至少一相（`{"created":{"summary":"not-started"}}`）；哨兵约定 `not-started` / `not-run` / `not-archived`（2026-11-03 lnkcard GIFT1 空桩四轮 schema 报错实证）。若回执已标记 `package_consumed=true`、已进入 `reviewed`/`absorbed` 等终态，或已包含执行完成证据，则拒绝重跑并要求重新出包授权。首次执行完成后必须回填同一回执并设置 `package_consumed=true`，此后同一包不得重复执行。
 
 **标准项目侧入口**：项目仓会话收到 released 包后，一行触发「**执行实施包 <绝对路径>**」，由 `implementation-package-execution` skill（项目仓侧标准执行入口）驱动全流程（四要素校验 → preflight → 权限宣告 → 波次执行 → return 回执）。历史上的「启动用长提示词」模式**降级为可选回退**：仅在目标仓未接入标准 skill 时使用；推荐迁移路径 = 目标仓接入 `implementation-package-execution` 软链后，一律改用一行触发。**出包会话的默认义务**：released 交付时必须同时输出交接包路径与项目仓启动段（已接入 skill 用一行触发，未接入用完整回退提示词），不得只交付包本体。
 
@@ -197,7 +197,7 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 | `owner_decisions_executed` | 实际执行的决策记录 |
 | `changes[]` | 每 change：`s6_rows`（含状态注记）、`feature_commits`、`verification_sha`、`archive_commit`、`archive_path`、`gates`、`notes` |
 | `changes[].phase_record` | v2.0 新增，plan-and-apply/create-or-consume 时必填、apply-existing 可省略：逐 change 记录 `created`（工件创建/补齐，含新建 change ID 与工件清单）、`planned`（proposal/design/tasks 定稿）、`validated`（strict validate 结果与命令）、`implemented`（apply 与 feature commits）四阶段事实；某阶段未发生则如实标 skipped + 原因，不得留空冒充已发生 |
-| `push_evidence` | 发布证据对象：推送区间、逐 commit、ancestry 结论、diffstat 与域检查、工作区状态、受保护工件哈希。由目标仓**发布会话**在 push 核验后回填（ls-remote 真远端查询 + merge-base --is-ancestor 逐 commit），W5 起多轮固化；`pushed=false` 的原始事实保留在回执历史，闭合由本对象承载 |
+| `push_evidence` | 发布证据对象：推送区间、逐 commit、ancestry 结论、diffstat 与域检查、工作区状态、受保护工件哈希。由目标仓**发布会话**在 push 核验后回填（ls-remote 真远端查询 + merge-base --is-ancestor 逐 commit），W5 起多轮固化；`pushed=false` 的原始事实保留在回执历史，闭合由本对象承载。**推送授权提示词必须按实际仓态核验而非按授权快照盲推**：执行会话按惯例在业务终态后单独提交回执 JSON，实际 ahead 比授权 commit 清单 +1 属预期形态（INV-1 `7f17b3a` + GIFT1 `20559c9` 双实证）；快照与实际不符时停止回报，由 Owner 裁决推送范围（如仅推恰 N 业务 commits），回执件随下一次授权推送 |
 | `delta_spec_merge` | 各 capability 合并计数与既有保留情况 |
 | `s6_ledger_untouched` / `docs_anchoring` / `protected_workspace_preserved` | 三项硬边界核验 |
 
@@ -244,3 +244,4 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 | v1.9.1 | 2026-10-22 | 规则 9 补惯例③接手判断：接手 reviewed 停驻回执收尾前先核对吸收证据是 HEAD 提交态还是工作区在途态，在途态属活跃会话半成品不得接管（2026-10-21/22 lnkreport 双实证：VTI 证据已提交可安全接手，chart-read/family-remediation ledger 在途属他会话） |
 | v2.0 | 2026-10-26 | 授权模型解耦与 plan-and-apply：①三重解耦——canonical ontology/PRD authority、change 是否已创建、执行授权互不推断，基线/PRD unresolved 不自动阻塞 released，仅真正阻塞的 Owner 决策或授权边界问题才 draft；②硬规则 2 豁免形态：未决项显式标 not_applicable_this_batch 并从范围排除后才不阻塞；③新增「执行模式与 change 策略」：`execution_mode: plan-and-apply` / `change_policy: create-or-consume` + 封闭 `allowed_change_ids`（fail closed），允许目标仓先创建/补齐 OpenSpec 工件、strict validate 再 apply；④commit/archive/push 独立权限位，不得从 released/autonomous/plan-and-apply 推断；⑤项目侧 fail closed 清单（越权/语义待决/环境边界回呼）；⑥回执 `changes[].phase_record` 记录 created/planned/validated/implemented；⑦兼容默认：未写两字段按 autonomous-batch + consume-existing 解释，v1.x apply-existing 既有包零迁移（LnkCRM released 包实际使用驱动，未照搬产品语义） |
 | v2.0.1 | 2026-10-26 | 两条实证红线 + 一个字段：①硬规则 4 补「锚点哈希取最终提交字节」（lnkcre de56d349 瞬态哈希实证）；②附录补回执形状红线与最小示例（phase_record 对象 / protected_workspace_preserved 非字符串 / 严格 jsonschema 自检）；③附录补 `push_evidence` 字段行。v2.0 plan-and-apply 首跑实证：lnkcre GAP-PC-04 P2 封闭清单零越权、phase_record 三段齐全 |
+| v2.0.2 | 2026-11-04 | 空桩与推送授权两条实证补注：①一次性消费守卫补空桩哨兵约定——未执行字段禁 `null`（schema 对 string 字段不接受），用 `not-started`/`not-run`/`not-archived`，`gates` 需对象、`phase_record` 至少一相（2026-11-03 lnkcard GIFT1 空桩四轮 schema 报错实证）；②`push_evidence` 字段行补推送授权核验口径——按实际仓态核验而非按授权快照盲推，执行会话业务终态后单独提交回执 JSON 使 ahead+1 属预期形态（INV-1 `7f17b3a` + GIFT1 `20559c9` 双实证），快照不符停止回报待 Owner 裁决推送范围 |
