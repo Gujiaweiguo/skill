@@ -73,6 +73,16 @@ ui_refs: []
 
 `<owner-confirmed-version>` is illustrative and must be replaced by a verified value; when unavailable, use `status: unresolved` plus `reason` and omit authority/version fields that are not known.
 
+## 版本链与回写结构（2026-11-04 海鼎合同域全弧线实证）
+
+增量 PRD 在吸收期内是**活文档**，以内部小版本链演进，不是每版新文件：
+
+1. **文件名钉主版本**：一个增量一个文件（如 `PRD-合同域对标海鼎-增量-v0.3.md`），内部版本以 v0.3-a、v0.3-b… 前进不改文件名（实证 a→z 共 26 版单文件）；版本史逐版一行（版本/日期/状态/触发事件与触及章节）。
+2. **一个外部事件 = 一个新版本**：owner 裁决登记、核验回执吸收、实施回执吸收、实施包签发各自触发一版；每版只改受影响章节，禁全文重写。
+3. **两级判定分工**：PRD 侧 `implementation_status` 允许基于基线推断的初判（inferred 级证据）；只读核验/实施回执的代码级证据可以修正它（实证：UC-HT-01/08 曾按基线推断收紧为 partial，W1 代码级核验恢复 existing——两级分工正确，不属 PRD 判错）。
+4. **切片状态词表**（切片表状态列统一用词，状态只前进不回退）：`pending-owner-triage` / `pending-owner-ruling` / `pending-evidence` / `designer-track`（形态类差异走设计流程吸收）/ `已授权（包 released，附 package_id）` / `delivered（回执吸收，附 archive 名）`；排除项标 `not_applicable_this_batch` 并注明先决条件。
+5. **收口形态**：owner 审阅全文后晋升 `accepted`（canonical），以三层 reconciliation records（ontology-code / ontology-prd / prd-code，对齐 `product-governance/reconciliation-record.schema.json`）收口；此后的新需求走新增量 PRD。
+
 ## 实施回写
 
 目标仓库返回 `implementation-return-package`，至少说明：

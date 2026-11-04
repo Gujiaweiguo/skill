@@ -72,7 +72,7 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 1. **交接单位是切片，不是 PRD**：一个批次一个包。PRD confirmed ≠ 实施授权；PRD draft 中被单独授权的切片同样可用本包。「产品方向已裁决 / canonical ontology·PRD authority 状态 / 实施授权已授予 / change 已创建 / 已实施 / 已归档 / archive 已进提交历史 / 已 push」是相互独立的事实，不得互相冒充。**三重解耦（v2.0）**：①canonical ontology/PRD authority（docs 侧晋升状态）②change 是否已在目标仓创建 ③执行授权（本包批次授权）三者互不推断——**基线/PRD unresolved（如增量 PRD 仍 draft、ontology 变更集未晋升）不自动阻塞 released**；只有存在**真正阻塞的未决 Owner 决策**或**授权边界本身未定**时才降 draft。
 2. **决策前置**：包内 `owner_decisions` 不允许 `pending` 阻塞项——存在未决产品问题不得放行该切片（可拆出留后续，并在后续追踪登记）。未决项**唯一的豁免形态**：显式标记为「本批不适用（not_applicable_this_batch）」并在批次范围/非目标中**明确排除**，才不构成阻塞；任何仍落在批次范围内的未决项照旧阻止 release。
 3. **权限分层**：范围内技术动作一次授权；归档、S6/台账升级、push、docs canonical 回写、真实外部联调是**独立权限位**，默认不授予。**commit / archive / push 三个权限位永远独立判定**，不得从 `package_status=released`、`execution_mode`（含 autonomous / plan-and-apply）或「自主执行」推断获得——权限表没写就是 denied。
-4. **输入锚定**：docs 工作区有未提交内容时，逐文件记 SHA-256 + 采集时间 + 「工作区版本」属性；禁止只用 docs HEAD 冒充实际消费版本。**锚点哈希必须取最终提交字节**：完成包体与被锚文件的全部编辑（含空白/EOF 规范化）并提交后，再计算或回填锚点；禁止锚定从未提交的瞬态工作区状态（2026-10-26 lnkcre 实证：包锚 `de56d349` 为签发后 EOF 规范化产生的瞬态哈希，不在任何 git 历史版本中，目标仓 preflight 匹配失败，只能内容级兜底并登记 discrepancy）。
+4. **输入锚定**：docs 工作区有未提交内容时，逐文件记 SHA-256 + 采集时间 + 「工作区版本」属性；禁止只用 docs HEAD 冒充实际消费版本。**锚点哈希必须取最终提交字节**：完成包体与被锚文件的全部编辑（含空白/EOF 规范化）并提交后，再计算或回填锚点；禁止锚定从未提交的瞬态工作区状态（2026-10-26 lnkcre 实证：包锚 `de56d349` 为签发后 EOF 规范化产生的瞬态哈希，不在任何 git 历史版本中，目标仓 preflight 匹配失败，只能内容级兜底并登记 discrepancy）。**锚点刷新必须全输入集重验**（2026-11-01 lnkcre W2 实证 INC-1）：刷新/回填锚点时（如被锚输入前进后的 vN.x 刷新）必须对**全部被锚输入文件**逐一对照最新提交字节，禁止只回填自己编辑过的文件——同一提交可能同时触碰多个被锚文件（实证：P12-NAV-01 裁决登记提交同时改 PRD 与 V7 差异清单两份被锚输入，v1.1 只回填 PRD 漏后者，目标仓 preflight 漂移、owner 打断裁定才放行）；owner 裁决登记属级联更新——PRD 裁决表 + 引用该裁决的全部文档 + released 包锚点刷新判定须一批处理。**哈希回填来源纪律**：锚点/版本哈希必须从命令输出复制或命令内嵌 `$(…)` 生成，禁止凭记忆书写或拼接（同批两次自误实证：包内文件名笔误、回执桩 HEAD 哈希凭记忆拼接错误，均靠当场自查侥幸拦截）；签发提交前对全部输入锚点终检一次（`git show HEAD:<path> | sha256sum` 对照包内记录）。
 5. **证据绑定**：evidence 绑定包含最终实现的真实 commit SHA；证据 SHA 之后的修复提交须重新生成受影响证据，不得跨 SHA 拼接。
 6. **单一权威**：会话级实施提示词不归档；以正式包 + `implementation-return` 回执为唯一权威记录，落在 `<company_base>/30-products/<product>/reconciliation/`（命名 `implementation-package-<batch>.md` / `implementation-return-<batch>.json`）。
 7. **公司解析**：生成包前经 resolver 确定 company_base（cwd 推断 → 用户点名 → 询问），绝不静默默认公司。
@@ -85,6 +85,7 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 |---|---|---|
 | `execution_mode` | `autonomous-batch`（默认，兼容既有 apply-existing 单纯模式） | change 已在目标仓创建完毕，项目侧直接按波次 apply |
 | | `plan-and-apply` | 允许项目侧在**明确授权的 change ID 清单内**先创建/补齐 OpenSpec proposal/design/tasks/spec，strict validate 通过后再 apply |
+| | `read-only-verification` | 零写面核验授权：允许读取目标仓一切文件并输出核验结论（findings 回执），不创建/不修改任何 change 与代码。用于「docs 侧主张需代码级实证后再定实施」的前置波次（2026-11-01 lnkcre W1 首用：PRD impl_status 代码级核验 + 缺陷实锤 + 下一批切片清单产出） |
 | `change_policy` | `consume-existing`（默认） | 只消费目标仓已存在的 change；发现缺失即回呼，不自行创建 |
 | | `create-or-consume` | 存在则消费、缺失则在授权清单内创建/补齐 |
 
@@ -94,6 +95,7 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 2. **创建/规划 ≠ 实施**：plan-and-apply 下每个 change 走「创建/补齐工件 → strict validate → apply」三段，strict validate 失败不得 apply；三段结果逐 change 记入回执（见附录 `phase_record`）。
 3. **兼容默认**：包体未写这两个字段时，按 `autonomous-batch` + `consume-existing` 解释，行为与 v1.x apply-existing 单纯模式完全一致——既有包零迁移即可继续执行（migration note：新出包建议显式写两字段；旧包不需要改）。
 4. **项目侧 fail closed 清单**（命中即停该 change 并按异常回呼格式上报，不得静默变通）：越权（change ID / scope 超出授权清单或波次）、语义待决（实施中发现包内 Owner 决策不足以裁决当前切片的产品语义）、环境边界问题（依赖/权限/共享环境无法隔离）。
+5. **核验→实施链式模式**：`read-only-verification` 包的回执（findings + 证据锚点）可作为下一只实施包的**锚定输入**被直接消费——核验回执即证据锚点权威来源（2026-11-01 lnkcre W1→W2 实证：W2 包 §1 锚定 W1 回执，四切片验收口径全部绑定 findings 编号）；链式前后包各自持独立授权边界，前包不隐含后包任何权限。
 
 ## 权限优先级与项目侧执行入口（v1.4）
 
@@ -245,3 +247,4 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 | v2.0 | 2026-10-26 | 授权模型解耦与 plan-and-apply：①三重解耦——canonical ontology/PRD authority、change 是否已创建、执行授权互不推断，基线/PRD unresolved 不自动阻塞 released，仅真正阻塞的 Owner 决策或授权边界问题才 draft；②硬规则 2 豁免形态：未决项显式标 not_applicable_this_batch 并从范围排除后才不阻塞；③新增「执行模式与 change 策略」：`execution_mode: plan-and-apply` / `change_policy: create-or-consume` + 封闭 `allowed_change_ids`（fail closed），允许目标仓先创建/补齐 OpenSpec 工件、strict validate 再 apply；④commit/archive/push 独立权限位，不得从 released/autonomous/plan-and-apply 推断；⑤项目侧 fail closed 清单（越权/语义待决/环境边界回呼）；⑥回执 `changes[].phase_record` 记录 created/planned/validated/implemented；⑦兼容默认：未写两字段按 autonomous-batch + consume-existing 解释，v1.x apply-existing 既有包零迁移（LnkCRM released 包实际使用驱动，未照搬产品语义） |
 | v2.0.1 | 2026-10-26 | 两条实证红线 + 一个字段：①硬规则 4 补「锚点哈希取最终提交字节」（lnkcre de56d349 瞬态哈希实证）；②附录补回执形状红线与最小示例（phase_record 对象 / protected_workspace_preserved 非字符串 / 严格 jsonschema 自检）；③附录补 `push_evidence` 字段行。v2.0 plan-and-apply 首跑实证：lnkcre GAP-PC-04 P2 封闭清单零越权、phase_record 三段齐全 |
 | v2.0.2 | 2026-11-04 | 空桩与推送授权两条实证补注：①一次性消费守卫补空桩哨兵约定——未执行字段禁 `null`（schema 对 string 字段不接受），用 `not-started`/`not-run`/`not-archived`，`gates` 需对象、`phase_record` 至少一相（2026-11-03 lnkcard GIFT1 空桩四轮 schema 报错实证）；②`push_evidence` 字段行补推送授权核验口径——按实际仓态核验而非按授权快照盲推，执行会话业务终态后单独提交回执 JSON 使 ahead+1 属预期形态（INV-1 `7f17b3a` + GIFT1 `20559c9` 双实证），快照不符停止回报待 Owner 裁决推送范围 |
+| v2.0.3 | 2026-11-04 | 硬规则 4 两补 + read-only-verification 模式（海鼎合同域弧线复盘）：①锚点刷新必须全输入集重验——同一提交可触碰多个被锚文件，只回填自己编辑过的文件会致 preflight 漂移（W2 INC-1 实证：v1.1 漏 V7 清单）+ 裁决登记=级联更新；②哈希回填来源纪律（命令输出复制/签发前终检，禁凭记忆拼接——两次自误实证）；③执行模式表新增 `read-only-verification`（零写面核验授权，W1 首用）+ 约束 5「核验→实施链式模式」（核验回执作下一包锚定输入，W1→W2 实证） |
