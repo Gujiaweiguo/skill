@@ -72,10 +72,11 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 1. **交接单位是切片，不是 PRD**：一个批次一个包。PRD confirmed ≠ 实施授权；PRD draft 中被单独授权的切片同样可用本包。「产品方向已裁决 / canonical ontology·PRD authority 状态 / 实施授权已授予 / change 已创建 / 已实施 / 已归档 / archive 已进提交历史 / 已 push」是相互独立的事实，不得互相冒充。**三重解耦（v2.0）**：①canonical ontology/PRD authority（docs 侧晋升状态）②change 是否已在目标仓创建 ③执行授权（本包批次授权）三者互不推断——**基线/PRD unresolved（如增量 PRD 仍 draft、ontology 变更集未晋升）不自动阻塞 released**；只有存在**真正阻塞的未决 Owner 决策**或**授权边界本身未定**时才降 draft。
 2. **决策前置**：包内 `owner_decisions` 不允许 `pending` 阻塞项——存在未决产品问题不得放行该切片（可拆出留后续，并在后续追踪登记）。未决项**唯一的豁免形态**：显式标记为「本批不适用（not_applicable_this_batch）」并在批次范围/非目标中**明确排除**，才不构成阻塞；任何仍落在批次范围内的未决项照旧阻止 release。
 3. **权限分层**：范围内技术动作一次授权；归档、S6/台账升级、push、docs canonical 回写、真实外部联调是**独立权限位**，默认不授予。**commit / archive / push 三个权限位永远独立判定**，不得从 `package_status=released`、`execution_mode`（含 autonomous / plan-and-apply）或「自主执行」推断获得——权限表没写就是 denied。
-4. **输入锚定**：docs 工作区有未提交内容时，逐文件记 SHA-256 + 采集时间 + 「工作区版本」属性；禁止只用 docs HEAD 冒充实际消费版本。**锚点哈希必须取最终提交字节**：完成包体与被锚文件的全部编辑（含空白/EOF 规范化）并提交后，再计算或回填锚点；禁止锚定从未提交的瞬态工作区状态（2026-10-26 lnkcre 实证：包锚 `de56d349` 为签发后 EOF 规范化产生的瞬态哈希，不在任何 git 历史版本中，目标仓 preflight 匹配失败，只能内容级兜底并登记 discrepancy）。**锚点刷新必须全输入集重验**（2026-11-01 lnkcre W2 实证 INC-1）：刷新/回填锚点时（如被锚输入前进后的 vN.x 刷新）必须对**全部被锚输入文件**逐一对照最新提交字节，禁止只回填自己编辑过的文件——同一提交可能同时触碰多个被锚文件（实证：P12-NAV-01 裁决登记提交同时改 PRD 与 V7 差异清单两份被锚输入，v1.1 只回填 PRD 漏后者，目标仓 preflight 漂移、owner 打断裁定才放行）；owner 裁决登记属级联更新——PRD 裁决表 + 引用该裁决的全部文档 + released 包锚点刷新判定须一批处理。**哈希回填来源纪律**：锚点/版本哈希必须从命令输出复制或命令内嵌 `$(…)` 生成，禁止凭记忆书写或拼接（同批两次自误实证：包内文件名笔误、回执桩 HEAD 哈希凭记忆拼接错误，均靠当场自查侥幸拦截）；签发提交前对全部输入锚点终检一次（`git show HEAD:<path> | sha256sum` 对照包内记录）。
+4. **输入锚定**：docs 工作区有未提交内容时，逐文件记 SHA-256 + 采集时间 + 「工作区版本」属性；禁止只用 docs HEAD 冒充实际消费版本。**锚点哈希必须取最终提交字节**：完成包体与被锚文件的全部编辑（含空白/EOF 规范化）并提交后，再计算或回填锚点；禁止锚定从未提交的瞬态工作区状态（2026-10-26 lnkcre 实证：包锚 `de56d349` 为签发后 EOF 规范化产生的瞬态哈希，不在任何 git 历史版本中，目标仓 preflight 匹配失败，只能内容级兜底并登记 discrepancy）。**锚点刷新必须全输入集重验**（2026-11-01 lnkcre W2 实证 INC-1）：刷新/回填锚点时（如被锚输入前进后的 vN.x 刷新）必须对**全部被锚输入文件**逐一对照最新提交字节，禁止只回填自己编辑过的文件——同一提交可能同时触碰多个被锚文件（实证：P12-NAV-01 裁决登记提交同时改 PRD 与 V7 差异清单两份被锚输入，v1.1 只回填 PRD 漏后者，目标仓 preflight 漂移、owner 打断裁定才放行）；owner 裁决登记属级联更新——PRD 裁决表 + 引用该裁决的全部文档 + released 包锚点刷新判定须一批处理。**包体 version 递增 = §2 全锚点重算**（2026-11-06 lnkreport residual 包第三例实证 INC-residual-01：v0.3 刷新触碰了被锚 PRD/对账内容却沿用 v0.1 §2 哈希，目标仓 preflight 抓出漂移，按「确认工作区版本」分支以同提交 diff 复核零语义漂移后放行——任何 version 递增，无论该次编辑是否自认与锚点无关，都必须重算全部 §2 锚点）。**哈希回填来源纪律**：锚点/版本哈希必须从命令输出复制或命令内嵌 `$(…)` 生成，禁止凭记忆书写或拼接（同批两次自误实证：包内文件名笔误、回执桩 HEAD 哈希凭记忆拼接错误，均靠当场自查侥幸拦截）；签发提交前对全部输入锚点终检一次（`git show HEAD:<path> | sha256sum` 对照包内记录）。
 5. **证据绑定**：evidence 绑定包含最终实现的真实 commit SHA；证据 SHA 之后的修复提交须重新生成受影响证据，不得跨 SHA 拼接。
 6. **单一权威**：会话级实施提示词不归档；以正式包 + `implementation-return` 回执为唯一权威记录，落在 `<company_base>/30-products/<product>/reconciliation/`（命名 `implementation-package-<batch>.md` / `implementation-return-<batch>.json`）。
 7. **公司解析**：生成包前经 resolver 确定 company_base（cwd 推断 → 用户点名 → 询问），绝不静默默认公司。
+8. **决策链 supersede 核对（2026-11-08 lnkreport 四区批次实证）**：包体与实施侧引用任何 Owner 决策 ID 或能力边界（「X 受旧决策限制」「Y 闭环未建」类判定）前，必须核对该决策**未被更新决策 supersede**——沿 PRD 裁决表 / pending-decisions / 回写记录按时间序追最新；同理，「能力是否存在」以目标仓 spec/归档/组件挂载点**实测**为准，禁止把前一批 PRD 差异矩阵的 missing/unsupported 快照当作当前能力事实。实证：PD-01（2026-11-04）已 supersede A04 并交付背景图/受控超链接能力，次日四区批次 wave3 仍引用 supersede 前的 A04 边界与「安全闭环未建」措辞，把已有能力渲染为 `unsupported-with-reason`——该误判越过 strict validate、批次门禁与验收三层未被拦截，直到残差批次 Wave 0 判定矩阵（接线 vs 新建）才纠正为接线缺口。波次内凡「引用既有裁决判定能力状态」的 change，其判定/差异矩阵必须附决策链核对记录（引用决策 ID + 是否链上最新）。
 
 ## 执行模式与 change 策略（v2.0）
 
@@ -203,11 +204,12 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 | `delta_spec_merge` | 各 capability 合并计数与既有保留情况 |
 | `s6_ledger_untouched` / `docs_anchoring` / `protected_workspace_preserved` | 三项硬边界核验 |
 
-**形状红线（高频违规，发射前严格校验）**——两处目标会话反复写成纯字符串导致 schema 违规（2026-10-26 lnkcre 两会话三批次实证，其中一次自称"schema 自检通过"实际未过）：
+**形状红线（高频违规，发射前严格校验）**——两处目标会话反复写成纯字符串导致 schema 违规（2026-10-26 lnkcre 两会话三批次实证，其中一次自称"schema 自检通过"实际未过；2026-11-06 lnkreport 弧线再添三例同型：schema_version `"1.1"` ×2 + `phase_record` 阶段纯字符串 ×1，三例回执均自称「schema 自检 OK」而严格校验全失败，**全部由 docs 吸收侧复跑严格校验抓出，无一被执行侧自检拦截**）：
 
 - `phase_record.<阶段>` 必须是**对象**（自由键值 + `summary`），不得写纯字符串；
 - `protected_workspace_preserved` 必须是 boolean / 对象 / 数组 / null，不得写纯字符串——需叙述时用对象包裹键值；
 - 回执发射前的自检必须用共享 `implementation-return.schema.json` 做**严格** jsonschema 校验，不得以宽松自检脚本替代。
+- **docs 吸收侧前置复跑**（2026-11-06 三例实证后固化为吸收 SOP 步骤）：docs 会话吸收任何 implementation-return 前，必须先对回执原文复跑 Draft202012 严格校验；未过即按形状红线机械修正（修正内容逐字保留、包裹为对象/改版本号）并在 absorption dispositions 登记，不得因执行侧「自检 OK」声明跳过。
 
 最小合规示例：
 
@@ -248,3 +250,4 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 | v2.0.1 | 2026-10-26 | 两条实证红线 + 一个字段：①硬规则 4 补「锚点哈希取最终提交字节」（lnkcre de56d349 瞬态哈希实证）；②附录补回执形状红线与最小示例（phase_record 对象 / protected_workspace_preserved 非字符串 / 严格 jsonschema 自检）；③附录补 `push_evidence` 字段行。v2.0 plan-and-apply 首跑实证：lnkcre GAP-PC-04 P2 封闭清单零越权、phase_record 三段齐全 |
 | v2.0.2 | 2026-11-04 | 空桩与推送授权两条实证补注：①一次性消费守卫补空桩哨兵约定——未执行字段禁 `null`（schema 对 string 字段不接受），用 `not-started`/`not-run`/`not-archived`，`gates` 需对象、`phase_record` 至少一相（2026-11-03 lnkcard GIFT1 空桩四轮 schema 报错实证）；②`push_evidence` 字段行补推送授权核验口径——按实际仓态核验而非按授权快照盲推，执行会话业务终态后单独提交回执 JSON 使 ahead+1 属预期形态（INV-1 `7f17b3a` + GIFT1 `20559c9` 双实证），快照不符停止回报待 Owner 裁决推送范围 |
 | v2.0.3 | 2026-11-04 | 硬规则 4 两补 + read-only-verification 模式（海鼎合同域弧线复盘）：①锚点刷新必须全输入集重验——同一提交可触碰多个被锚文件，只回填自己编辑过的文件会致 preflight 漂移（W2 INC-1 实证：v1.1 漏 V7 清单）+ 裁决登记=级联更新；②哈希回填来源纪律（命令输出复制/签发前终检，禁凭记忆拼接——两次自误实证）；③执行模式表新增 `read-only-verification`（零写面核验授权，W1 首用）+ 约束 5「核验→实施链式模式」（核验回执作下一包锚定输入，W1→W2 实证） |
+| v2.0.4 | 2026-11-06 | lnkreport 编辑器属性对齐弧线复盘两补（复利工程 user-approved）：①形状红线补第三例族（schema_version "1.1"×2 + phase_record 纯字符串×1，均自称自检 OK）+ 新增「docs 吸收侧前置复跑」吸收 SOP 步骤——三例全由吸收侧复跑抓出；②硬规则 4 补「包体 version 递增 = §2 全锚点重算」（INC-residual-01 第三例：v0.3 触碰被锚输入沿用旧哈希被 preflight 抓出） |
