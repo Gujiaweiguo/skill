@@ -77,11 +77,11 @@ ui_refs: []
 
 增量 PRD 在吸收期内是**活文档**，以内部小版本链演进，不是每版新文件：
 
-1. **文件名钉主版本**：一个增量一个文件（如 `PRD-合同域对标海鼎-增量-v0.3.md`），内部版本以 v0.3-a、v0.3-b… 前进不改文件名（实证 a→z 共 26 版单文件）；版本史逐版一行（版本/日期/状态/触发事件与触及章节）。
-2. **一个外部事件 = 一个新版本**：owner 裁决登记、核验回执吸收、实施回执吸收、实施包签发各自触发一版；每版只改受影响章节，禁全文重写。
-3. **两级判定分工**：PRD 侧 `implementation_status` 允许基于基线推断的初判（inferred 级证据）；只读核验/实施回执的代码级证据可以修正它（实证：UC-HT-01/08 曾按基线推断收紧为 partial，W1 代码级核验恢复 existing——两级分工正确，不属 PRD 判错）。
-4. **切片状态词表**（切片表状态列统一用词，状态只前进不回退）：`pending-owner-triage` / `pending-owner-ruling` / `pending-evidence` / `designer-track`（形态类差异走设计流程吸收）/ `已授权（包 released，附 package_id）` / `delivered（回执吸收，附 archive 名）`；排除项标 `not_applicable_this_batch` 并注明先决条件。
-5. **收口形态**：owner 审阅全文后晋升 `accepted`（canonical），以三层 reconciliation records（ontology-code / ontology-prd / prd-code，对齐 `product-governance/reconciliation-record.schema.json`）收口；此后的新需求走新增量 PRD。
+1. **文件与版本可辨**：一个增量一个活文档。字母版（如 v0.3-a）与点分版（如 v0.7.10）存量命名不强制迁移；同一增量内部命名规则应一致，版本可辨，版本史记录版本、日期、触发事件与触及章节。
+2. **一次评审/吸收批次可包含多个相关事件**：owner 裁决登记、核验/实施回执吸收、实施包签发可以合并为一版，但版本史须逐项列明每个事件及来源；每版只改受影响章节，禁全文重写。
+3. **事实判断可修正**：PRD 侧 implementation_status 初判如基于基线推断，必须如实标记 evidence_state=inferred 并给出依据。代码级核验可以修正初判；不能一概判为「无错」，须核对初判是否有依据、标注是否诚实，并保留原判定、新证据与修正原因。
+4. **四个状态空间分离**：切片交付生命周期、implementation_status、evidence_state、开放问题状态分别记录。新证据可修正事实判断或重新打开问题，保留原判定及修正依据；不得用「只前进」拒绝合法勘误，也不得倒写已发生的授权、消费或验证历史。切片状态词表仍为 pending-owner-triage / pending-owner-ruling / pending-evidence / designer-track / 已授权（附 package_id）/ delivered（附回执与实际归档状态）；排除项标 not_applicable_this_batch 并记先决条件。未归档不得为满足 delivered 注记伪造 archive 名。
+5. **增量范围收口**：owner 审阅后可晋升 accepted canonical；三对关系 ontology-code / ontology-prd / prd-code 逐项说明受影响、未受影响、未检查或不适用，未受影响/不适用须附依据；ontology 无变化可引用有依据的 impact check/no-change。受影响对按 `product-governance/reconciliation-record.schema.json` 记录 pair、scope、revision、coverage、limitations；增量新交付主动声明 reconciliation_scope=increment-scoped，不冒充产品级全量对账。旧记录缺省字段仅表示未声明，不自动推断。accepted canonical、代码已实现、已归档、已发布分别记录，互不推断。此后的新需求走新增量 PRD。
 
 ## 实施回写
 

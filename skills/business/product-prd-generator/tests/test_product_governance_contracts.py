@@ -776,3 +776,125 @@ def test_accepted_initial_ontology_change_requires_versioned_release() -> None:
         "proposed_release": {"version": "0.1.0", "source_revision": "a" * 40, "release_id": "SEM-CRM-001"},
     }
     assert _validate("ontology-change-set.schema.json", accepted_with_release) == []
+
+
+# ---------------------------------------------------------------------------
+# change align-governance-handoff-contracts 6.4（2026-11-13）：
+# - 等价于本 change 两份脱敏样例的内联完整夹具（只读 findings 正例：mode
+#   read-only + policy none + []、findings 承载交付；实施反例：mode
+#   autonomous-batch + policy consume-existing、changes=[] 缺执行证据）——两者
+#   都必须 schema 0 errors：反例是人工协议验收判负，不是 schema 机械拒绝。
+#   内联化是为了 fresh clone / change 归档后测试仍然成立。
+# - OQ-1 已裁决新增字段：reconciliation_scope 枚举 合法通过/缺省通过（仅未声明，
+#   不推断范围、无伪造默认）/ 非法失败；schema_version const 1.0 不动。
+# ---------------------------------------------------------------------------
+
+
+def _readonly_findings_return_fixture() -> dict[str, JsonValue]:
+    """正例：read-only-verification findings 型回执（changes=[] 合法，
+    findings 承载交付，附验证链与只读事实）。"""
+    return {
+        "schema_version": "1.0",
+        "return_id": "sample-readonly-findings-return",
+        "product_id": "lnkcre",
+        "origin_flow": "implementation-package-execution",
+        "package_ref": "/sample/implementation-package-sample-readonly.md",
+        "package_consumed": True,
+        "changes": [],
+        "changes_empty_reason": (
+            "read-only-verification grants no change creation or execution; "
+            "findings carry the deliverable"
+        ),
+        "findings": [
+            "SAMPLE-F1: target repo anchor files verified at revision <sha>; no code modified",
+            "SAMPLE-F2: PRD impl_status claim X confirmed by code read at path/to/file.go:L1-L20",
+        ],
+        "trace_ids": ["sample-wave-1", "sample-REQ-001"],
+        "target_repo": "/sample/target-repo",
+        "source_revision": "0" * 40,
+        "head_revision": "0" * 40,
+        "verification_refs": [],
+        "review_status": "pending",
+        "review_owner": "OPC",
+        "proposed_updates": [{
+            "target": "prd",
+            "update": "SAMPLE: correct impl_status for REQ-001 from inferred-partial to existing per code evidence",
+            "disposition": "proposed",
+        }],
+        "docs_anchoring": True,
+        "s6_ledger_untouched": True,
+        "protected_workspace_preserved": True,
+        "execution_mode": "read-only-verification",
+        "change_policy": "none",
+        "allowed_change_ids": [],
+    }
+
+
+def _execution_empty_changes_return_fixture() -> dict[str, JsonValue]:
+    """反例：实施模式（autonomous-batch + consume-existing）空 changes——形状
+    合法但缺执行证据，人工协议验收判负；不得靠删字段逼 schema 报错。"""
+    return {
+        "schema_version": "1.0",
+        "return_id": "sample-execution-empty-changes",
+        "product_id": "lnkcre",
+        "origin_flow": "implementation-package-execution",
+        "package_ref": "/sample/implementation-package-sample-execution.md",
+        "package_consumed": True,
+        "changes": [],
+        "findings": ["nothing to see"],
+        "trace_ids": ["sample-wave-1"],
+        "target_repo": "/sample/target-repo",
+        "source_revision": "0" * 40,
+        "review_status": "pending",
+        "review_owner": "OPC",
+        "execution_mode": "autonomous-batch",
+        "change_policy": "consume-existing",
+        "allowed_change_ids": [],
+    }
+
+
+def test_change_sample_shapes_both_schema_valid() -> None:
+    # 反例的缺陷（实施模式空 changes 缺执行证据）由人工协议验收判负，
+    # 样例形状本身必须通过 schema。
+    assert _validate("implementation-return.schema.json", _readonly_findings_return_fixture()) == []
+    assert _validate("implementation-return.schema.json", _execution_empty_changes_return_fixture()) == []
+
+
+def test_reconciliation_scope_enum_valid_absent_and_invalid() -> None:
+    base: dict[str, JsonValue] = {
+        "schema_version": "1.0",
+        "reconciliation_id": "REC-SCOPE-001",
+        "product_id": "lnkreport",
+        "pair": "ontology-code",
+        "left": {
+            "product_id": "lnkreport", "product_class": "tool", "ontology_profile": "tool-ontology",
+            "layer": "ontology", "status": "resolved", "authority_ref": "ontology/ontology.yaml", "version": "1.0",
+        },
+        "right": {
+            "product_id": "lnkreport", "product_class": "tool", "ontology_profile": "tool-ontology",
+            "layer": "code", "status": "resolved", "authority_ref": "/opt/code/lnkreport", "revision": "abc123",
+        },
+        "coverage": {"status": "partial", "scope": ["src/reports"], "limitations": []},
+        "outcome": "drifted",
+        "findings": [],
+    }
+    # 合法枚举值通过
+    assert _validate("reconciliation-record.schema.json", {
+        **base, "reconciliation_scope": "increment-scoped",
+    }) == []
+    assert _validate("reconciliation-record.schema.json", {
+        **base, "reconciliation_scope": "product-wide",
+    }) == []
+    # 缺省通过：仅表示未声明，不推断为任一范围、不伪造默认值
+    assert _validate("reconciliation-record.schema.json", base) == []
+    # 非枚举值失败
+    assert _validate("reconciliation-record.schema.json", {
+        **base, "reconciliation_scope": "team-wide",
+    })
+    assert _validate("reconciliation-record.schema.json", {
+        **base, "reconciliation_scope": "increment",
+    })
+    # schema_version const 1.0 不动
+    assert _validate("reconciliation-record.schema.json", {
+        **base, "schema_version": "1.1",
+    })

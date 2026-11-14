@@ -36,7 +36,7 @@ S/M/L 只控制交接信息的密度和执行材料的详细程度，不改变 L
 6. **Preflight 事实断言必须全量实读（P5 教训，2026-10-18 实证）**：包内 preflight 表的每条事实断言（尤其**否定性断言**如「Makefile 无 X 目标」「仓内无 Y」）必须来自完整输出——禁止 grep/head/tail 截断后下结论（实证：`grep '^[a-z-]+:' Makefile | head -20` 截断漏看 L91-95 的 smoke 目标，误判写进包 P5，被实施方 preflight 纠正，偏差登记于回执）。否定性断言须以完整清单或反向枚举复核；实施方 preflight 对包事实的修正按偏差如实登记并回执，不静默改写。
 7. **released 包 preflight 可变事实刷新（2026-10-21 实证）**：包生成到执行之间目标仓推进时，允许且建议对 released 包做**仅限 preflight 可变事实**的版本刷新（执行区间/active changes/工作区禁触清单/测试门禁提示），Owner 决策表与授权边界一字不动；刷新后版本行递增并重新同条输出摘要+路径+启动段。实证：asof 包 v1.0（10-18）→ v1.1（10-21，目标仓 2934e881→ed8a981a 期间 40+ 提交：active changes 4→2、他会话脏文件全部提交、测试基建合入），刷新消解三处过时断言，执行侧零回呼。
 8. **docs 侧回执吸收 SOP（2026-10-21 实证）**：`proposed_updates` 必须**先核验再吸收**——逐条对照归档 verification-report/feature SHA/提交区间实证后才写 PRD；回执生命周期 reviewed→absorbed 需补齐：`docs_side_audit`（verified + 未独立复跑项 + discrepancies 如实保留）、PRD SHA 双锚定（输入版/回写版）、包状态推进 reconciled + 版本行。禁止把「门禁零新增失败」表述为「全绿」（known_failed/flaky 台账事实保留）。
-9. **吸收收尾义务与时序（2026-10-21 pilot 实证，lnkcre tax-export + masterdata-fullwidth 双例）**：吸收会话完成 PRD/状态板/包体回写后，**必须同批把回执 `review_status` 推进到 `absorbed` 并补 absorption 处置记录**（dispositions 逐项 done-verified + 证据锚点 + not_independently_verified 如实保留）——双例均出现「包体已标 reconciled 而回执停留 reviewed」的滞后，吸收闭环以回执 absorbed 为准。附带惯例三条：①released 包发布时预创建的空桩回执（全 pending、`package_consumed=false`）= 执行中占位，属合法形态；②docs 侧吸收写入应**尽快提交**（或先在状态板/包体留 in-flight 标记），避免与并行 docs 会话在同一 reconciliation 目录碰撞（2026-10-21 lnkreport 实证：在途未提交吸收 + 第二会话险些重复写入）；③**接手判断（2026-10-21/22 lnkreport 双实证）**：接手 reviewed 停驻回执的 absorbed 收尾前，必须先核对其吸收证据（ledger / pending-decisions / 包体回填）是 **HEAD 已提交态还是工作区在途态**——在途态属活跃会话半成品（其 proposed_updates 常自述「absorbed this return file」），不得接管，避免同文件双写；只有证据已在提交历史中才可安全接手收尾。
+9. **吸收收尾义务与时序（2026-10-21 pilot 实证，lnkcre tax-export + masterdata-fullwidth 双例）**：吸收会话完成 PRD/状态板/包体回写后，**必须同批把回执 `review_status` 推进到 `absorbed` 并补 absorption 处置记录**（dispositions 逐项 done-verified + 证据锚点 + not_independently_verified 如实保留）——双例均出现「包体已标 reconciled 而回执停留 reviewed」的滞后，吸收闭环以回执 absorbed 为准。附带惯例三条：①released 包发布时预创建的空桩回执（全 pending、`package_consumed=false`）= 执行中占位，属合法形态；②docs 侧吸收写入应**尽快提交**（或先在状态板/包体留 in-flight 标记），避免与并行 docs 会话在同一 reconciliation 目录碰撞（2026-10-21 lnkreport 实证：在途未提交吸收 + 第二会话险些重复写入）；③**接手判断（2026-10-21/22 lnkreport 双实证）**：接手 reviewed 停驻回执的 absorbed 收尾前，必须先核对其吸收证据（ledger / pending-decisions / 包体回填）是 **HEAD 已提交态还是工作区在途态**——在途态属活跃会话半成品（其 proposed_updates 常自述「absorbed this return file」），不得接管，避免同文件双写；只有证据已在提交历史中才可安全接手收尾。**生命周期推进责任（v2.1）**：执行侧只产出完整回执并报告已执行事实，不改 docs 包体；docs 侧核验回执后才把包体推进 `executed`；回执 `reviewed → absorbed` 以事实与 `proposed_updates` 逐项处置完成为准，**不因停驻天数自动吸收**——包体 `executed/reconciled` 与回执 `pending/reviewed/absorbed` 是两组独立状态，互不推断；接手停驻件前先排除他会话在途（按本规则惯例③执行，不在此复制）。
 
 ## 一步触发（默认入口）
 
@@ -78,7 +78,19 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 7. **公司解析**：生成包前经 resolver 确定 company_base（cwd 推断 → 用户点名 → 询问），绝不静默默认公司。
 8. **决策链 supersede 核对（2026-11-08 lnkreport 四区批次实证）**：包体与实施侧引用任何 Owner 决策 ID 或能力边界（「X 受旧决策限制」「Y 闭环未建」类判定）前，必须核对该决策**未被更新决策 supersede**——沿 PRD 裁决表 / pending-decisions / 回写记录按时间序追最新；同理，「能力是否存在」以目标仓 spec/归档/组件挂载点**实测**为准，禁止把前一批 PRD 差异矩阵的 missing/unsupported 快照当作当前能力事实。实证：PD-01（2026-11-04）已 supersede A04 并交付背景图/受控超链接能力，次日四区批次 wave3 仍引用 supersede 前的 A04 边界与「安全闭环未建」措辞，把已有能力渲染为 `unsupported-with-reason`——该误判越过 strict validate、批次门禁与验收三层未被拦截，直到残差批次 Wave 0 判定矩阵（接线 vs 新建）才纠正为接线缺口。波次内凡「引用既有裁决判定能力状态」的 change，其判定/差异矩阵必须附决策链核对记录（引用决策 ID + 是否链上最新）。
 
+## 版本三分与勘误模式（v2.1）
+
+签发版本（released 时点的包字节）、实际消费版本（目标仓执行时实际锚定的包版本）与当前文档版本（此刻包文件的最新版本）是**三个独立事实**，分开记录、互不推断：
+
+1. **三分记录**：包记录与回执必须能区分三者；目标执行了 v1.0 而包文件已前进到 v1.1 时，如实记录「实际消费 v1.0」，保留 v1.0 输入锚点，版本切换作为独立事实待 Owner 处置（lnkcard IC1 模式）。
+2. **未消费包 refresh 记版本切换**：对尚未消费的包做 preflight 可变事实刷新时，版本行记录旧版本 → 新版本切换与新版本的适用条件（沿用规则 7：Owner 决策表与授权边界一字不动）。
+3. **已消费包不得替换消费事实**：包已被消费后，禁止用新字节覆盖或倒写实际消费事实；后续修正一律走**独立勘误/补充记录**，且必须保留实际消费锚点——原签发输入与哈希、实际消费版本、原始错误记录（lnkcard RA1 勘误模式）。
+4. **时间戳证据纪律**：git 时间戳、日志时序、提交先后只证明其自身事件，不能据此补造 preflight 开始时点或事前授权结论——该类结论只能来自显式记录或 Owner 裁决。
+5. **字节匹配 ≠ 当前适用**：历史锚点在提交历史中字节复现，不自动表示该输入仍适用于继续执行（包可能已在更新版本重新签发）；继续执行须按执行侧基线漂移判定树的「工作区是否前进」分支复核（见 execution-protocol §1 第 7 项）。
+6. **不自动追认偏差**：已发生的范围或顺序偏差不因时间推移或后续配合而自动视为已追认的合规执行；偏差如实登记，追认与否归 Owner 处置。
+
 ## 执行模式与 change 策略（v2.0）
+
 
 包体两个字段声明执行形态，二者独立于权限位，**不隐含授予任何 commit/archive/push 权限**：
 
@@ -89,6 +101,7 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 | | `read-only-verification` | 零写面核验授权：允许读取目标仓一切文件并输出核验结论（findings 回执），不创建/不修改任何 change 与代码。用于「docs 侧主张需代码级实证后再定实施」的前置波次（2026-11-01 lnkcre W1 首用：PRD impl_status 代码级核验 + 缺陷实锤 + 下一批切片清单产出） |
 | `change_policy` | `consume-existing`（默认） | 只消费目标仓已存在的 change；发现缺失即回呼，不自行创建 |
 | | `create-or-consume` | 存在则消费、缺失则在授权清单内创建/补齐 |
+| | `none` | 不消费、不创建任何 change；仅对 `read-only-verification` 模式合法 |
 
 约束：
 
@@ -96,7 +109,19 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 2. **创建/规划 ≠ 实施**：plan-and-apply 下每个 change 走「创建/补齐工件 → strict validate → apply」三段，strict validate 失败不得 apply；三段结果逐 change 记入回执（见附录 `phase_record`）。
 3. **兼容默认**：包体未写这两个字段时，按 `autonomous-batch` + `consume-existing` 解释，行为与 v1.x apply-existing 单纯模式完全一致——既有包零迁移即可继续执行（migration note：新出包建议显式写两字段；旧包不需要改）。
 4. **项目侧 fail closed 清单**（命中即停该 change 并按异常回呼格式上报，不得静默变通）：越权（change ID / scope 超出授权清单或波次）、语义待决（实施中发现包内 Owner 决策不足以裁决当前切片的产品语义）、环境边界问题（依赖/权限/共享环境无法隔离）。
-5. **核验→实施链式模式**：`read-only-verification` 包的回执（findings + 证据锚点）可作为下一只实施包的**锚定输入**被直接消费——核验回执即证据锚点权威来源（2026-11-01 lnkcre W1→W2 实证：W2 包 §1 锚定 W1 回执，四切片验收口径全部绑定 findings 编号）；链式前后包各自持独立授权边界，前包不隐含后包任何权限。
+5. **核验→实施链式模式**：`read-only-verification` 包的回执（findings + 证据锚点）可作为下一只实施包的**锚定输入**被直接消费——核验回执即证据锚点权威来源（2026-11-01 lnkcre W1→W2 实证：W2 包 §1 锚定 W1 回执，四切片验收口径全部绑定 findings 编号）；链式前后包各自持独立授权边界，前包不隐含后包任何权限。**核验回执不得借发射获得 docs 写面授权**：findings 回执只能经包内既定回执渠道交付，发射行为本身不构成对 docs 仓或任何权威层的写入授权（docs 写入永不可授予，见「权限优先级」）。
+6. **mode × policy 语义矩阵（v2.1，唯一权威）**：评估顺序 = 先解析 `execution_mode`（含只读分支短路），再解析 `change_policy`——不存在先于只读分支评估的「创建模式通用条件」；未知/未定义/`null`/畸形的 mode 或 policy 一律拒绝（fail closed），不落到任何默认。
+
+   | execution_mode \ change_policy | 缺省 | `consume-existing` | `create-or-consume` | `none` | 未知/null/畸形 |
+   |---|---|---|---|---|---|
+   | 缺省 | 兼容默认 autonomous-batch + consume-existing | 正常 | 合法（需封闭 `allowed_change_ids`） | 拒绝（无执行对象） | 拒绝 |
+   | `autonomous-batch` | 按 consume-existing 解释 | 正常 | 合法（需封闭 `allowed_change_ids`） | 拒绝（无执行对象） | 拒绝 |
+   | `plan-and-apply` | 按 consume-existing 解释（封闭 `allowed_change_ids` 仍必须存在） | 正常（清单仍必须） | 合法（需封闭 `allowed_change_ids`） | 拒绝（无执行对象） | 拒绝 |
+   | `read-only-verification` | 按 `none` + `[]` 解释，不授予任何写面 | 仅作**无写权限的旧别名**接受，不据此 apply | **拒绝**（无实现模式默认可覆盖） | 合法；须配 `allowed_change_ids: []`（封闭空集，字段存在不构成拒绝；非空集拒绝） | 拒绝 |
+   | 未知/null/畸形 | 拒绝 | 拒绝 | 拒绝 | 拒绝 | 拒绝 |
+
+   执行侧 preflight 判定步骤见 `implementation-package-execution/references/execution-protocol.md`（引用本矩阵，不复制）。
+7. **findings 型回执的协议条件与 schema 形状校验分离（v2.1）**：`read-only-verification` 包的回执允许 `changes=[]`，最小显式字段 = `execution_mode: "read-only-verification"`、空集原因（`changes_empty_reason`）、核验范围与限度（scope/limitations）、findings（字符串 + 证据锚点：命令/路径/revision）、`schema_version: "1.0"`、初始 `review_status: "pending"`；schema 只做形状校验（`changes=[]` 形状合法），`autonomous-batch` / `plan-and-apply` 回执的空 `changes` 同样过形状——执行模式空 `changes` 属**缺执行证据**，由人工协议验收判缺陷；本仓未实现协议解析器，不得表述为 schema 机械拒绝。回执交付只落包内授权的本地回执路径；该路径在 docs 仓时仅在会话内交付内容、绝不写入——发射/交付不隐含任何 docs 写面授权。
 
 ## 权限优先级与项目侧执行入口（v1.4）
 
@@ -114,7 +139,7 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 - **push 仅当权限表显式授予**，不得由「自主执行」推断获得；默认不授予（`push_policy: explicit`）；
 - **docs 写入、产品语义 / S6 判据 / Owner 决策变更永远不因批次授权获得**——它们不在批次授权的可授予集合内，任何包都授不了。
 
-**一次性消费守卫**：项目侧执行前必须校验 `package_status = released`，并检查同 `package_id` 的 `implementation-return`。released 包预创建的 pending 空桩是合法 reservation，不构成已消费，不得因此阻断首次执行；该空桩必须同时保持 `package_consumed=false` 且不含 feature commit、verification SHA 或 archive commit/path 等执行完成证据。**空桩的未执行字段禁止用 `null`**——共享 schema 对 string 型字段（`open_spec_change_id` / `verification_sha` / `archive_commit`）不接受 null，`gates` 需对象（`{"status":"not-run"}`）、`phase_record` 需至少一相（`{"created":{"summary":"not-started"}}`）；哨兵约定 `not-started` / `not-run` / `not-archived`（2026-11-03 lnkcard GIFT1 空桩四轮 schema 报错实证）。若回执已标记 `package_consumed=true`、已进入 `reviewed`/`absorbed` 等终态，或已包含执行完成证据，则拒绝重跑并要求重新出包授权。首次执行完成后必须回填同一回执并设置 `package_consumed=true`，此后同一包不得重复执行。
+**一次性消费守卫**：项目侧执行前必须校验 `package_status = released`，并检查同 `package_id` 的 `implementation-return`。released 包预创建的 pending 空桩是合法 reservation，不构成已消费，不得因此阻断首次执行；该空桩必须同时保持 `package_consumed=false` 且不含 feature commit、verification SHA 或 archive commit/path 等执行完成证据。**空桩 ≠ 未实施证明（v2.1，lnkcard RA1 实证）**：docs 空桩 `package_consumed=false` 仅是签发侧占位事实，不能单独证明目标仓未实施该批次；守卫不得只看回执文件——执行前必须按目标侧证据渠道（同 package_id 既有回执、目标仓 active changes、feature commits）交叉核对目标执行事实，发现目标侧已实施迹象时停止并回呼 Owner 裁决，不得在空桩单独背书下重跑。**空桩的未执行字段禁止用 `null`**——共享 schema 对 string 型字段（`open_spec_change_id` / `verification_sha` / `archive_commit`）不接受 null，`gates` 需对象（`{"status":"not-run"}`）、`phase_record` 需至少一相（`{"created":{"summary":"not-started"}}`）；哨兵约定 `not-started` / `not-run` / `not-archived`（2026-11-03 lnkcard GIFT1 空桩四轮 schema 报错实证）。若回执已标记 `package_consumed=true`、已进入 `reviewed`/`absorbed` 等终态，或已包含执行完成证据，则拒绝重跑并要求重新出包授权。首次执行完成后必须回填同一回执并设置 `package_consumed=true`，此后同一包不得重复执行。
 
 **标准项目侧入口**：项目仓会话收到 released 包后，一行触发「**执行实施包 <绝对路径>**」，由 `implementation-package-execution` skill（项目仓侧标准执行入口）驱动全流程（四要素校验 → preflight → 权限宣告 → 波次执行 → return 回执）。历史上的「启动用长提示词」模式**降级为可选回退**：仅在目标仓未接入标准 skill 时使用；推荐迁移路径 = 目标仓接入 `implementation-package-execution` 软链后，一律改用一行触发。**出包会话的默认义务**：released 交付时必须同时输出交接包路径与项目仓启动段（已接入 skill 用一行触发，未接入用完整回退提示词），不得只交付包本体。
 
@@ -184,7 +209,7 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 ## 生命周期
 
 ```text
-包：draft（仅范围内未决业务决策（未豁免排除）、授权边界未定或明确草案请求时）→ released（默认直接到达：基线充分且无真正阻塞项时一步生成，摘要+路径+启动段同条输出，不设 Owner 同意中间状态）→ executed（目标仓返回回执）→ reconciled（docs 回写完成）
+包：draft（仅范围内未决业务决策（未豁免排除）、授权边界未定或明确草案请求时）→ released（默认直接到达：基线充分且无真正阻塞项时一步生成，摘要+路径+启动段同条输出，不设 Owner 同意中间状态）→ executed（目标仓发射完整回执；**docs 侧核验回执后由 docs 写入包体**，执行侧不改包体）→ reconciled（docs 回写完成）
 回执：review_status pending → reviewed → absorbed（proposed_updates 逐项处置）
 ```
 
@@ -209,7 +234,7 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 - `phase_record.<阶段>` 必须是**对象**（自由键值 + `summary`），不得写纯字符串；
 - `protected_workspace_preserved` 必须是 boolean / 对象 / 数组 / null，不得写纯字符串——需叙述时用对象包裹键值；
 - 回执发射前的自检必须用共享 `implementation-return.schema.json` 做**严格** jsonschema 校验，不得以宽松自检脚本替代。
-- **docs 吸收侧前置复跑**（2026-11-06 三例实证后固化为吸收 SOP 步骤）：docs 会话吸收任何 implementation-return 前，必须先对回执原文复跑 Draft202012 严格校验；未过即按形状红线机械修正（修正内容逐字保留、包裹为对象/改版本号）并在 absorption dispositions 登记，不得因执行侧「自检 OK」声明跳过。
+- **docs 吸收侧前置复跑（三例实证后固化为吸收 SOP 步骤）**：docs 会话吸收任何 implementation-return 前，必须先对回执原文复跑 Draft202012 严格校验（入口见 prd-writeback.md 报告模块 `strict_validation_report`）；源件未过时**不改写源件**——以 compat 规范化视图独立处理，吸收记录引用三段结果（原文错误数 / 规范化动作与 warnings / 规范化后剩余错误）；确需持久修正走独立勘误/补充记录并保留原件锚点（版本三分与勘误模式第 3 条）；不得补造 review_owner / verification_refs / change 标识等事实，也不得把规范化后通过表述为源件严格通过，不得因执行侧「自检 OK」声明跳过。
 
 最小合规示例：
 
@@ -251,3 +276,4 @@ released 实施包（含默认直接 released 的正式包）交付**同一条�
 | v2.0.2 | 2026-11-04 | 空桩与推送授权两条实证补注：①一次性消费守卫补空桩哨兵约定——未执行字段禁 `null`（schema 对 string 字段不接受），用 `not-started`/`not-run`/`not-archived`，`gates` 需对象、`phase_record` 至少一相（2026-11-03 lnkcard GIFT1 空桩四轮 schema 报错实证）；②`push_evidence` 字段行补推送授权核验口径——按实际仓态核验而非按授权快照盲推，执行会话业务终态后单独提交回执 JSON 使 ahead+1 属预期形态（INV-1 `7f17b3a` + GIFT1 `20559c9` 双实证），快照不符停止回报待 Owner 裁决推送范围 |
 | v2.0.3 | 2026-11-04 | 硬规则 4 两补 + read-only-verification 模式（海鼎合同域弧线复盘）：①锚点刷新必须全输入集重验——同一提交可触碰多个被锚文件，只回填自己编辑过的文件会致 preflight 漂移（W2 INC-1 实证：v1.1 漏 V7 清单）+ 裁决登记=级联更新；②哈希回填来源纪律（命令输出复制/签发前终检，禁凭记忆拼接——两次自误实证）；③执行模式表新增 `read-only-verification`（零写面核验授权，W1 首用）+ 约束 5「核验→实施链式模式」（核验回执作下一包锚定输入，W1→W2 实证） |
 | v2.0.4 | 2026-11-06 | lnkreport 编辑器属性对齐弧线复盘两补（复利工程 user-approved）：①形状红线补第三例族（schema_version "1.1"×2 + phase_record 纯字符串×1，均自称自检 OK）+ 新增「docs 吸收侧前置复跑」吸收 SOP 步骤——三例全由吸收侧复跑抓出；②硬规则 4 补「包体 version 递增 = §2 全锚点重算」（INC-residual-01 第三例：v0.3 触碰被锚输入沿用旧哈希被 preflight 抓出） |
+| v2.1 | 2026-11-13 | align-governance-handoff-contracts 落地（OQ-2 裁决口径：只读模式有副作用命令默认拒绝，仅包内显式列举且事前明确授权时在批准边界内可执行；DB 写入/迁移永远 denied；DB 只读查询须范围 + 连接授权，与 DB 写入分属不同权限面；前后状态核对只是证据，不替代授权）：①执行侧 read-only-verification 分支闭合——mode × policy 语义矩阵收为契约唯一权威（含 `none` 枚举、只读缺省 none/[] 解释与分支短路、未知/null/畸形 mode·policy 拒绝，无创建模式通用条件先于只读分支评估）、findings 型回执最小显式字段与 changes=[] 的协议条件/schema 形状校验分离（无协议解析器，不宣称机械拒绝）、约束 5 补「核验回执不得借发射获得 docs 写面授权」；②新增「版本三分与勘误模式」小节（签发/实际消费/当前版本三分、未消费 refresh 记版本切换与适用条件、已消费勘误保留消费锚点、时间戳只证明自身事件、字节匹配≠当前适用、不自动追认偏差）；③消费守卫补「空桩 ≠ 未实施证明」，执行前按目标侧证据渠道（既有回执/active changes/feature commits）交叉核对；④规则 9 补生命周期推进责任（执行侧只产完整回执不改 docs 包体，docs 核验后 executed，逐项处置后 absorbed/reconciled，不因停驻天数自动吸收）。执行侧细则展开见 implementation-package-execution/references/execution-protocol.md |

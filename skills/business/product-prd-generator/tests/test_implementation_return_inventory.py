@@ -28,6 +28,9 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
+from pathlib import Path
 from typing import Any, Final
 
 import pytest
@@ -315,3 +318,354 @@ def test_helper_does_not_mutate_input() -> None:
     snapshot = json.dumps(ret, sort_keys=True, ensure_ascii=False)
     normalize_implementation_return(ret)
     assert json.dumps(ret, sort_keys=True, ensure_ascii=False) == snapshot
+
+
+# ---------------------------------------------------------------------------
+# strict_validation_report 三段报告（change align-governance-handoff-contracts
+# 6.1/6.2/6.3，2026-11-13）：source 与 normalized 各自独立校验，均可失败并
+# 报告全部剩余错误；输入不可变；warnings/actions 保留原始值；不补造事实。
+# ---------------------------------------------------------------------------
+
+from product_prd_generator.implementation_return_report import (  # noqa: E402
+    ReportDependencyError,
+    strict_validation_report,
+)
+
+_SKILL_ROOT: Final = Path(__file__).resolve().parents[1]
+
+# 脱敏 7-error 形态（对应 2026-11 两件 schema_version:'1.1' 历史漂移回执的
+# 复测签名）：source 侧 7 个 schema 错误——schema_version '1.1'（anyOf×1）、
+# trace_ids 裸字符串（anyOf×1）、phase_record.created 纯字符串（phaseFact×1）、
+# absorbed 门槛字段缺失（required×4：open_spec_change_id / source_revision /
+# verification_refs / review_owner）。
+_SEVEN_ERROR_RETURN: Final[dict[str, Any]] = {
+    "return_id": "RET-REPORT-7ERR",
+    "product_id": "lnkreport",
+    "schema_version": "1.1",
+    "origin_flow": "implementation-package-execution",
+    "review_status": "absorbed",
+    "trace_ids": "REC-7ERR-single-trace",
+    "changes": [{
+        "id": "chg-7err",
+        "feature_commit": "abc1234",
+        "phase_record": {"created": "created"},
+    }],
+}
+
+
+def test_strict_validation_report_seven_error_source_vs_normalized() -> None:
+    """6.2：source 按路径/计数报告 7 errors；normalized 独立校验并按实际剩余
+    错误断言（规范化不补造 review_owner 等事实，absorbed 门槛仍失败）。"""
+    raw = json.loads(json.dumps(_SEVEN_ERROR_RETURN))  # 深拷贝隔离
+    snapshot = json.dumps(raw, sort_keys=True, ensure_ascii=False)
+
+    report = strict_validation_report(raw)
+
+    # 输入不可变（深比较）
+    assert json.dumps(raw, sort_keys=True, ensure_ascii=False) == snapshot
+
+    src = report["source"]
+    assert src["ok"] is False
+    assert src["error_count"] == 7
+    assert len(src["errors"]) == 7
+    assert all(e["path"] and e["message"] for e in src["errors"])
+    # 7 个错误各自带路径（required 锚在 "$"，字段级错误锚在字段路径）
+    paths = [e["path"] for e in src["errors"]]
+    assert paths.count("$") == 4  # absorbed 门槛 required×4
+    assert "$.schema_version" in paths
+    assert "$.trace_ids" in paths
+    assert "$.changes[0].phase_record.created" in paths
+
+    normalized = report["normalized"]
+    # normalized 独立校验：归一化修复了 schema_version/trace_ids/phase_record
+    # 形态，但不补造 absorbed 门槛事实——4 个 required 仍失败。
+    assert normalized["ok"] is False
+    assert normalized["error_count"] == 4
+    missing = {
+        e["message"].split("'")[1]
+        for e in normalized["errors"]
+        if "is a required property" in e["message"]
+    }
+    assert missing == {"open_spec_change_id", "source_revision", "verification_refs", "review_owner"}
+    assert normalized["error_count"] < src["error_count"]
+
+    # warnings/动作保留原始值（'1.1'、裸字符串 trace、phase_record 不补造）
+    warnings = report["normalization"]["warnings"]
+    assert any("1.1" in w for w in warnings)
+    assert any("trace_ids" in w for w in warnings)
+    actions = report["normalization"]["actions"]
+    by_field = {a["field"]: a for a in actions}
+    assert by_field["schema_version"]["source_value"] == "1.1"
+    assert by_field["schema_version"]["view_value"] == "1.0"
+    assert by_field["trace_ids"]["source_value"] == "REC-7ERR-single-trace"
+    # 4 个 required 剩余错误本身就是「未补造 absorbed 门槛事实」的机械证明
+
+
+def test_strict_validation_report_legitimate_normalized_pass_source_fail() -> None:
+    """合法的「normalized 通过 / source 失败」形态：'1.1' 折叠 + 缺 trace 兜底
+    后视图通过，但 source 的 '1.1' 严格失败——不得冒称源件通过。"""
+    raw = {
+        "return_id": "RET-REPORT-NORMPASS",
+        "product_id": "lnkcre",
+        "schema_version": "1.1",
+        "origin_flow": "implementation-package-execution",
+        "review_status": "pending",
+    }
+    report = strict_validation_report(raw)
+    assert report["source"]["ok"] is False
+    assert report["source"]["error_count"] == 1
+    assert "$.schema_version" in [e["path"] for e in report["source"]["errors"]]
+    assert report["normalized"]["ok"] is True
+    assert report["normalized"]["error_count"] == 0
+
+
+def test_strict_validation_report_review_status_vocabulary() -> None:
+    """6.3：词表四值过严格校验（absorbed 需带门槛事实）；accepted/incomplete
+    严格失败且兼容读取保留原值 + warning（不映射）。"""
+    gated_facts = {
+        "open_spec_change_id": "report-vocab-change",
+        "source_revision": "abc123",
+        "verification_refs": ["verification-report.md"],
+        "review_owner": "OPC",
+    }
+    for status in ("pending", "reviewed", "rejected"):
+        raw = {
+            "schema_version": "1.0",
+            "return_id": f"RET-REPORT-VOCAB-{status}",
+            "product_id": "lnkcrm",
+            "origin_flow": "implementation-package-execution",
+            "review_status": status,
+            "proposed_updates": [],
+        }
+        report = strict_validation_report(raw)
+        assert report["source"]["ok"] is True, (status, report["source"]["errors"])
+        assert report["normalized"]["ok"] is True
+    absorbed = {
+        "schema_version": "1.0",
+        "return_id": "RET-REPORT-VOCAB-absorbed",
+        "product_id": "lnkcrm",
+        "origin_flow": "implementation-package-execution",
+        "review_status": "absorbed",
+        **gated_facts,
+        "proposed_updates": [],
+    }
+    report = strict_validation_report(absorbed)
+    assert report["source"]["ok"] is True, report["source"]["errors"]
+    # compat 归一化视图不透传 review_owner（不补造事实）→ normalized 按实际
+    # 剩余错误失败，而非被伪装通过；且通用 diff 必须把这一被投影丢弃的
+    # 原值显式记为 projected-out 动作，不得静默消失。
+    assert report["normalized"]["ok"] is False
+    assert any("review_owner" in e["message"] for e in report["normalized"]["errors"])
+    owner_action = next(
+        a for a in report["normalization"]["actions"] if a["field"] == "review_owner"
+    )
+    assert owner_action["action"] == "projected-out"
+    assert owner_action["source_present"] is True
+    assert owner_action["view_present"] is False
+    assert owner_action["source_value"] == "OPC"
+
+    for wild in ("accepted", "incomplete"):
+        raw = {
+            "schema_version": "1.0",
+            "return_id": f"RET-REPORT-WILD-{wild}",
+            "product_id": "lnkcrm",
+            "origin_flow": "implementation-package-execution",
+            "review_status": wild,
+            "proposed_updates": [],
+        }
+        report = strict_validation_report(raw)
+        # source：enum 严格失败
+        assert report["source"]["ok"] is False
+        assert any("is not one of" in e["message"] and wild in e["message"]
+                   for e in report["source"]["errors"])
+        # 兼容读取：野值不映射，保留原值 + warning
+        view, warnings = normalize_implementation_return(raw)
+        assert "review_status" not in view
+        assert any(wild in w and "野值" in w for w in warnings)
+
+
+def test_strict_validation_report_wild_statuses_are_not_mapped() -> None:
+    """真实存量野值形态经报告通道同样不映射：source 失败、warning 保留原文。"""
+    for wild in ("closed-registered-and-pushed", "approved-and-archived"):
+        raw = {
+            "schema_version": "1.0",
+            "return_id": f"RET-REPORT-WILD-REAL-{wild[:10]}",
+            "product_id": "lnkreport",
+            "origin_flow": "implementation-package-execution",
+            "review_status": wild,
+            "proposed_updates": [],
+        }
+        report = strict_validation_report(raw)
+        assert report["source"]["ok"] is False
+        assert any(wild in e["message"] for e in report["source"]["errors"])
+        # 野值不映射：通用 diff 中 review_owner…此处 review_status 为
+        # projected-out（源有/视图无），source 保留原值，view_present=False
+        status_action = next(
+            a for a in report["normalization"]["actions"] if a["field"] == "review_status"
+        )
+        assert status_action["action"] == "projected-out"
+        assert status_action["source_present"] is True
+        assert status_action["view_present"] is False
+        assert status_action["source_value"] == wild
+
+
+def test_actions_distinguish_missing_sentinel_from_literal_string() -> None:
+    """通用 diff 的存在性布尔必须区分「键缺失」与「字面量 '<missing>' 字符串」：
+    哨兵 source_value 同为 '<missing>'，但 source_present 布尔是权威判据。"""
+    base = {
+        "return_id": "RET-REPORT-MISSING-SENTINEL",
+        "product_id": "lnkcre",
+        "origin_flow": "implementation-package-execution",
+        "review_status": "pending",
+        "schema_version": "1.0",
+    }
+    # 形态一：trace_ids 键缺失（视图兜底 []）
+    absent = strict_validation_report(dict(base))
+    a1 = next(a for a in absent["normalization"]["actions"] if a["field"] == "trace_ids")
+    assert a1["source_present"] is False
+    assert a1["view_present"] is True
+    assert a1["source_value"] == "<missing>"  # 哨兵
+    assert a1["action"] == "added-by-normalization"
+
+    # 形态二：trace_ids 恰为字面量 "<missing>" 字符串（真实源值，非哨兵）
+    literal = strict_validation_report({**base, "return_id": "RET-REPORT-MISSING-LITERAL", "trace_ids": "<missing>"})
+    a2 = next(a for a in literal["normalization"]["actions"] if a["field"] == "trace_ids")
+    assert a2["source_present"] is True
+    assert a2["view_present"] is True
+    assert a2["source_value"] == "<missing>"  # 与哨兵同形
+    assert a2["source_present"] != a1["source_present"]  # 布尔可区分
+    assert a2["action"] == "changed"
+    assert a2["label"] == "shape-normalized"
+
+
+def test_actions_cover_all_projected_out_keys_deterministically() -> None:
+    """所有被投影丢弃的源键（findings / review_owner / package_ref 等）都必须
+    出现在动作清单里（projected-out），不静默消失；排序确定性。"""
+    raw = {
+        "return_id": "RET-REPORT-PROJECTED",
+        "product_id": "lnkcre",
+        "schema_version": "1.0",
+        "origin_flow": "implementation-package-execution",
+        "review_status": "reviewed",
+        "trace_ids": ["REC-1"],
+        "findings": ["FND-1: observed fact"],
+        "review_owner": "OPC",
+        "package_ref": "/sample/pkg.md",
+        "docs_anchoring": True,
+        "proposed_updates": [],
+    }
+    report = strict_validation_report(raw)
+    actions = report["normalization"]["actions"]
+    fields = [a["field"] for a in actions]
+    # 字段序确定性（sorted）
+    assert fields == sorted(fields)
+    projected = {a["field"] for a in actions if a["action"] == "projected-out"}
+    # compat 视图不透传这些键 → 全部显式登记为 projected-out
+    assert {"findings", "review_owner", "package_ref", "docs_anchoring"} <= projected
+    for a in actions:
+        if a["action"] == "projected-out":
+            assert a["source_present"] is True and a["view_present"] is False
+
+
+def test_compat_stdlib_import_and_normalize_under_python_S() -> None:
+    """6.1：python -S 隔离环境（无 site-packages → 无 jsonschema）下，普通
+    compat 导入与 normalize 调用仍工作，证明 compat 模块不依赖 jsonschema。"""
+    code = (
+        "import sys\n"
+        "try:\n"
+        "    import jsonschema\n"
+        "    sys.exit(3)\n"  # 隔离失效（jsonschema 仍可见）→ 3
+        "except ImportError:\n"
+        "    pass\n"
+        "from product_prd_generator.implementation_return_compat import (\n"
+        "    normalize_implementation_return,\n"
+        ")\n"
+        "view, warnings = normalize_implementation_return({\n"
+        "    'return_id': 'R-S', 'product_id': 'lnkcre',\n"
+        "    'schema_version': '1.1', 'review_status': 'accepted',\n"
+        "})\n"
+        "assert view['schema_version'] == '1.0'\n"
+        "assert 'review_status' not in view and warnings\n"
+        "print('OK')\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-S", "-c", code],
+        cwd=_SKILL_ROOT, capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+
+
+def test_cli_exit_codes_source_failure_and_dependency_errors() -> None:
+    """CLI：exit 0 iff source 通过；source 失败=1（即使 normalized 通过）；
+    输入不可读=2。输出必须是可解析的 JSON 报告。"""
+    import tempfile
+
+    def _run(content: str, name: str) -> subprocess.CompletedProcess[str]:
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            path = Path(tmp) / name
+            path.write_text(content, encoding="utf-8")
+            return subprocess.run(
+                [sys.executable, "-m", "product_prd_generator.implementation_return_report", str(path)],
+                cwd=_SKILL_ROOT, capture_output=True, text=True, timeout=60,
+            )
+
+    valid = {
+        "schema_version": "1.0",
+        "return_id": "RET-CLI-OK",
+        "product_id": "lnkcre",
+        "origin_flow": "implementation-package-execution",
+        "review_status": "pending",
+        "proposed_updates": [],
+    }
+    result = _run(json.dumps(valid, ensure_ascii=False), "ok.json")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert json.loads(result.stdout)["source"]["ok"] is True
+
+    # source 失败（'1.1' 严格失败）但 normalized 折叠后通过 → 退出码必须是 1
+    invalid = {**valid, "return_id": "RET-CLI-FAIL", "schema_version": "1.1"}
+    result = _run(json.dumps(invalid, ensure_ascii=False), "fail.json")
+    assert result.returncode == 1, result.stdout + result.stderr
+    report = json.loads(result.stdout)
+    assert report["source"]["ok"] is False
+    assert report["normalized"]["ok"] is True
+
+    # 操作性错误（文件不存在）→ 2，且不伪装为校验结论
+    missing = subprocess.run(
+        [sys.executable, "-m", "product_prd_generator.implementation_return_report",
+         "/tmp/opencode/__no_such_return__.json"],
+        cwd=_SKILL_ROOT, capture_output=True, text=True, timeout=60,
+    )
+    assert missing.returncode == 2
+    assert "operational_error" in json.loads(missing.stdout)
+
+    # 输入 JSON 解析失败 → 操作性错误 exit 2（非校验结论、非 traceback）
+    result = _run("{not valid json!!", "bad.json")
+    assert result.returncode == 2
+    assert "operational_error" in json.loads(result.stdout)
+
+
+def test_report_dependency_error_is_explicit_not_validation_result() -> None:
+    """缺 jsonschema 时报告为显式依赖错误（monkeypatch 移除依赖可见性），
+    不是校验通过/失败。"""
+    import builtins
+    import product_prd_generator.implementation_return_report as report_mod
+
+    real_import = builtins.__import__
+
+    def _blocked(name: str, *args: Any, **kwargs: Any):  # type: ignore[no-untyped-def]
+        if name == "jsonschema" or name == "referencing":
+            raise ImportError(f"blocked for test: {name}")
+        return real_import(name, *args, **kwargs)
+
+    builtins.__import__ = _blocked
+    try:
+        try:
+            strict_validation_report({"return_id": "R", "product_id": "lnkcre"})
+        except ReportDependencyError as exc:
+            assert "jsonschema" in str(exc)
+            assert "依赖" in str(exc)
+        else:
+            raise AssertionError("缺依赖时应抛 ReportDependencyError，而非校验结论")
+    finally:
+        builtins.__import__ = real_import
+

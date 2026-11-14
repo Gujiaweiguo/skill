@@ -28,6 +28,18 @@ evidence or imply requirement satisfaction.
 
 Ontology changes carry proposed semantic content in `changes[].proposed_content`; an ontology-change-set is a reviewable content proposal, not merely a missing-concept pointer. An accepted review requires owner decision metadata and a versioned `proposed_release` record before canonical promotion.
 
+## 词表与版本唯一权威（2026-11-13，change align-governance-handoff-contracts A2）
+
+- implementation-return 新回执的 `schema_version` 唯一目标值为 `1.0`；`review_status` 的唯一词表是 `implementation-return.schema.json` 的 enum（`pending`/`reviewed`/`absorbed`/`rejected`）。
+- `'1.1'` 与 `accepted`/`incomplete` 属 2026-11 历史漂移形态，**不是已发布标准**：兼容读取（`product_prd_generator/implementation_return_compat.py`）按原值折叠/记 warning 保留原文，不升级为标准值、不无条件映射到词表；映射处置待 owner 裁决。
+- 吸收完成 = `reviewed → absorbed`，且 `absorbed` 受 schema 既有约束（须 `verification_refs` + `review_owner` 等证据锚）；证据不齐 = 停留原状态 + 显式缺口记录（compat warning），不引入第二状态值。
+- 严格校验三段报告（`product_prd_generator.implementation_return_report.strict_validation_report`）：source（原件）与 normalized（归一化视图）各自独立校验、均允许失败并报告全部剩余错误；invocation 语义以 source 为唯一裁决输入——normalized 通过不等于源件通过。CLI 退出码：0=source 通过、1=source 失败（即使 normalized 通过）、2=依赖/输入操作性错误。
+
+## 对账范围声明（`reconciliation-record.schema.json` `reconciliation_scope`，2026-11-13）
+
+- 可选枚举字段：`increment-scoped`（仅覆盖本次增量交付涉及的切片）/ `product-wide`（产品级全量对账）；`schema_version` 保持 const `1.0`。
+- 字段缺省仅表示**未声明**，不推断为任一范围；增量交付默认 increment-scoped，不得冒充 product-wide。
+
 ## Flow Direction and Approval
 
 The default for new product work and PRD increments is forward governance: assess ontology impact against the current accepted baseline, record either no ontology change or a reviewable ontology candidate, prepare the PRD baseline/delta, then hand approved intent to code implementation. A forward ontology impact check is required even when the result is no change.

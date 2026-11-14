@@ -23,6 +23,7 @@
 - `layer-reference.schema.json`：标识被回写目标层的 authority 与版本；解析不到时显式记 `unresolved` / `unsupported` / `inaccessible` 及原因，不用其他产品的 authority 顶替。
 - `reconciliation-record.schema.json`：单次 pairwise 对账记录（见下文「晋升后 pairwise 对账」）。
 - 涉及 ontology 变更时，另按 `ontology-change-set.schema.json` 记 draft/delta 提案。
+- 回执严格校验报告（吸收侧复跑入口，2026-11-13）：`skills/business/product-prd-generator/product_prd_generator/implementation_return_report.py`（依赖 jsonschema；原 `implementation_return_compat.py` 保持 stdlib-only 与既有 API 不变）。API：`strict_validation_report(raw)` 返回 `source` 与 `normalized` 各自的 `{ok, error_count, errors[]}`（errors 含 path/message），规范化动作与 warnings 单列并保留原始值；`normalized` 允许仍失败，禁止补造任何事实。CLI：`cd /opt/code/skill/skills/business/product-prd-generator && uv run --extra dev python -m product_prd_generator.implementation_return_report <return.json>`——退出码 `0`=源件通过、`1`=源件存在校验错误（即使规范化后通过）、`2`=运行性问题（用法/读取/解析/依赖缺失，非校验结论）。
 
 契约是 skill 间接口，不是产品数据存储，也不是任何产品 canonical ontology/PRD/code 的权威；适用产品范围以该目录 README 为准（7 个软件产品，lnkwebsite 站点运营不在此契约内）。本 skill 所在的 skill 仓库不拥有任何外部 canonical 层产物。
 
@@ -88,7 +89,8 @@ docs 侧必须记录：
 5. 读取必要代码落点和测试证据；按「交付三元组与逐 change 记录」登记 docs 侧与项目仓侧指针。
 6. 判断 PRD gap 状态：已实现 / 已合并到其他能力 / 暂缓 / code_map 漏判 / 仍未处理。
 7. 更新前先列出候选 changes、目标 PRD、将修改的 PRD 文件和范围，以及按 `implementation-return.schema.json` 组织的 `proposed_updates` 清单，等用户确认。
-8. 用户确认后再进入回写；canonical 更新仍须由 destination owner 审核接受。用户确认仅在其身份为 destination owner 或获授权代理时才满足该审核门。不改目标项目代码，不创建目标项目 change。
+8. 吸收 implementation-return 前必须先复跑严格校验（Draft202012 + 共享 `implementation-return.schema.json`，**先于任何 canonical 更新执行**），并引用报告模块 `strict_validation_report` 的**三段结果**——①原文严格校验（错误数与错误路径）、②规范化动作（含 warnings 与原始值）、③规范化后独立校验结果（剩余错误路径与计数）——作为三个独立事实登记；仅规范化后通过不得表述为原文严格通过，缺字段不得补造 `review_owner` / `verification_refs` / change 标识等事实凑通过。源件保持原文不改写。
+9. 用户确认后再进入回写；canonical 更新仍须由 destination owner 审核接受。用户确认仅在其身份为 destination owner 或获授权代理时才满足该审核门。不改目标项目代码，不创建目标项目 change。
 
 用户确认必须落盘为 owner decision record；至少包含 `status`、`decision`、`owner`、`OWNER SIGN-OFF`、`approved_changes` 和 `forbidden_changes`。会话中的口头“已批准”不作为独立审计证据。
 
@@ -97,7 +99,7 @@ docs 侧必须记录：
 - 目标治理顺序：未来增量先做 ontology impact check（记录变更或有依据的无变更），再形成 PRD delta，最后交目标代码仓实施。已存在的代码领先场景可反向形成带 revision/coverage 的实现事实与 reconciliation/candidate，但不得将实现现状自动升级为产品意图。
 - OPC 为产品及 ontology 决策审核 owner。OPC 批准语义候选后才可晋升 ontology/PRD canonical；代码实现事实仍须记录目标仓、revision、扫描范围与验证证据，OPC 决策本身不构成技术验证。
 - origin flow 是单次 change/return 的字段，不是产品属性。产品完整状态、ontology/PRD 内容覆盖成熟度、adapter 支持度（capability 文件口径）分开记录。
-- 回写证据是 proposal：`proposed_updates[].status` 起始为 `proposed`；canonical 更新（PRD 资料库文件、ontology 基线）须经 destination owner 审核接受后执行。`review_status: accepted` 必须有 `verification_refs` 和 `review_owner`；证据不齐时保留 `incomplete`，不凑数接受。
+- 回写证据是 proposal：`proposed_updates[].status` 起始为 `proposed`；canonical 更新（PRD 资料库文件、ontology 基线）须经 destination owner 审核接受后执行。`review_status` 的唯一词表 = 共享 `implementation-return.schema.json` 现行 enum（`pending` / `reviewed` / `absorbed` / `rejected`），本文件不另立状态值；吸收完成 = `reviewed → absorbed`（`absorbed` 受 schema 既有条件约束：必须携带 `verification_refs` 与 `review_owner`）；证据不齐 = 停留原状态并显式记录缺口（兼容读取以 warning 表达），不凑数推进。历史文件中的词表外值（如 `accepted`、`incomplete`）按兼容读取保留原文 + warning 交 owner 处置，不无条件映射进词表；新回执 `schema_version` 唯一目标值 `1.0`。
 - ontology draft/delta 保持 review-gated：涉及 ontology 变更只产出 `ontology-change-set` 提案（draft / under-review），canonical 晋升前必须获得 approval；回写流程不得直接改写 ontology 权威文件。
 - 未实施、暂缓、排除项必须保留底稿原文带回并按原文登记，不得改写成已实施；项目仓不转述改写，docs 侧不替项目仓补口径。
 - 所有权边界：目标仓库拥有自己的 OpenSpec changes 和验证；回写只消费 archived change 证据，不替目标仓库 apply、verify，不写产品代码仓库。
@@ -125,6 +127,7 @@ canonical 晋升（ontology 或 PRD 任一侧更新落地）之后，三对关�
 规则：
 
 - 三对独立检查，不得用一对的结论推断另一对。
+- **增量交付不强制三份全量报告**：增量默认 increment-scoped，`reconciliation_scope`（可选枚举，缺省=未声明，不推断范围）与三对关系的四态说明（受影响 / 未受影响 / 未检查 / 不适用，后两态须附依据）统一按 `skills/business/product-prd-generator/references/incremental-prd-handoff.md` 收口规则与 `reconciliation-record.schema.json` 执行，本文件不复制。
 - `coverage.status` 如实保留 `complete` / `partial` / `not-scanned` / `inaccessible`；未扫描或不可访问区域不得推断为缺失（对应 outcome 不得记 `missing`）。
 - 证实为误判的历史 drift finding，用 outcome `false-positive-corrected` 修正并留痕，不静默删除。
 

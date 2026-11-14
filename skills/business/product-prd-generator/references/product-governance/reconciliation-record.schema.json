@@ -6,6 +6,10 @@
   "required": ["schema_version", "reconciliation_id", "product_id", "pair", "left", "right", "coverage", "outcome", "findings"],
   "properties": {
     "schema_version": {"const": "1.0"},
+    "reconciliation_scope": {
+      "$comment": "可选对账范围声明（OQ-1 裁决为新增字段，2026-11-13）：increment-scoped=仅覆盖本次增量交付涉及的切片；product-wide=产品级全量对账。缺省仅表示未声明，不推断为任一范围；增量交付默认 increment-scoped，不得冒充 product-wide。additive optional，不破坏存量记录。",
+      "enum": ["increment-scoped", "product-wide"]
+    },
     "reconciliation_id": {"type": "string", "minLength": 1},
     "product_id": {"enum": ["lnkcre", "lnkcrm", "lnkchatbi", "lnkreport", "lnkvision", "lnkgateway", "lnkchat", "lnkcard"]},
     "pair": {"enum": ["ontology-prd", "prd-code", "ontology-code"]},
