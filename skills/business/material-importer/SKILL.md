@@ -40,6 +40,37 @@ compatibility: >
     PEP 723 inline deps in the script header document requirements but are not the primary run path.
   Cert expiry: pytesseract (optional, CPU-only, lightweight).
 change: >
+  v8.2 — 2026-11-14（recognize-web-capture-provenance 复核遗漏补充，第三批）
+  • 文首旧 source/source_path 一条 URL 一条本地路径（两种顺序）不再只取首条：
+  双方都保留（URL 进声明表与 external_sources_unverified；本地取先出现的
+  非URL 命中照常解析，source_kind=mixed），本地缺失/越界照常报告，
+  不以有效 URL 掩盖本地来源问题
+  • 旧 source/source_path 的 URL 形态命中只认文首连续注释区（head_comment_region_end
+  同口径）；正文、围栏代码块、后置注释中的 URL 命中不是有效网页来源（不进外部
+  清单、不进本地解析、也不当缺失文件）。本地路径命中的既有全头检索兼容行为
+  不变（不收紧）
+  v8.1 — 2026-11-14（recognize-web-capture-provenance 独立复核修复，第二批）
+  • 游离存档哈希零路径：unresolved-hash-binding（零/多路径统一）与
+    invalid-hash（零路径也报）不再静默；local_archive_observations 键一致存在
+  • 同头部多值声明不选首条：多条不同 sha256_observed → declared-hash-conflict
+    （hash_check=unresolved-declared-hash，不按首条判 match/mismatch）；
+    多条不同 observed_at → observed-at-conflict；多条不同抓取时间 →
+    source_declaration_conflicts（kind=captured-at，外部条目不带单一权威时间）
+  • local_archive 值形态非法（空值/URL 形态）不做文件系统解析：
+    invalid-archive-declaration（issue=empty-value|url-shaped），
+    不再产生 EISDIR/假 missing；只做加法发现，未放宽任何既有规则
+  v8 — 2026-11-14（recognize-web-capture-provenance）
+  • provenance_inventory 识别 raw MD 文首中文抓取头（来源 URL/抓取时间/source_url）：
+    HTTP(S) 按外部来源分维表达（external-url/not-scanned/unknown-scope），绝不联网、
+    绝不走文件路径解析；未核验外部声明单列 external_sources_unverified（rc=3），
+    URL-only 不再误报 missing_source/missing_original
+  • 新增报告节 source_declaration_conflicts / source_declaration_errors /
+    local_archive_findings 与 item.source_declarations（含行位置）；
+    wrong_source_suspects 按 source_kind 分支（external-not-verified），
+    外部声明不进本地回填候选
+  • local_archive 独立存档观察：仅明确声明、当前哈希实际计算、两时点分列
+    （declared_observed_at vs observed_at）、越界不读取、不按同名 HTML 推断、
+    不升级 recorded-at-conversion
   v7 — 2026-11-14（harden-material-import-provenance）
   • 新增 scripts/provenance_inventory.py：只读溯源体检（四类链接状态 + source_nature/
     accessibility/hash_check 三维分维、boundary-violation 单列、抽样口径显式、退出码
@@ -176,14 +207,104 @@ uv run {baseDir}/scripts/provenance_inventory.py [--base $COMPANY_BASE] [--repor
   匹配索引/指纹/manifest 只在当前基座内构建，同名原件/相同相对路径不跨公司匹配复用；
   声明来源解析（含 symlink）越出基座 → `boundary-violation` 单列且不读取目标内容。
 - **退出码**：0=完成无缺口 / 1=工具失败 / 2=用法错误 / 3=完成且有发现（缺口清单含缺来源、
-  缺哈希、缺原件、歧义匹配、manifest 损坏/记录冲突/产物缺失、边界问题）。
-  **「有发现」不是工具故障**——rc=3 时报告仍是完整可用的证据。
+  缺哈希、缺原件、歧义匹配、manifest 损坏/记录冲突/产物缺失、边界问题、**未核验外部
+  网页声明、声明冲突/错误、存档发现**）。
+  **「有发现」不是工具故障**——rc=3 时报告仍是完整可用的证据；URL-only 文章"未核验"
+  即 rc=3，**不承诺体检归零**。
 - `--repair-candidates`：对缺溯源产物产候选（唯一 basename 匹配 → candidate-association
   级，附候选原件当前哈希；多候选/无依据 CSV↔sheet 映射 → unresolved；已有 source →
   wrong_source_suspects 仅评估建议）。recorded-at-conversion 只按 D7 三要件对既有记录判定
   （转换器签名 + 同基座来源 + 合法转换时哈希），仅证明存在转换时点的来源声明；
   verified-historical 为更高独立核验概念，本工具永不自动授予。历史回填/重转/清理
   **必须**由 Owner 基于本工具 dry-run 报告另行授权后才执行。
+
+#### 网页抓取声明识别（v8，recognize-web-capture-provenance）
+
+针对「公众号文章等网页抓取后存的 raw MD」：中文抓取头是与本地文件来源**并列的独立
+声明形态，不改写成 source 路径去迎合本地检查。
+
+- **支持字段**（只在文首有界注释区识别，半角/全角冒号均可）：
+  `来源 URL`（含紧凑写法 `来源URL`）、`source_url` → 网页来源；`抓取时间` → 声明日期；
+  `local_archive` / `local_archive_sha256_observed` / `local_archive_observed_at` →
+  显式本地存档声明（见下节）。示例（与测试同构、真实锚点格式）：
+
+  ```markdown
+  <!--
+  来源 URL: https://mp.weixin.qq.com/s/xxxx
+  抓取时间: 2026-11-07
+  账号名: 某公众号
+  -->
+  ```
+
+- **头部边界**：只采集文首空白后**连续 HTML 注释区**（受 4000 字符头上限约束）；
+  正文、代码块、正文后置注释里的 URL 一律不认；未闭合或被截断的注释不给有效来源。
+  支持字段保留原值与 1-based 行位置（`item.source_declarations[]`，每条含
+  field/kind/value/value_normalized/line）。
+- **URL 规则**：HTTP(S) 单个完整 URL（有 hostname、无用户凭据/控制符/空白附注）→
+  外部来源（`source_kind: external-url`，`accessibility: not-scanned`，
+  `hash_check: unknown-scope`，MD 自身读取状态单列 `projection_accessibility`）；
+  绝不联网、绝不走文件路径解析/哈希。`file://`/`ftp://` 等报告 unsupported-scheme
+  （不当相对路径）；畸形值进 `source_declaration_errors` 并保留原值，不做 basename
+  推断回填。旧 `source:`/`source_path:` 字段完整值为 scheme 形态时同样走外部分支，
+  但**只认文首连续注释区内的命中**（v8.2）——正文、围栏代码块、后置注释里的旧
+  source/source_path URL 不是有效网页来源（不进外部清单、不进本地解析、也不当
+  缺失文件）；本地路径命中的既有全头检索兼容行为不变（不收紧）。
+- **日期只是声明**：`抓取时间` 保留原文、语义标记 `declared`；不推断时区、不校验
+  抓取真实发生，不得当作已核验历史事实。**不要求历史 MD 增补字段、不伪造 extractor
+  签名**——工具识别既有声明，不回写任何 MD。
+- **多声明**：相同 URL 按去首尾空白后的精确值归组（保留全部位置）；不同 URL 记
+  `source_declaration_conflicts`（`kind` 缺省为 URL 冲突，`urls` 列全部值），不选权威。
+  多条不同 `抓取时间` 同样记 `source_declaration_conflicts`（`kind: captured-at`，
+  `values`/`lines` 逐条保留）——外部条目此时**不带单一权威时间**（不选首条）。
+  本地 source 与网页 URL 并存时
+  （`source_kind: mixed`）顶层保留本地结果，URL 进独立清单，互不掩盖。
+  **旧 source/source_path 多条命中同理不隐藏（v8.2）**：一条 URL 一条本地路径
+  （无论顺序）时双方都保留——URL 命中（限文首区）全部进声明表与外部未核验清单，
+  本地取先出现的非 URL 命中照常解析校验（`declared_source`/`declared_via` 指向
+  本地声明），本地缺失/越界/哈希诊断照常输出，不以有效 URL 掩盖。
+- **报告新增字段/节**（始终存在、稳定排序、纳入 rc=3 判定）：
+  `items[].source_declarations[]`（field/kind/value/value_normalized/line，URL 类附
+  status）；`items[].external_urls`；顶层 `external_sources_unverified[]`（path/url/
+  declarations[]/captured_at/captured_at_semantics=declared/verification=not-performed）、
+  `source_declaration_conflicts[]`、`source_declaration_errors[]`（issue=
+  malformed/not-url/unsupported-scheme，原值保留）、`local_archive_findings[]`、
+  `external_verification`（status=not-performed 或 no-external-declarations）。
+  **`scan.complete` 只覆盖声明的本地扫描范围**——未联网不影响本地枚举完整性判定，
+  外部 URL 可达性一律 not-performed，报告不得解读为"全来源已核验"。
+- **修复候选隔离**：有效/冲突/畸形外部声明都不进 `repair_candidates`（不当"无来源可
+  自动补本地source"）；`wrong_source_suspects` 对 external-url 条目记
+  `external-not-verified`（绝不落 resolvable-in-base），mixed 条目沿用本地判断。
+
+#### 本地网页存档观察（local_archive，可选显式声明）
+
+- **只认显式声明**：`local_archive: <基座内路径>`；附近存在同名 HTML **不构成**存档
+  关系，工具绝不按文件名推断或写入元数据。仅有存档声明不消除真正 missing_source。
+- **观察字段**（`items[].local_archive_observations[]`，每条明确路径独立一项）：
+  `declared_path`/`declared_line`/`accessibility`（accessible|missing|
+  permission-denied|inaccessible|boundary-violation）/`sha256_observed`（当前字节
+  实际计算，即使无 --full-hash——仅明确关联对象，开销有界）/`observed_at`（本次
+  观察时点）/`declared_sha256_observed`/`declared_observed_at`/`hash_check`
+  （match-observed|mismatch-observed|unresolved-declared-hash|no-declared-hash|
+  not-applicable；`unresolved-declared-hash` = 有哈希声明但未绑定——多值冲突或
+  路径数 ≠ 1，不冒充无声明也不按首条判定）。
+- **声明值形态**（独立复核第二批）：`local_archive` 值为空或 URL 形态（scheme://）
+  时**不做文件系统解析**（空值不得解析为基座目录、URL 不得当相对路径猜路径），
+  记 `invalid-archive-declaration` 发现（issue=empty-value|url-shaped，原值保留），
+  不产生 accessible/missing/read-error 假观察。
+- **两时点哈希分列**：`local_archive_sha256_observed` + `local_archive_observed_at`
+  是历史声明观察，本次 `sha256_observed` + `observed_at` 是当前观察；一致也只证明
+  当前字节一致，**不提升网页来源真实性、不触发 recorded-at-conversion**。
+- **发现清单**（`local_archive_findings[]`）：missing（≠网页原件不存在，两者分列）/
+  read-error（带 errno 依据）/boundary（跨公司、基座外绝对路径、越界符号链接——
+  不读取目标内容、不复用其他公司同名存档）/invalid-hash（含零路径的非法格式哈希）/
+  hash-mismatch-observed/archive-conflict（多条不同路径：逐项保留，不选首条权威）/
+  declared-hash-conflict（多条不同 sha256_observed：逐值分列，不选首条为比对基准）/
+  observed-at-conflict（多条不同观察时间：不选首条为权威时点）/
+  invalid-archive-declaration（local_archive 值为空/URL 形态：不解析不猜路径）/
+  unresolved-hash-binding（游离哈希**零路径或多路径**均无法唯一绑定：不静默
+  套用到任何一条）。
+- **本 capability 不改**：source 回填写入（backfill_source.py）、转换器签名/代际、
+  fragment 或描述性复合来源的自然语言拆分——均留独立范围。
 
 ### 转换指纹与增量重跑（convert_doc / convert_excel）
 

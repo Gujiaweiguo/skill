@@ -24,6 +24,39 @@
         "suspect_slides": [1, 2],
         "reasons_include": "merged-cells"
       }
+    },
+    {
+      "name": "gdcreia-association-web-capture",
+      "kind": "md-head-provenance",
+      "comment": "recognize-web-capture-provenance 真实观察锚点（只读登记，正文/HTML 不复制进本仓）。九篇公众号文章 md 统一中文首部 <!-- 来源 URL / 抓取时间 2026-11-07 -->；html/ 为同名网页存档但 MD 未声明 local_archive，工具不得自动建立关系。",
+      "base": "/opt/code/docs/gdcreia/raw/协会介绍资料/公众号文章",
+      "registered_at": "2026-11-14",
+      "files": {
+        "md/01-书记-杨军艇.md": "38e4589d5f09206b6c30696592a94de35d9a8d3100f32f123f2ab2d43d498ec9",
+        "html/01-书记-杨军艇.html": "01c63353da25182081cb6ce366d3af3b247433d550dd553d26674f29b5d33611",
+        "md/02-会长-赵水林.md": "27ef4815183ddb13e53fb428b6afeaaabeecb4a8435f06e60b9e1b1af2f90bb2",
+        "html/02-会长-赵水林.html": "cdb51fe6b401c37df5636b9585483f200e217cba9c59c4f7e1a83118934f3dbf",
+        "md/03-专职常务副会长-黄文杰.md": "687913d38b38542c4fd9d8c4b731b4a7ca97e78f10466c577b9b77701f63e77b",
+        "html/03-专职常务副会长-黄文杰.html": "3552a84335dca3d6b6e83ad7ed7e71168d7e8d27ec25c3cf6240dbf818581c2e",
+        "md/04-常务副会长.md": "3bc7452614dba65bd41e47e8066ad4d22f350167484ebd325d2376ff3e12021d",
+        "html/04-常务副会长.html": "7da0e8a60bcc083134b9ae8f74c98515857ef5bda7ac936088dbec72fd8c522e",
+        "md/05-副会长.md": "347d31ec1e9377d4396691821196014205d5bc8301b5c2494c2ee08eade3af23",
+        "html/05-副会长.html": "ae2de88efb2fc11be0c75a4046bc3032f3483ead2e3699d920df186960fbd95d",
+        "md/06-常务理事.md": "e8fa313398a8c5e46fd717bc332bd42c909a1c3fbdbcb8c24d20cc1423ea96f6",
+        "html/06-常务理事.html": "d6657ffde4ebd8214fa4e72489577ab4ba53f27e7fcc1a788fa8dbdf3b6f3a7a",
+        "md/07-理事.md": "d868054a41e91ef0c491cbbaf80963a9796515e25221bbf6356ccdc54f04ab75",
+        "html/07-理事.html": "3237f10704c1212c7c1eda03d11bc428d2a559171ac4765569816bdd2f8540fa",
+        "md/08-监事会.md": "95d51a9b01eab6a6cc1901b5f817f34be32fe1ae89ed3625786f950106bd16bf",
+        "html/08-监事会.html": "12795b5a8421155e414ff795f945b28aafc501dfdcaba2c1c1435da3c19ec1e5",
+        "md/09-协会简介.md": "4283da35719c7d2273c7ef59e9e2a17ccf4ba1fb5dca32fd0d9e9f11b009a377",
+        "html/09-协会简介.html": "a1983b43d4a47d16808d20962211a9ed4454e9930403aa541a1252c279dd1793"
+      },
+      "expectations": {
+        "head_fields_observed": ["来源 URL", "抓取时间", "账号名", "文章标题", "发布时间"],
+        "declared_capture_date": "2026-11-07",
+        "md_url_declared_count": 9,
+        "html_same_name_no_local_archive_declaration": "工具不得按同名自动建立存档关系"
+      }
     }
   ]
 }

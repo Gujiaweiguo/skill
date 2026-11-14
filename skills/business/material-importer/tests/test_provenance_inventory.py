@@ -13,6 +13,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
@@ -484,6 +485,1104 @@ class ProvenanceInventoryTest(unittest.TestCase):
         for u in report["unverifiable_sources"]:
             self.assertNotIn("基座之外", u["reason"])
             self.assertIn("errno", u["reason"])
+
+
+# --- recognize-web-capture-provenance：受控网页声明解析（任务 1.1）---
+# 全部合成基座；URL 一律 *.invalid（RFC 2606 保留域），不依赖真实 docs 基座、
+# 不复制任何真实文章正文。真实锚点只读登记于 tests/fixtures_registry.json。
+
+WEB_URL = "https://mp.example.invalid/s/abc123"
+WEB_URL2 = "https://mp.example.invalid/s/def456"
+
+
+def write_raw_md_head(base: Path, rel: str, head: str,
+                      body: str = "正文段落\n") -> Path:
+    p = base / "raw" / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(head + "\n\n" + body, encoding="utf-8")
+    return p
+
+
+class WebCaptureDeclarationTest(unittest.TestCase):
+    """中文/ASCII 网页抓取声明只在文首有界注释区识别；本地解析兼容接口不变。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.base = make_base(self.root)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _gaps_for(self, report: dict, rel: str) -> dict:
+        return {k: [g for g in v if g["path"] == rel]
+                for k, v in report["gaps"].items()}
+
+    # 真实锚点格式：块注释 + 中文键 + 半角冒号（01-书记-杨军艇.md 同构）
+    def test_chinese_head_url_and_capture_time(self):
+        head = ("<!--\n"
+                f"来源 URL: {WEB_URL}\n"
+                "抓取时间: 2026-11-07\n"
+                "账号名: 某协会\n"
+                "文章标题: 某文章\n"
+                "发布时间: 2026-09-29 16:57\n"
+                "-->\n")
+        write_raw_md_head(self.base, "article.md", head)
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/article.md"]
+        self.assertEqual(item["source_kind"], "external-url")
+        self.assertEqual(item["source_nature"], "declared")
+        self.assertEqual(item["link_state"], "declared")
+        self.assertEqual(item["accessibility"], "not-scanned")
+        self.assertEqual(item["projection_accessibility"], "accessible")
+        self.assertEqual(item["hash_check"], "unknown-scope")
+        decls = item["source_declarations"]
+        url_decl = [d for d in decls if d["kind"] == "source-url"]
+        self.assertEqual(len(url_decl), 1)
+        self.assertEqual(url_decl[0]["value"], WEB_URL)      # 保留原值
+        self.assertEqual(url_decl[0]["field"], "来源 URL")
+        self.assertEqual(url_decl[0]["line"], 2)             # 1-based 行位置
+        cap = [d for d in decls if d["kind"] == "captured-at"]
+        self.assertEqual(cap[0]["value"], "2026-11-07")
+        self.assertEqual(cap[0]["line"], 3)
+        g = self._gaps_for(report, "raw/article.md")
+        self.assertEqual(g["missing_source"], [])
+        self.assertEqual(g["missing_original"], [])
+        self.assertEqual(g["missing_hash"], [])
+        ext = report["external_sources_unverified"]
+        self.assertEqual([(e["path"], e["url"]) for e in ext],
+                         [("raw/article.md", WEB_URL)])
+        self.assertEqual(ext[0]["captured_at"], "2026-11-07")
+        self.assertEqual(ext[0]["captured_at_semantics"], "declared")
+        self.assertEqual(ext[0]["verification"], "not-performed")
+        self.assertTrue(pi.has_findings(report))  # 未核验 → 有发现
+        self.assertEqual(snapshot(self.base), before)  # 零写入
+
+    def test_full_width_colon_and_compact_variants(self):
+        head = ("<!--\n"
+                f"来源URL：{WEB_URL}\n"
+                "抓取时间：2026-11-07\n"
+                "-->\n")
+        write_raw_md_head(self.base, "fw.md", head)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/fw.md"]
+        self.assertEqual(item["source_kind"], "external-url")
+        self.assertEqual(report["external_sources_unverified"][0]["url"],
+                         WEB_URL)
+
+    def test_explicit_ascii_source_url_field(self):
+        head = (f"<!-- source_url: {WEB_URL} -->\n"
+                "<!-- 抓取时间: 2026-11-07 -->\n")
+        write_raw_md_head(self.base, "ascii.md", head)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/ascii.md"]
+        self.assertEqual(item["source_kind"], "external-url")
+        self.assertEqual(item["source_declarations"][0]["field"],
+                         "source_url")
+        self.assertEqual(item["source_declarations"][0]["line"], 1)
+
+    def test_old_source_field_http_url_external_branch(self):
+        # <!-- source: https://... --> 完整值为合法 HTTP(S) URL → 外部分支
+        write_raw_md(self.base, "web.md", WEB_URL, None)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/web.md"]
+        self.assertEqual(item["source_kind"], "external-url")
+        self.assertEqual(item["declared_source"], WEB_URL)
+        self.assertEqual(item["declared_via"], "source")
+        self.assertEqual(item["hash_check"], "unknown-scope")
+        g = self._gaps_for(report, "raw/web.md")
+        self.assertEqual(g["missing_original"], [])
+        self.assertEqual(g["missing_source"], [])
+        self.assertEqual(report["external_sources_unverified"][0]["url"],
+                         WEB_URL)
+
+    def test_old_block_source_path_with_url(self):
+        # convert_excel 块形态 source_path: URL → 同样外部分支
+        head = ("<!--\n"
+                f"source_path: {WEB_URL}\n"
+                "extractor: convert_excel.py v3\n"
+                "-->\n")
+        write_raw_md_head(self.base, "blk.md", head)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/blk.md"]
+        self.assertEqual(item["source_kind"], "external-url")
+        g = self._gaps_for(report, "raw/blk.md")
+        self.assertEqual(g["missing_original"], [])
+
+    def test_url_never_resolved_never_network(self):
+        # URL 不进 resolve_declared_source；本地路径仍走（兼容接口不变）；
+        # 网络哨兵：socket 被封死时扫描照常完成。
+        (self.base / "incoming" / "local.docx").write_bytes(b"L")
+        write_raw_md(self.base, "local.md", "incoming/local.docx",
+                     sha(b"L"))
+        head = f"<!--\n来源 URL: {WEB_URL}\n抓取时间: 2026-11-07\n-->\n"
+        write_raw_md_head(self.base, "web.md", head)
+        orig = pi.resolve_declared_source
+        seen: list[str] = []
+
+        def guard(declared, base):
+            seen.append(declared)
+            if declared.strip().lower().startswith(
+                    ("http://", "https://", "ftp://", "file://")):
+                raise AssertionError(f"URL 进入本地路径解析: {declared}")
+            return orig(declared, base)
+
+        with mock.patch.object(pi, "resolve_declared_source",
+                               side_effect=guard):
+            report = pi.run_inventory(self.base)
+        self.assertIn("incoming/local.docx", seen)   # 本地路径照常解析
+        self.assertNotIn(WEB_URL, seen)
+        web_item = report["items"]["raw/web.md"]
+        self.assertNotIn("source", web_item)          # 无本地解析结果
+        self.assertNotIn("source_sha256_actual", web_item)
+        with mock.patch("socket.socket",
+                        side_effect=AssertionError("network attempted")), \
+             mock.patch("socket.create_connection",
+                        side_effect=AssertionError("network attempted")):
+            report2 = pi.run_inventory(self.base)
+        self.assertEqual(report2["external_sources_unverified"][0]["url"],
+                         WEB_URL)
+
+    def test_duplicate_urls_grouped_all_positions_kept(self):
+        head = ("<!--\n"
+                f"来源 URL: {WEB_URL}\n"
+                f"来源 URL:  {WEB_URL}  \n"   # 首尾空白差异，去首尾空白后同值
+                f"source_url: {WEB_URL}\n"
+                "-->\n")
+        write_raw_md_head(self.base, "dup.md", head)
+        report = pi.run_inventory(self.base)
+        ext = report["external_sources_unverified"]
+        self.assertEqual(len(ext), 1)
+        self.assertEqual(ext[0]["url"], WEB_URL)
+        self.assertEqual([d["line"] for d in ext[0]["declarations"]],
+                         [2, 3, 4])
+        self.assertEqual(report["source_declaration_conflicts"], [])
+
+    def test_conflicting_urls_reported_no_authority(self):
+        head = ("<!--\n"
+                f"来源 URL: {WEB_URL2}\n"
+                f"source_url: {WEB_URL}\n"
+                "-->\n")
+        write_raw_md_head(self.base, "conf.md", head)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/conf.md"]
+        self.assertEqual(item["source_kind"], "external-url")
+        self.assertEqual(item["external_urls"], sorted([WEB_URL, WEB_URL2]))
+        conf = report["source_declaration_conflicts"]
+        self.assertEqual(len(conf), 1)
+        self.assertEqual(conf[0]["path"], "raw/conf.md")
+        self.assertEqual(conf[0]["urls"], sorted([WEB_URL, WEB_URL2]))
+        ext_urls = sorted(e["url"] for e
+                          in report["external_sources_unverified"])
+        self.assertEqual(ext_urls, sorted([WEB_URL, WEB_URL2]))
+
+    def test_malformed_url_declarations_diagnosed(self):
+        cases = [
+            ("m1.md", "https://exa mple.invalid/a", "malformed"),   # 内部空白附注
+            ("m2.md", "https://", "malformed"),                     # 无 hostname
+            ("m3.md", "https://u:p@mp.example.invalid/s", "malformed"),  # 用户凭据
+            ("m4.md", "notaurl", "not-url"),                        # 无 scheme
+        ]
+        for rel, val, _issue in cases:
+            write_raw_md_head(
+                self.base, rel,
+                f"<!-- source_url: {val} -->\n")
+        report = pi.run_inventory(self.base)
+        errs = report["source_declaration_errors"]
+        self.assertEqual(len(errs), 4)
+        for rel, val, issue in cases:
+            e = [x for x in errs if x["path"] == f"raw/{rel}"]
+            self.assertEqual(len(e), 1)
+            self.assertEqual(e[0]["issue"], issue)
+            self.assertEqual(e[0]["value"], val)          # 原值保留
+            self.assertEqual(e[0]["field"], "source_url")
+        self.assertEqual(report["external_sources_unverified"], [])
+        for rel, _val, _issue in cases:
+            g = self._gaps_for(report, f"raw/{rel}")
+            self.assertEqual(g["missing_original"], [])   # 不当本地路径
+        # 无可用来源 → missing_source 如实；但不做 basename 回填（见 2.x）
+
+    def test_unsupported_scheme_reported_not_relative_path(self):
+        for rel, val in (("f1.md", "file:///opt/x/doc.docx"),
+                         ("f2.md", "ftp://example.invalid/f")):
+            write_raw_md_head(self.base, rel,
+                              f"<!--\nsource_url: {val}\n-->\n")
+        report = pi.run_inventory(self.base)
+        errs = report["source_declaration_errors"]
+        self.assertEqual([e["issue"] for e in errs],
+                         ["unsupported-scheme", "unsupported-scheme"])
+        self.assertEqual(report["boundary_violations"], [])
+        for rel in ("raw/f1.md", "raw/f2.md"):
+            g = self._gaps_for(report, rel)
+            self.assertEqual(g["missing_original"], [])   # 不当相对路径
+
+    def test_body_code_block_and_post_comment_urls_ignored(self):
+        # 正文段内 URL
+        write_raw_md_head(self.base, "b1.md", "",
+                          body=f"参考 {WEB_URL} 详情\n")
+        # 围栏代码块内
+        write_raw_md_head(self.base, "b2.md", "",
+                          body=f"```\n来源 URL: {WEB_URL}\n```\n")
+        # 正文之后的注释（非文首区）
+        write_raw_md_head(self.base, "b3.md", "",
+                          body=f"正文\n\n<!-- 来源 URL: {WEB_URL} -->\n")
+        report = pi.run_inventory(self.base)
+        self.assertEqual(report["external_sources_unverified"], [])
+        for rel in ("raw/b1.md", "raw/b2.md", "raw/b3.md"):
+            item = report["items"][rel]
+            self.assertEqual(item.get("source_declarations"), [])
+            g = self._gaps_for(report, rel)
+            self.assertEqual(len(g["missing_source"]), 1)
+
+    def test_truncated_or_unclosed_comment_yields_no_source(self):
+        # 未闭合注释
+        write_raw_md_head(self.base, "t1.md",
+                          f"<!--\n来源 URL: {WEB_URL}\n抓取时间: 2026-11-07\n")
+        # --> 落在 4000 字符头之外（截断）
+        write_raw_md_head(
+            self.base, "t2.md",
+            f"<!--\n来源 URL: {WEB_URL}\n" + "填充" * 2200 + "\n-->\n")
+        report = pi.run_inventory(self.base)
+        self.assertEqual(report["external_sources_unverified"], [])
+        self.assertEqual(report["source_declaration_errors"], [])
+        for rel in ("raw/t1.md", "raw/t2.md"):
+            g = self._gaps_for(report, rel)
+            self.assertEqual(len(g["missing_source"]), 1)
+
+
+# --- recognize-web-capture-provenance：分维报告与修复候选隔离（任务 2.1）---
+
+class ExternalSourceReportingTest(unittest.TestCase):
+    """URL-only / mixed / 坏本地source+URL / _index 推断并存 / 回填候选隔离。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.base = make_base(self.root)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _gaps_for(self, report: dict, rel: str) -> dict:
+        return {k: [g for g in v if g["path"] == rel]
+                for k, v in report["gaps"].items()}
+
+    def test_url_only_rc3_scan_complete_external_not_performed(self):
+        head = f"<!--\n来源 URL: {WEB_URL}\n抓取时间: 2026-11-07\n-->\n"
+        write_raw_md_head(self.base, "web.md", head)
+        before = snapshot(self.base)
+        r = run_cli(self.base)
+        self.assertEqual(r.returncode, 3)               # 未核验 → 有发现
+        self.assertEqual(snapshot(self.base), before)   # 零写入
+        report = json.loads(r.stdout)
+        # 本地枚举完整性不受未联网影响
+        self.assertTrue(report["scan"]["complete"])
+        self.assertEqual(report["external_verification"]["status"],
+                         "not-performed")
+        # 不再 missing_source / missing_original / missing_hash
+        g = self._gaps_for(report, "raw/web.md")
+        self.assertEqual(g["missing_source"], [])
+        self.assertEqual(g["missing_original"], [])
+        self.assertEqual(g["missing_hash"], [])
+
+    def test_mixed_local_and_url_keeps_local_diagnostics(self):
+        (self.base / "incoming" / "orig.docx").write_bytes(b"O")
+        head = (f"<!-- source: incoming/orig.docx -->\n"
+                f"<!-- source_sha256: {sha(b'O')} -->\n"
+                f"<!-- source_url: {WEB_URL} -->\n"
+                "<!-- 抓取时间: 2026-11-07 -->\n")
+        write_raw_md_head(self.base, "mixed.md", head)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/mixed.md"]
+        self.assertEqual(item["source_kind"], "mixed")
+        # 顶层保留本地语义：来源解析、哈希匹配照常
+        self.assertEqual(item["source_nature"], "declared")
+        self.assertEqual(item["source"], "incoming/orig.docx")
+        self.assertEqual(item["hash_check"], "match")
+        # URL 走独立表达，不掩盖也不被掩盖
+        self.assertEqual(item["external_urls"], [WEB_URL])
+        self.assertEqual([(e["path"], e["url"])
+                          for e in report["external_sources_unverified"]],
+                         [("raw/mixed.md", WEB_URL)])
+        self.assertEqual(report["source_declaration_conflicts"], [])
+        g = self._gaps_for(report, "raw/mixed.md")
+        self.assertEqual(g["missing_source"], [])
+        self.assertEqual(g["missing_hash"], [])
+
+    def test_bad_local_source_with_valid_url_not_masked(self):
+        head = (f"<!-- source: incoming/不存在.docx -->\n"
+                f"<!-- source_url: {WEB_URL} -->\n")
+        write_raw_md_head(self.base, "bad.md", head)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/bad.md"]
+        self.assertEqual(item["source_kind"], "mixed")
+        self.assertEqual(item["accessibility"], "missing")
+        # 本地缺口照常呈现，URL 不掩盖
+        g = self._gaps_for(report, "raw/bad.md")
+        self.assertEqual(len(g["missing_original"]), 1)
+        # URL 仍未核验
+        self.assertEqual([(e["path"], e["url"])
+                          for e in report["external_sources_unverified"]],
+                         [("raw/bad.md", WEB_URL)])
+
+    def test_index_inference_coexistence(self):
+        # 一个 URL md（声明优先于推断）+ 一个无声明 md（照常 _index 推断）
+        head = f"<!--\n来源 URL: {WEB_URL}\n-->\n"
+        write_raw_md_head(self.base, "web.md", head)
+        (self.base / "incoming" / "foo.pptx").write_bytes(b"FOO")
+        md = self.base / "raw" / "sub" / "foo.pptx.md"
+        md.parent.mkdir(parents=True)
+        md.write_text("正文\n", encoding="utf-8")
+        (self.base / "raw" / "_index.json").write_text(
+            json.dumps({"sub/foo.pptx.md":
+                        {"imported_from": "incoming/foo.pptx"}}),
+            encoding="utf-8")
+        report = pi.run_inventory(self.base)
+        web = report["items"]["raw/web.md"]
+        self.assertEqual(web["source_kind"], "external-url")
+        self.assertEqual(web["source_nature"], "declared")
+        self.assertNotIn("inferred_candidates", web)   # 声明优先于推断
+        inf = report["items"]["raw/sub/foo.pptx.md"]
+        self.assertEqual(inf["source_nature"], "inferred")
+        self.assertEqual(inf["inferred_candidates"], ["incoming/foo.pptx"])
+
+    def test_external_declaration_not_backfill_candidate(self):
+        # URL-only md + 同 basename 原件存在：不得按 basename 自动补 source
+        (self.base / "incoming" / "web.docx").write_bytes(b"W")
+        head = f"<!--\n来源 URL: {WEB_URL}\n-->\n"
+        write_raw_md_head(self.base, "web.docx.md", head)
+        report = pi.run_inventory(self.base, repair_candidates=True)
+        paths = [r["path"] for r in report["repair_candidates"]]
+        self.assertNotIn("raw/web.docx.md", paths)
+        # 畸形URL声明同样不进回填候选
+        write_raw_md_head(self.base, "bad.docx.md",
+                          "<!-- source_url: notaurl -->\n")
+        (self.base / "incoming" / "bad.docx").write_bytes(b"B")
+        report2 = pi.run_inventory(self.base, repair_candidates=True)
+        paths2 = [r["path"] for r in report2["repair_candidates"]]
+        self.assertNotIn("raw/bad.docx.md", paths2)
+
+    def test_wrong_source_suspects_external_branch(self):
+        (self.base / "incoming" / "orig.docx").write_bytes(b"O")
+        (self.base / "incoming" / "web.docx").write_bytes(b"W")
+        head = f"<!--\n来源 URL: {WEB_URL}\n-->\n"
+        write_raw_md_head(self.base, "web.docx.md", head)
+        mixed = (f"<!-- source: incoming/orig.docx -->\n"
+                 f"<!-- source_url: {WEB_URL} -->\n")
+        write_raw_md_head(self.base, "mixed.md", mixed)
+        report = pi.run_inventory(self.base, repair_candidates=True)
+        suspects = {s["path"]: s for s in report["wrong_source_suspects"]}
+        ext = suspects["raw/web.docx.md"]
+        self.assertEqual(ext["source_kind"], "external-url")
+        self.assertEqual(ext["verifiability"], "external-not-verified")
+        self.assertNotEqual(ext["verifiability"], "resolvable-in-base")
+        # mixed 条目沿用本地判断：来源可解析 → resolvable-in-base
+        mix = suspects["raw/mixed.md"]
+        self.assertEqual(mix["verifiability"], "resolvable-in-base")
+
+    def test_cli_report_outside_base_and_sorted(self):
+        for i in range(3):
+            head = (f"<!--\n来源 URL: https://mp{i}.example.invalid/s/x\n"
+                    "抓取时间: 2026-11-07\n-->\n")
+            write_raw_md_head(self.base, f"z{i}.md", head)
+        write_raw_md_head(self.base, "a.md",
+                          f"<!-- source_url: {WEB_URL} -->\n")
+        before = snapshot(self.base)
+        out = self.root / "reports" / "inv.json"   # 基座外
+        r = run_cli(self.base, "--report", str(out), "--repair-candidates")
+        self.assertEqual(r.returncode, 3)
+        self.assertTrue(out.is_file())
+        self.assertEqual(snapshot(self.base), before)  # 基座零写入
+        report = json.loads(out.read_text(encoding="utf-8"))
+        ext = report["external_sources_unverified"]
+        self.assertEqual(
+            [(e["path"], e["url"]) for e in ext],
+            sorted((e["path"], e["url"]) for e in ext))  # 稳定排序
+        self.assertEqual(len(ext), 4)
+        self.assertTrue(report["wrong_source_suspects"])
+        ws = report["wrong_source_suspects"]
+        self.assertEqual([s["path"] for s in ws],
+                         sorted(s["path"] for s in ws))
+
+    def test_external_url_with_signature_hash_not_upgraded(self):
+        # URL-only + 转换器签名 + 哈希：recorded-at-conversion 第②要件
+        # （同基座可解析来源）不成立，绝不升级；哈希对外部URL不可核验
+        head = (f"<!--\n来源 URL: {WEB_URL}\n-->\n"
+                f"<!-- source_sha256: {'a' * 64} -->\n"
+                "<!-- extracted_by: markitdown via convert_doc.py v2"
+                " (2026-01-01) -->\n")
+        write_raw_md_head(self.base, "conv.md", head)
+        # 旧 source 字段完整值为 URL + 签名 + 哈希：同样撤销升级
+        write_raw_md(self.base, "conv2.md", WEB_URL, "b" * 64,
+                     "markitdown via convert_doc.py v2 (2026-01-01)")
+        report = pi.run_inventory(self.base)
+        for rel in ("raw/conv.md", "raw/conv2.md"):
+            item = report["items"][rel]
+            self.assertEqual(item["source_kind"], "external-url")
+            self.assertIsNone(item.get("provenance_class"))  # 不升级
+            self.assertEqual(item["hash_check"], "unknown-scope")
+            self.assertIn("source_sha256_declared", item)
+        self.assertIn("第②要件",
+                      report["items"]["raw/conv2.md"]
+                      .get("hash_semantics_basis", ""))
+
+    def test_new_sections_always_present_on_clean_base(self):
+        report = pi.run_inventory(self.base)
+        self.assertEqual(report["external_sources_unverified"], [])
+        self.assertEqual(report["source_declaration_conflicts"], [])
+        self.assertEqual(report["source_declaration_errors"], [])
+        self.assertEqual(report["local_archive_findings"], [])
+        self.assertEqual(report["external_verification"]["status"],
+                         "no-external-declarations")
+        self.assertFalse(pi.has_findings(report))
+
+
+# --- recognize-web-capture-provenance：独立本地存档观察（任务 3.1）---
+
+ARCHIVE_BYTES = b"<html>ARCHIVE-ORIGINAL</html>"
+
+
+def write_web_md_with_archive(base: Path, rel: str, url: str,
+                              archive: str | None,
+                              archive_sha: str | None = None,
+                              archive_at: str | None = None) -> Path:
+    lines = ["<!--", f"来源 URL: {url}", "抓取时间: 2026-11-07"]
+    if archive is not None:
+        lines.append(f"local_archive: {archive}")
+    if archive_sha is not None:
+        lines.append(f"local_archive_sha256_observed: {archive_sha}")
+    if archive_at is not None:
+        lines.append(f"local_archive_observed_at: {archive_at}")
+    lines.append("-->")
+    return write_raw_md_head(base, rel, "\n".join(lines) + "\n")
+
+
+class LocalArchiveObservationTest(unittest.TestCase):
+    """local_archive 只作独立关系观察：两时点哈希分列，不升级真实性。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.base = make_base(self.root)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _findings_for(self, report: dict, rel: str) -> list[dict]:
+        return [f for f in report["local_archive_findings"]
+                if f["path"] == rel]
+
+    def _obs(self, report: dict, rel: str) -> list[dict]:
+        return report["items"][rel]["local_archive_observations"]
+
+    def test_archive_present_two_timepoint_hashes(self):
+        (self.base / "incoming" / "web.html").write_bytes(ARCHIVE_BYTES)
+        declared_sha = sha(ARCHIVE_BYTES)
+        write_web_md_with_archive(
+            self.base, "a.md", WEB_URL, "incoming/web.html",
+            archive_sha=declared_sha, archive_at="2026-11-07T10:00:00+08:00")
+        report = pi.run_inventory(self.base)
+        obs = self._obs(report, "raw/a.md")
+        self.assertEqual(len(obs), 1)
+        self.assertEqual(obs[0]["accessibility"], "accessible")
+        self.assertEqual(obs[0]["resolved_path"], "incoming/web.html")
+        self.assertEqual(obs[0]["sha256_observed"], sha(ARCHIVE_BYTES))
+        self.assertTrue(obs[0]["observed_at"])               # 本次观察时点
+        # 两时点分列：声明观察时点 ≠ 本次观察时点
+        self.assertEqual(obs[0]["declared_sha256_observed"], declared_sha)
+        self.assertEqual(obs[0]["declared_observed_at"],
+                         "2026-11-07T10:00:00+08:00")
+        self.assertNotEqual(obs[0]["declared_observed_at"],
+                            obs[0]["observed_at"])
+        self.assertEqual(obs[0]["hash_check"], "match-observed")
+        # 存档不代替网页来源：external-url 摘要与未核验清单照旧
+        item = report["items"]["raw/a.md"]
+        self.assertEqual(item["source_kind"], "external-url")
+        self.assertEqual(report["external_sources_unverified"][0]["url"],
+                         WEB_URL)
+        # 当前字节一致也只证明当前一致：不升级分级
+        self.assertIsNone(item.get("provenance_class"))
+        self.assertEqual(self._findings_for(report, "raw/a.md"), [])
+
+    def test_archive_hash_mismatch_observed_two_timepoints(self):
+        (self.base / "incoming" / "web.html").write_bytes(ARCHIVE_BYTES)
+        write_web_md_with_archive(
+            self.base, "a.md", WEB_URL, "incoming/web.html",
+            archive_sha="0" * 64, archive_at="2026-11-07T10:00:00+08:00")
+        report = pi.run_inventory(self.base)
+        obs = self._obs(report, "raw/a.md")
+        self.assertEqual(obs[0]["hash_check"], "mismatch-observed")
+        self.assertEqual(obs[0]["declared_sha256_observed"], "0" * 64)
+        self.assertEqual(obs[0]["sha256_observed"], sha(ARCHIVE_BYTES))
+        f = self._findings_for(report, "raw/a.md")
+        self.assertEqual([x["kind"] for x in f], ["hash-mismatch-observed"])
+
+    def test_archive_invalid_declared_hash(self):
+        (self.base / "incoming" / "web.html").write_bytes(ARCHIVE_BYTES)
+        write_web_md_with_archive(self.base, "a.md", WEB_URL,
+                                  "incoming/web.html", archive_sha="zzz")
+        report = pi.run_inventory(self.base)
+        obs = self._obs(report, "raw/a.md")
+        self.assertIsNone(obs[0]["declared_sha256_observed"])
+        self.assertEqual([x["kind"] for x in
+                          self._findings_for(report, "raw/a.md")],
+                         ["invalid-hash"])
+
+    def test_archive_missing_keeps_external_unverified(self):
+        write_web_md_with_archive(self.base, "a.md", WEB_URL,
+                                  "incoming/不存在.html")
+        report = pi.run_inventory(self.base)
+        obs = self._obs(report, "raw/a.md")
+        self.assertEqual(obs[0]["accessibility"], "missing")
+        self.assertIsNone(obs[0]["sha256_observed"])
+        kinds = [x["kind"] for x in self._findings_for(report, "raw/a.md")]
+        self.assertEqual(kinds, ["missing"])
+        # 存档缺失 ≠ 网页原件不存在：外部未核验照旧
+        self.assertEqual(report["external_sources_unverified"][0]["url"],
+                         WEB_URL)
+
+    @unittest.skipIf(os.geteuid() == 0, "root 无视权限位，chmod 000 不生效")
+    def test_archive_read_failure_reported(self):
+        arch = self.base / "incoming" / "web.html"
+        arch.write_bytes(ARCHIVE_BYTES)
+        os.chmod(arch, 0o000)
+        try:
+            write_web_md_with_archive(self.base, "a.md", WEB_URL,
+                                      "incoming/web.html")
+            report = pi.run_inventory(self.base)
+        finally:
+            os.chmod(arch, 0o644)
+        obs = self._obs(report, "raw/a.md")
+        self.assertEqual(obs[0]["accessibility"], "permission-denied")
+        self.assertIsNone(obs[0]["sha256_observed"])
+        kinds = [x["kind"] for x in self._findings_for(report, "raw/a.md")]
+        self.assertEqual(kinds, ["read-error"])
+        self.assertEqual(report["external_sources_unverified"][0]["url"],
+                         WEB_URL)
+
+    def test_archive_boundary_not_read(self):
+        # 基座外绝对路径
+        outside = self.root / "elsewhere" / "web.html"
+        outside.parent.mkdir(parents=True, exist_ok=True)
+        outside.write_bytes(b"OTHER-COMPANY-SECRET")
+        write_web_md_with_archive(self.base, "a1.md", WEB_URL,
+                                  str(outside))
+        # 相对路径越界（..）
+        write_web_md_with_archive(self.base, "a2.md", WEB_URL,
+                                  "../elsewhere/web.html")
+        # 基座内符号链接指向基座外
+        link = self.base / "incoming" / "link.html"
+        link.symlink_to(outside)
+        write_web_md_with_archive(self.base, "a3.md", WEB_URL,
+                                  "incoming/link.html")
+        report = pi.run_inventory(self.base)
+        for rel in ("raw/a1.md", "raw/a2.md", "raw/a3.md"):
+            obs = self._obs(report, rel)
+            self.assertEqual(obs[0]["accessibility"], "boundary-violation")
+            # 越界不读取：无字节哈希，不泄露内容
+            self.assertIsNone(obs[0]["sha256_observed"])
+            self.assertNotIn("resolved_path", obs[0])
+            kinds = [x["kind"] for x in self._findings_for(report, rel)]
+            self.assertEqual(kinds, ["boundary"])
+
+    def test_archive_multi_declaration_conflict_unbound_hash(self):
+        (self.base / "incoming" / "a.html").write_bytes(b"AAA")
+        (self.base / "incoming" / "b.html").write_bytes(b"BBB")
+        head = ("<!--\n"
+                f"来源 URL: {WEB_URL}\n"
+                "local_archive: incoming/a.html\n"
+                "local_archive: incoming/b.html\n"
+                f"local_archive_sha256_observed: {sha(b'AAA')}\n"
+                "local_archive_observed_at: 2026-11-07T10:00:00+08:00\n"
+                "-->\n")
+        write_raw_md_head(self.base, "a.md", head)
+        report = pi.run_inventory(self.base)
+        obs = self._obs(report, "raw/a.md")
+        self.assertEqual(len(obs), 2)      # 逐项保留观察，不选首条权威
+        for o in obs:
+            # 游离哈希无法唯一绑定：不静默套用到任何一条
+            self.assertIsNone(o["declared_sha256_observed"])
+        kinds = sorted(x["kind"] for x
+                       in self._findings_for(report, "raw/a.md"))
+        self.assertEqual(kinds, ["archive-conflict", "unresolved-hash-binding"])
+
+    def test_no_same_name_html_inference(self):
+        # URL 已声明，raw 旁存在同名 HTML 但无 local_archive 声明
+        (self.base / "incoming" / "web.html").write_bytes(ARCHIVE_BYTES)
+        head = f"<!--\n来源 URL: {WEB_URL}\n-->\n"
+        write_raw_md_head(self.base, "web.md", head)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/web.md"]
+        self.assertNotIn("local_archive_observations", item)
+        self.assertEqual(report["local_archive_findings"], [])
+        # 同名 HTML 未被自动列为已确认存档
+        html_item = report["items"]["incoming/web.html"]
+        self.assertEqual(html_item["kind"], "original")
+
+    def test_archive_alone_does_not_replace_missing_source(self):
+        (self.base / "incoming" / "web.html").write_bytes(ARCHIVE_BYTES)
+        head = "<!--\nlocal_archive: incoming/web.html\n-->\n"
+        write_raw_md_head(self.base, "solo.md", head)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/solo.md"]
+        # 存档声明不消除真正 missing_source
+        g = [gg for gg in report["gaps"]["missing_source"]
+             if gg["path"] == "raw/solo.md"]
+        self.assertEqual(len(g), 1)
+        # 但观察照做
+        self.assertEqual(self._obs(report, "raw/solo.md")[0]
+                         ["sha256_observed"], sha(ARCHIVE_BYTES))
+
+    def test_cross_company_same_archive_path_not_reused(self):
+        # 两家公司基座同名相对路径、字节不同：各观察各的，不复用
+        co_a = self.base
+        co_b = make_base(self.root, "co2")
+        (co_a / "incoming" / "shared.html").write_bytes(b"COMPANY-A")
+        (co_b / "incoming" / "shared.html").write_bytes(b"COMPANY-B")
+        head = "<!--\nlocal_archive: incoming/shared.html\n-->\n"
+        write_raw_md_head(co_a, "a.md", head)
+        write_raw_md_head(co_b, "a.md", head)
+        ra = pi.run_inventory(co_a)
+        rb = pi.run_inventory(co_b)
+        self.assertEqual(ra["items"]["raw/a.md"]["local_archive_observations"]
+                         [0]["sha256_observed"], sha(b"COMPANY-A"))
+        self.assertEqual(rb["items"]["raw/a.md"]["local_archive_observations"]
+                         [0]["sha256_observed"], sha(b"COMPANY-B"))
+
+
+# --- recognize-web-capture-provenance：独立复核修复回归（第二批，2026-11-14）---
+# 五类问题（依据独立复核探针 /tmp/opencode/probe_rv + 复核扩展探针重建）：
+#   C1 游离存档哈希（零 local_archive 路径）完全静默：
+#      合法格式无 unresolved-hash-binding、非法格式无 invalid-hash、
+#      local_archive_observations 键缺失（spec 场景11「游离哈希…报告未解决绑定」）。
+#   C2 同头部多条不同 local_archive_sha256_observed：首条静默绑定，
+#      hash_check 按首条判定（match 可掩盖冲突产生零发现）（spec 场景4/11）。
+#   C3 多值观察时间/抓取时间冲突首条静默采用：local_archive_observed_at
+#      与 抓取时间 均不报冲突（spec 场景4「多项声明并存不被隐藏」）。
+#   C4 local_archive 值非法形态（URL 形态/空值）被当路径解析：
+#      URL 形态 → in-base 假 missing；空值 → 解析成基座目录 EISDIR 假 read-error
+#      （spec 场景3 原则「不猜测文件路径」）。
+#   C5 SKILL.md 文档漂移（无 pytest 用例，由文档更新 + check 对齐，
+#      见 SKILL.md §网页抓取声明识别 / §本地网页存档观察）。
+
+
+class IndependentReviewFixRegressionTest(unittest.TestCase):
+    """独立复核发现修复回归：只做加法发现，不放宽任何既有规则。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.base = make_base(self.root)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _findings_for(self, report: dict, rel: str) -> list[dict]:
+        return [f for f in report["local_archive_findings"]
+                if f["path"] == rel]
+
+    def _kinds(self, report: dict, rel: str) -> list[str]:
+        return sorted(x["kind"] for x in self._findings_for(report, rel))
+
+    # --- C1：游离哈希（零路径） ---
+
+    def test_orphan_valid_hash_zero_path_unresolved_binding(self):
+        # probe_rv/03.md 同构：URL + 游离合法哈希，无任何 local_archive 路径
+        head = ("<!--\n"
+                f"来源 URL: {WEB_URL}\n"
+                f"local_archive_sha256_observed: {sha(b'ORPHAN')}\n"
+                "-->\n")
+        write_raw_md_head(self.base, "a.md", head)
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base)
+        # 零路径 = 无法唯一绑定 → unresolved-hash-binding 必须出现
+        self.assertEqual(self._kinds(report, "raw/a.md"),
+                         ["unresolved-hash-binding"])
+        f = self._findings_for(report, "raw/a.md")[0]
+        self.assertEqual(f["declared_paths"], [])
+        self.assertEqual(f["declared_sha256_observed"], sha(b"ORPHAN"))
+        # observations 键一致存在（空列表），外部未核验照旧，不算 missing_source
+        item = report["items"]["raw/a.md"]
+        self.assertEqual(item["local_archive_observations"], [])
+        self.assertEqual(item["source_kind"], "external-url")
+        g = report["gaps"]
+        self.assertEqual([x for x in g["missing_source"]
+                          if x["path"] == "raw/a.md"], [])
+        self.assertTrue(pi.has_findings(report))
+        self.assertEqual(snapshot(self.base), before)  # 零写入
+
+    def test_orphan_invalid_hash_zero_path_invalid_hash_reported(self):
+        # probe_rv2/h6 同构：非法格式游离哈希 → invalid-hash 也要报告
+        head = ("<!--\n"
+                f"来源 URL: {WEB_URL}\n"
+                "local_archive_sha256_observed: zz-not-hex\n"
+                "-->\n")
+        write_raw_md_head(self.base, "a.md", head)
+        report = pi.run_inventory(self.base)
+        self.assertEqual(self._kinds(report, "raw/a.md"), ["invalid-hash"])
+        self.assertEqual(
+            report["items"]["raw/a.md"]["local_archive_observations"], [])
+
+    # --- C2：多值哈希冲突 ---
+
+    def test_conflicting_hashes_first_match_not_authoritative(self):
+        # probe_rv/04.md 升级版：存档存在且首条哈希恰好等于当前字节
+        # （修复前：match-observed + 零冲突发现 = 虚假干净）
+        (self.base / "incoming" / "web.html").write_bytes(ARCHIVE_BYTES)
+        head = ("<!--\n"
+                f"来源 URL: {WEB_URL}\n"
+                "local_archive: incoming/web.html\n"
+                f"local_archive_sha256_observed: {sha(ARCHIVE_BYTES)}\n"
+                f"local_archive_sha256_observed: {sha(b'OTHER')}\n"
+                "-->\n")
+        write_raw_md_head(self.base, "a.md", head)
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base)
+        self.assertEqual(self._kinds(report, "raw/a.md"),
+                         ["declared-hash-conflict"])
+        f = self._findings_for(report, "raw/a.md")[0]
+        self.assertEqual(f["declared_sha256_values"],
+                         sorted([sha(ARCHIVE_BYTES), sha(b'OTHER')]))
+        obs = report["items"]["raw/a.md"]["local_archive_observations"]
+        self.assertEqual(len(obs), 1)
+        # 冲突 → 不绑定任何一条，不按首条判 match/mismatch
+        self.assertIsNone(obs[0]["declared_sha256_observed"])
+        self.assertEqual(obs[0]["hash_check"], "unresolved-declared-hash")
+        # 当前字节照常观察（两时点分列原则不因冲突取消）
+        self.assertEqual(obs[0]["sha256_observed"], sha(ARCHIVE_BYTES))
+        self.assertEqual(snapshot(self.base), before)
+
+    def test_conflicting_hashes_no_mismatch_against_first(self):
+        # 修复前：按首条判 mismatch-observed（首条被当作权威基准）
+        (self.base / "incoming" / "web.html").write_bytes(ARCHIVE_BYTES)
+        head = ("<!--\n"
+                "local_archive: incoming/web.html\n"
+                f"local_archive_sha256_observed: {sha(b'X1')}\n"
+                f"local_archive_sha256_observed: {sha(b'X2')}\n"
+                "-->\n")
+        write_raw_md_head(self.base, "a.md", head)
+        report = pi.run_inventory(self.base)
+        self.assertEqual(self._kinds(report, "raw/a.md"),
+                         ["declared-hash-conflict"])
+        obs = report["items"]["raw/a.md"]["local_archive_observations"]
+        self.assertEqual(obs[0]["hash_check"], "unresolved-declared-hash")
+
+    # --- C3：多值观察时间 / 抓取时间冲突 ---
+
+    def test_conflicting_observed_at_not_first_bound(self):
+        (self.base / "incoming" / "web.html").write_bytes(ARCHIVE_BYTES)
+        head = ("<!--\n"
+                "local_archive: incoming/web.html\n"
+                f"local_archive_sha256_observed: {sha(ARCHIVE_BYTES)}\n"
+                "local_archive_observed_at: 2026-11-07T10:00:00+08:00\n"
+                "local_archive_observed_at: 2026-11-08T10:00:00+08:00\n"
+                "-->\n")
+        write_raw_md_head(self.base, "a.md", head)
+        report = pi.run_inventory(self.base)
+        self.assertIn("observed-at-conflict", self._kinds(report, "raw/a.md"))
+        f = [x for x in self._findings_for(report, "raw/a.md")
+             if x["kind"] == "observed-at-conflict"][0]
+        self.assertEqual(f["declared_observed_at_values"],
+                         ["2026-11-07T10:00:00+08:00",
+                          "2026-11-08T10:00:00+08:00"])
+        obs = report["items"]["raw/a.md"]["local_archive_observations"]
+        # 冲突 → 声明观察时间不绑定首条
+        self.assertIsNone(obs[0]["declared_observed_at"])
+
+    def test_conflicting_captured_at_conflict_reported(self):
+        head = ("<!--\n"
+                f"来源 URL: {WEB_URL}\n"
+                "抓取时间: 2026-11-07\n"
+                "抓取时间: 2026-11-08\n"
+                "-->\n")
+        write_raw_md_head(self.base, "a.md", head)
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base)
+        conf = report["source_declaration_conflicts"]
+        self.assertEqual(len(conf), 1)
+        self.assertEqual(conf[0]["path"], "raw/a.md")
+        self.assertEqual(conf[0]["kind"], "captured-at")
+        self.assertEqual(conf[0]["values"], ["2026-11-07", "2026-11-08"])
+        # 外部条目不带单一权威时间（不选首条）
+        ext = report["external_sources_unverified"]
+        self.assertNotIn("captured_at", ext[0])
+        self.assertEqual(snapshot(self.base), before)
+
+    # --- C4：local_archive 值非法形态 ---
+
+    def test_archive_url_shaped_value_never_resolved(self):
+        # 诱饵：基座内真的存在以 URL 字面量拼出的"路径"，
+        # 修复前会 resolve+读字节（accessible）；修复后不 resolve 不读。
+        decoy = self.base / "https:" / "example.invalid" / "page.html"
+        decoy.parent.mkdir(parents=True, exist_ok=True)
+        decoy.write_bytes(b"DECOY-CONTENT")
+        head = ("<!--\n"
+                f"来源 URL: {WEB_URL}\n"
+                "local_archive: https://example.invalid/page.html\n"
+                "-->\n")
+        write_raw_md_head(self.base, "a.md", head)
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base)
+        self.assertEqual(self._kinds(report, "raw/a.md"),
+                         ["invalid-archive-declaration"])
+        f = self._findings_for(report, "raw/a.md")[0]
+        self.assertEqual(f["issue"], "url-shaped")
+        self.assertEqual(f["declared_path"], "https://example.invalid/page.html")
+        # 不产生 accessible/missing/boundary 假观察，不读诱饵字节
+        obs = report["items"]["raw/a.md"]["local_archive_observations"]
+        self.assertEqual(obs, [])
+        self.assertEqual(snapshot(self.base), before)
+
+    def test_archive_empty_value_not_dir_read(self):
+        # 修复前：空值 resolve 成基座目录本身 → EISDIR 假 read-error
+        head = "<!--\nlocal_archive:\n-->\n"
+        write_raw_md_head(self.base, "a.md", head)
+        report = pi.run_inventory(self.base)
+        self.assertEqual(self._kinds(report, "raw/a.md"),
+                         ["invalid-archive-declaration"])
+        f = self._findings_for(report, "raw/a.md")[0]
+        self.assertEqual(f["issue"], "empty-value")
+        self.assertEqual(
+            report["items"]["raw/a.md"]["local_archive_observations"], [])
+
+    # --- 混合场景：C1+C4 并存，全部声明保留 ---
+
+    def test_invalid_path_plus_orphan_hash_all_findings_kept(self):
+        head = ("<!--\n"
+                f"来源 URL: {WEB_URL}\n"
+                "local_archive: https://example.invalid/x.html\n"
+                f"local_archive_sha256_observed: {sha(b'K')}\n"
+                "-->\n")
+        write_raw_md_head(self.base, "a.md", head)
+        report = pi.run_inventory(self.base)
+        # 非法路径声明 + 合法哈希零有效路径：两类发现并存，不互相掩盖
+        self.assertEqual(self._kinds(report, "raw/a.md"),
+                         ["invalid-archive-declaration",
+                          "unresolved-hash-binding"])
+        # 全部声明原样保留在 source_declarations
+        decls = report["items"]["raw/a.md"]["source_declarations"]
+        self.assertEqual([d["field"] for d in decls],
+                         ["来源 URL", "local_archive",
+                          "local_archive_sha256_observed"])
+
+
+# --- recognize-web-capture-provenance：复核遗漏补充回归（第三批，2026-11-14）---
+# 原独立复核（第二批）遗漏的两类输入形态（探针 /tmp/opencode/probe_rv3/probe.py 复现）：
+#   G1 文首两条旧 source/source_path 一条 URL 一条本地路径（两种顺序）：
+#      修复前 parse_raw_md_provenance 只取先出现的一条，另一条整条静默丢弃——
+#      URL 在前 → 本地路径不解析、缺失零报告（source_kind=external-url）；
+#      本地在前 → URL 不进外部未核验清单（source_kind=local）
+#      （spec 场景4「多项声明并存不被隐藏…不以有效URL掩盖本地来源缺失」）。
+#   G2 正文、围栏代码块、后置注释中的旧 source/source_path URL 成为有效网页来源：
+#      修复前 INLINE/BLOCK 正则对 4000 字符头全文检索，正文命中被当外部声明
+#      （spec 场景3「URL只在声明位置识别」）。
+#      修复约束：不得收紧本地路径既有兼容行为（正文中的本地 source 命中照旧有效）。
+
+
+class ReviewGapFixRegressionTest(unittest.TestCase):
+    """第三批复核遗漏修复回归：双声明并存不隐藏；URL 只认文首声明位置。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.base = make_base(self.root)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _gaps_for(self, report: dict, rel: str) -> dict:
+        return {k: [g for g in v if g["path"] == rel]
+                for k, v in report["gaps"].items()}
+
+    # --- G1：文首 URL+本地双声明，两种顺序，双方都保留 ---
+
+    def test_head_url_then_local_both_kept_missing_reported(self):
+        # 顺序一：URL 在前、本地路径在后（修复前：本地整条丢弃，缺失零报告）
+        head = (f"<!-- source: {WEB_URL} -->\n"
+                "<!-- source_path: incoming/missing.docx -->\n")
+        write_raw_md_head(self.base, "m1.md", head)
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/m1.md"]
+        self.assertEqual(item["source_kind"], "mixed")
+        # 双方声明都保留：URL 进声明表（原字段/原值/行位置）
+        url_decls = [d for d in item["source_declarations"]
+                     if d["kind"] == "source-url"]
+        self.assertEqual([(d["field"], d["value"], d["line"])
+                          for d in url_decls],
+                         [("source", WEB_URL, 1)])
+        # URL 进外部未核验清单
+        self.assertEqual([(e["path"], e["url"])
+                          for e in report["external_sources_unverified"]],
+                         [("raw/m1.md", WEB_URL)])
+        # 本地声明保留并照常校验：declared_source=本地路径，缺失如实报告
+        self.assertEqual(item["declared_source"], "incoming/missing.docx")
+        self.assertEqual(item["declared_via"], "source_path")
+        self.assertEqual(item["accessibility"], "missing")
+        self.assertEqual(
+            len(self._gaps_for(report, "raw/m1.md")["missing_original"]), 1)
+        # 不因 URL 掩盖而漏报，也不误报 missing_source
+        self.assertEqual(
+            self._gaps_for(report, "raw/m1.md")["missing_source"], [])
+        self.assertTrue(pi.has_findings(report))
+        self.assertEqual(snapshot(self.base), before)  # 零写入
+
+    def test_head_local_then_url_both_kept_missing_reported(self):
+        # 顺序二：本地路径在前、URL 在后（块形态 URL + 行内本地，覆盖两种载体；
+        # 修复前：URL 整条丢弃，不进外部未核验清单）
+        head = ("<!--\n"
+                f"source_path: {WEB_URL}\n"
+                "-->\n"
+                "<!-- source: incoming/missing.docx -->\n")
+        write_raw_md_head(self.base, "m2.md", head)
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/m2.md"]
+        self.assertEqual(item["source_kind"], "mixed")
+        url_decls = [d for d in item["source_declarations"]
+                     if d["kind"] == "source-url"]
+        self.assertEqual([(d["field"], d["value"]) for d in url_decls],
+                         [("source_path", WEB_URL)])
+        self.assertEqual([(e["path"], e["url"])
+                          for e in report["external_sources_unverified"]],
+                         [("raw/m2.md", WEB_URL)])
+        self.assertEqual(item["declared_source"], "incoming/missing.docx")
+        self.assertEqual(item["declared_via"], "source")
+        self.assertEqual(
+            len(self._gaps_for(report, "raw/m2.md")["missing_original"]), 1)
+        self.assertEqual(
+            self._gaps_for(report, "raw/m2.md")["missing_source"], [])
+        self.assertTrue(pi.has_findings(report))
+        self.assertEqual(snapshot(self.base), before)  # 零写入
+
+    def test_head_url_and_existing_local_hash_match_mixed(self):
+        # 本地原件存在且哈希匹配：URL 声明不打断本地核验通道（mixed 完整）
+        (self.base / "incoming" / "orig.docx").write_bytes(b"O")
+        head = (f"<!-- source_path: {WEB_URL} -->\n"
+                f"<!-- source: incoming/orig.docx -->\n"
+                f"<!-- source_sha256: {sha(b'O')} -->\n")
+        write_raw_md_head(self.base, "m3.md", head)
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/m3.md"]
+        self.assertEqual(item["source_kind"], "mixed")
+        self.assertEqual(item["source"], "incoming/orig.docx")
+        self.assertEqual(item["hash_check"], "match")
+        self.assertEqual(item["declared_source"], "incoming/orig.docx")
+        self.assertEqual(item["declared_via"], "source")
+        self.assertEqual([e["url"]
+                          for e in report["external_sources_unverified"]],
+                         [WEB_URL])
+        g = self._gaps_for(report, "raw/m3.md")
+        self.assertEqual(g["missing_source"], [])
+        self.assertEqual(g["missing_hash"], [])
+        self.assertEqual(snapshot(self.base), before)  # 零写入
+
+    # --- G2：正文/代码块/后置注释中的旧 source URL 不是有效网页来源 ---
+
+    def test_body_old_source_url_not_web_source(self):
+        # 修复前：正文注释中的旧 source URL 被当外部声明（external-url 分支）
+        write_raw_md_head(self.base, "b1.md", "",
+                          body=f"正文开头\n\n<!-- source: {WEB_URL} -->\n\n"
+                               "结尾\n")
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/b1.md"]
+        self.assertEqual(item.get("source_declarations"), [])
+        self.assertEqual([e for e in report["external_sources_unverified"]
+                          if e["path"] == "raw/b1.md"], [])
+        self.assertNotEqual(item.get("source_kind"), "external-url")
+        # 无可用声明来源 → missing_source 如实；URL 绝不当本地路径
+        g = self._gaps_for(report, "raw/b1.md")
+        self.assertEqual(len(g["missing_source"]), 1)
+        self.assertEqual(g["missing_original"], [])
+        self.assertEqual(report["boundary_violations"], [])
+        self.assertEqual(snapshot(self.base), before)  # 零写入
+
+    def test_code_block_old_source_url_not_web_source(self):
+        # 围栏代码块内的旧 source 注释是文档内容，不是声明位置
+        write_raw_md_head(self.base, "b2.md", "",
+                          body=f"说明\n\n```\n<!-- source: {WEB_URL} -->\n```\n")
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/b2.md"]
+        self.assertEqual(item.get("source_declarations"), [])
+        self.assertEqual([e for e in report["external_sources_unverified"]
+                          if e["path"] == "raw/b2.md"], [])
+        self.assertNotEqual(item.get("source_kind"), "external-url")
+        g = self._gaps_for(report, "raw/b2.md")
+        self.assertEqual(len(g["missing_source"]), 1)
+        self.assertEqual(g["missing_original"], [])
+        self.assertEqual(snapshot(self.base), before)  # 零写入
+
+    def test_post_comment_old_source_path_url_not_web_source(self):
+        # 后置注释（正文之后）中的旧 source_path URL 同样不是声明位置
+        write_raw_md_head(self.base, "b3.md", "正文段落\n",
+                          body=f"\n<!-- source_path: {WEB_URL} -->\n")
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/b3.md"]
+        self.assertEqual(item.get("source_declarations"), [])
+        self.assertEqual([e for e in report["external_sources_unverified"]
+                          if e["path"] == "raw/b3.md"], [])
+        self.assertNotEqual(item.get("source_kind"), "external-url")
+        g = self._gaps_for(report, "raw/b3.md")
+        self.assertEqual(len(g["missing_source"]), 1)
+        self.assertEqual(g["missing_original"], [])
+        self.assertEqual(snapshot(self.base), before)  # 零写入
+
+    def test_body_url_does_not_mask_head_local(self):
+        # 文首本地 source + 正文 URL 注释：URL 整体忽略，本地照常（local 非 mixed）
+        (self.base / "incoming" / "orig.docx").write_bytes(b"O")
+        head = (f"<!-- source: incoming/orig.docx -->\n"
+                f"<!-- source_sha256: {sha(b'O')} -->\n")
+        write_raw_md_head(self.base, "b4.md", head,
+                          body=f"正文\n\n<!-- source: {WEB_URL} -->\n")
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/b4.md"]
+        self.assertEqual(item["source_kind"], "local")
+        self.assertEqual(item["hash_check"], "match")
+        self.assertEqual([e for e in report["external_sources_unverified"]
+                          if e["path"] == "raw/b4.md"], [])
+        self.assertEqual(snapshot(self.base), before)  # 零写入
+
+    # --- G2 修复约束：本地路径既有兼容行为不得收紧 ---
+
+    def test_body_only_local_source_compat_unchanged(self):
+        # 正文中的本地路径 source 命中：修复前就有效，修复后必须仍然有效
+        (self.base / "incoming" / "orig.docx").write_bytes(b"O")
+        write_raw_md_head(self.base, "b5.md", "",
+                          body=f"正文\n\n<!-- source: incoming/orig.docx -->\n")
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/b5.md"]
+        self.assertEqual(item["source_kind"], "local")
+        self.assertEqual(item["source_nature"], "declared")
+        self.assertEqual(item["source"], "incoming/orig.docx")
+        g = self._gaps_for(report, "raw/b5.md")
+        self.assertEqual(g["missing_source"], [])
+        self.assertEqual(snapshot(self.base), before)  # 零写入
+
+    def test_head_url_and_body_local_both_kept_compat(self):
+        # 文首 URL + 正文本地 source 并存：双方都保留（URL 外部未核验 +
+        # 本地照常解析），且本地兼容不因 URL 出现而收紧
+        (self.base / "incoming" / "orig.docx").write_bytes(b"O")
+        write_raw_md_head(self.base, "b6.md", f"<!-- source: {WEB_URL} -->\n",
+                          body="正文\n\n<!-- source_path: incoming/orig.docx"
+                               " -->\n")
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/b6.md"]
+        self.assertEqual(item["source_kind"], "mixed")
+        self.assertEqual(item["declared_source"], "incoming/orig.docx")
+        self.assertEqual(item["declared_via"], "source_path")
+        self.assertEqual(item["source"], "incoming/orig.docx")
+        self.assertEqual([(e["path"], e["url"])
+                          for e in report["external_sources_unverified"]],
+                         [("raw/b6.md", WEB_URL)])
+        self.assertEqual(snapshot(self.base), before)  # 零写入
 
 
 if __name__ == "__main__":

@@ -49,6 +49,7 @@ import sys
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).parent))
 from _company_base import resolve_company_base  # noqa: E402
@@ -85,6 +86,137 @@ FM_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|\Z)", re.S)
 FM_SOURCE_RE = re.compile(r"(?m)^\s*source\s*:\s*(.*?)\s*$")
 
 MID_TILDE_DOLLAR_RE = re.compile(r"^.+~\$.+")  # basename 中部含 ~$（非前缀）
+
+# --- recognize-web-capture-provenance（D1：受控网页声明采集） ---
+# 声明字段名 → kind。键为「去首尾空白、去内部空白、ASCII 小写」归一后的字段名；
+# 中文键（来源 URL / 抓取时间）与 ASCII 键（source_url / local_archive 系）都认，
+# 半角/全角冒号均接受。
+DECL_KIND_BY_FIELD = {
+    "来源url": "source-url",
+    "source_url": "source-url",
+    "抓取时间": "captured-at",
+    "local_archive": "local-archive",
+    "local_archive_sha256_observed": "archive-hash-observed",
+    "local_archive_observed_at": "archive-observed-at",
+}
+DECL_LINE_RE = re.compile(r"(?m)^[ \t]*([^:：\r\n]+?)[ \t]*[:：][ \t]*(.*?)[ \t]*$")
+URL_SCHEME_SHAPED_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.\-]*://")
+
+
+def _norm_decl_field(name: str) -> str:
+    return re.sub(r"[ \t]", "", name).lower()
+
+
+def iter_head_comment_blocks(text: str):
+    """产出文首空白后**连续 HTML 注释区**内每个已闭合注释的
+    (content, content 在全文中的起始偏移)。
+
+    - 只认文首：跳过文首空白（含 BOM）后必须立刻是 `<!--`；
+    - 注释之间只允许空白；正文、代码块、后置注释一律不在产出内；
+    - 未闭合（含被 4000 字符头截断）的注释不给有效来源。
+    """
+    if text.startswith("\ufeff"):
+        text = text[1:]
+    pos = 0
+    while pos < len(text) and text[pos].isspace():
+        pos += 1
+    while pos < len(text):
+        if not text.startswith("<!--", pos):
+            break
+        end = text.find("-->", pos + 4)
+        if end == -1:
+            break  # 未闭合/截断：不给有效来源
+        yield text[pos + 4:end], pos + 4
+        pos = end + 3
+        while pos < len(text) and text[pos].isspace():
+            pos += 1
+
+
+def head_comment_region_end(text: str) -> int:
+    """文首连续注释区的结束偏移（原文本坐标系；含 BOM 时不位移命中位置）。
+
+    与 iter_head_comment_blocks 同一口径：跳过文首空白（含 BOM）后必须立刻
+    是 `<!--`，注释之间只允许空白。返回最后一个已闭合文首注释的 `-->`
+    结束偏移；无文首注释（或首个注释未闭合/截断）时返回 0。
+
+    旧 source/source_path 的 URL 形态命中只有落在此区内才是有效网页声明
+    位置（spec 场景3「URL只在声明位置识别」）；本地路径命中不受此区限制
+    （既有全头检索兼容行为不变，不收紧）。
+    """
+    pos = 1 if text.startswith("\ufeff") else 0
+    while pos < len(text) and text[pos].isspace():
+        pos += 1
+    last_end = 0
+    while pos < len(text):
+        if not text.startswith("<!--", pos):
+            break
+        end = text.find("-->", pos + 4)
+        if end == -1:
+            break  # 未闭合/截断：文首区在此终止
+        last_end = end + 3
+        pos = last_end
+        while pos < len(text) and text[pos].isspace():
+            pos += 1
+    return last_end
+
+
+def collect_source_declarations(text_head: str) -> list[dict]:
+    """D1 有界首部声明采集：仅文首连续注释区内的受控字段。
+
+    每条：field（原文键名）/ kind / value（原值，仅去行尾空白）/
+    value_normalized（去首尾空白，用于比较归组）/ line（头部内 1-based 行位置）。
+    日期类声明只保留原文 + declared 语义，不推断时区、不校验历史真实性。
+    """
+    decls: list[dict] = []
+    for content, abs_start in iter_head_comment_blocks(text_head):
+        for m in DECL_LINE_RE.finditer(content):
+            kind = DECL_KIND_BY_FIELD.get(_norm_decl_field(m.group(1)))
+            if kind is None:
+                continue
+            value = m.group(2)
+            decls.append({
+                "field": m.group(1),
+                "kind": kind,
+                "value": value,
+                "value_normalized": value.strip(),
+                "line": text_head.count("\n", 0, abs_start + m.start()) + 1,
+            })
+    return decls
+
+
+def diagnose_web_url(value: str) -> tuple[str, str]:
+    """受控 URL 诊断（纯 urlsplit 解析，绝不联网）。
+
+    返回 (status, detail)：
+    - "valid"             合法 HTTP(S) 单个完整 URL；
+    - "unsupported-scheme" 有 scheme 形态但非 http/https（file/ftp…），
+                           不当相对路径、不做 basename 推断；
+    - "malformed"         scheme 形态存在但结构非法（内部空白附注/控制符/
+                           无 hostname/用户凭据/urlsplit 失败）；
+    - "not-url"           无 scheme 形态（对 source_url 类字段按声明错误列诊断；
+                          对旧 source/source_path 保持本地路径逻辑）。
+    """
+    v = value.strip()
+    if not v:
+        return "not-url", "空值"
+    if URL_SCHEME_SHAPED_RE.match(v) is None:
+        return "not-url", "无 scheme 形态（http(s)://…）"
+    if any(ch.isspace() for ch in v):
+        return "malformed", "URL 内含空白分隔附注，非单个完整 URL"
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in v):
+        return "malformed", "含控制符"
+    try:
+        parts = urlsplit(v)
+    except ValueError as e:
+        return "malformed", f"urlsplit 解析失败: {e}"
+    scheme = (parts.scheme or "").lower()
+    if scheme not in ("http", "https"):
+        return "unsupported-scheme", f"scheme={scheme}（仅支持 http/https）"
+    if not parts.hostname:
+        return "malformed", "无 hostname"
+    if "@" in (parts.netloc or ""):
+        return "malformed", "netloc 含用户凭据（user:pass@）"
+    return "valid", ""
 
 
 class ScanFailure:
@@ -157,6 +289,7 @@ def parse_raw_md_provenance(text_head: str) -> dict:
     - 哈希：`source_sha256` / `source_sha256_at_backfill`（旧/新名均可）。
     """
     out: dict = {"source": None, "declared_via": None,
+                 "source_pos": None,
                  "source_sha256": None, "extracted_by": None,
                  "signature_via": None}
     source_hits: list[tuple[int, str, str]] = []  # (位置, 值, 字段名)
@@ -199,6 +332,11 @@ def parse_raw_md_provenance(text_head: str) -> dict:
         _pos, value, via = unique[0]
         out["source"] = value
         out["declared_via"] = via
+        out["source_pos"] = _pos  # 头部内偏移（用于声明行位置；加法键）
+        # 第三批（复核遗漏补充）：全部命中按位置加法保留，供调用方做
+        # URL/本地多声明分流；source/declared_via 语义（先出现者）不变
+        out["source_hits"] = [{"pos": p, "value": v, "via": vv}
+                              for p, v, vv in unique]
     return out
 
 
@@ -349,6 +487,11 @@ def run_inventory(base: Path, *, full_hash: bool = False,
         "hash_mismatches": [],
         "unverifiable_sources": [],
         "provenance_class_summary": {},
+        # --- recognize-web-capture-provenance（D2：新增节始终存在，向后兼容扩展）---
+        "external_sources_unverified": [],
+        "source_declaration_conflicts": [],
+        "source_declaration_errors": [],
+        "local_archive_findings": [],
     }
 
     sha_cache: dict[Path, tuple[str | None, OSError | None]] = {}
@@ -625,19 +768,132 @@ def run_inventory(base: Path, *, full_hash: bool = False,
             prov = parse_raw_md_provenance(head)
             cls = classify_provenance(prov)
             item["extracted_by"] = prov.get("extracted_by")
-            if prov.get("declared_via"):
-                item["declared_via"] = prov["declared_via"]
+            # declared_via/declared_source 统一在下方分流处按有效命中回填
+            # （第三批：非文首区 URL 命中不是有效来源，不再从 prov 顶层带入）
             if prov.get("signature_via"):
                 item["signature_via"] = prov["signature_via"]
 
-            if prov.get("source"):
+            # --- D1/D2：受控网页声明采集（加法输出，不改本地字段优先规则）---
+            # 第三批（复核遗漏补充）修复：
+            # (a) 旧 source/source_path 多条命中不再只取先出现的一条——
+            #     文首区 URL 命中全部进声明表（外部未核验清单），本地命中
+            #     取先出现者照常解析，双方并存不互相掩盖（spec 场景4）；
+            # (b) URL 形态命中只有落在文首连续注释区内才是有效网页来源；
+            #     正文/代码块/后置注释中的 URL 命中不算（spec 场景3）。
+            #     本地路径命中的既有全头检索兼容行为不变（不收紧）。
+            decls = collect_source_declarations(head)
+            region_end = head_comment_region_end(head)
+            head_url_hits: list[dict] = []
+            local_hits: list[dict] = []
+            for h in prov.get("source_hits") or []:
+                if URL_SCHEME_SHAPED_RE.match(h["value"]):
+                    if h["pos"] < region_end:
+                        head_url_hits.append(h)
+                    # 非文首区 URL 形态命中：不是有效网页来源——不进外部
+                    # 清单、不进本地解析、也不当缺失文件（spec 场景3）
+                else:
+                    local_hits.append(h)
+            for h in head_url_hits:
+                decls.append({
+                    "field": h["via"],
+                    "kind": "source-url",
+                    "value": h["value"],
+                    "value_normalized": h["value"].strip(),
+                    "line": head.count("\n", 0, h["pos"]) + 1,
+                })
+            decls.sort(key=lambda d: d["line"])
+            item["source_declarations"] = decls
+
+            url_decls = [d for d in decls if d["kind"] == "source-url"]
+            url_groups: dict[str, list[dict]] = {}
+            for d in url_decls:
+                status, detail = diagnose_web_url(d["value_normalized"])
+                d["status"] = status
+                if detail:
+                    d["status_detail"] = detail
+                if status == "valid":
+                    # 相同 URL 按去首尾空白后的精确值归组，保留全部位置；
+                    # 不做重定向/大小写/参数排序合并
+                    url_groups.setdefault(d["value_normalized"], []).append(d)
+                else:
+                    report["source_declaration_errors"].append({
+                        "path": rel, "field": d["field"], "line": d["line"],
+                        "value": d["value"], "issue": status, "detail": detail,
+                    })
+            valid_urls = sorted(url_groups)
+            external_present = bool(valid_urls)
+            url_attempted = bool(url_decls)
+
+            captured_at_decls = [d for d in decls
+                                 if d["kind"] == "captured-at"]
+            # C3：多条不同抓取时间 → 声明冲突（不选首条为权威），
+            #     外部条目不带单一权威时间；单条时保留原文 declared 语义
+            distinct_captured_at: list[str] = []
+            for d in captured_at_decls:
+                if d["value_normalized"] not in distinct_captured_at:
+                    distinct_captured_at.append(d["value_normalized"])
+            captured_at_conflict = len(distinct_captured_at) > 1
+            if external_present:
+                for url in valid_urls:
+                    entry = {
+                        "path": rel, "url": url,
+                        "declarations": [{"field": d["field"],
+                                          "line": d["line"]}
+                                         for d in url_groups[url]],
+                        "verification": "not-performed",
+                        "note": "声明的外部网页来源；未联网核验，无网络取证",
+                    }
+                    if captured_at_decls and not captured_at_conflict:
+                        # 日期保留原文且仅为声明（declared），
+                        # 不推断时区、不校验历史抓取真实发生
+                        entry["captured_at"] = captured_at_decls[0]["value"]
+                        entry["captured_at_semantics"] = "declared"
+                    report["external_sources_unverified"].append(entry)
+                if len(valid_urls) > 1:
+                    report["source_declaration_conflicts"].append({
+                        "path": rel, "urls": valid_urls,
+                        "reason": "多个不同URL声明并存：逐条保留并分别标记"
+                                  "未核验，不推断权威版本，不合并",
+                    })
+                if captured_at_conflict:
+                    report["source_declaration_conflicts"].append({
+                        "path": rel, "kind": "captured-at",
+                        "values": [d["value"] for d in captured_at_decls],
+                        "lines": [d["line"] for d in captured_at_decls],
+                        "reason": "多个不同抓取时间声明并存：逐条保留，"
+                                  "不选首条为权威；外部条目不带单一权威"
+                                  "时间（日期只是声明）",
+                    })
+                item["external_urls"] = valid_urls
+
+            def _external_summary():
+                """URL-only 顶层摘要：来源侧未扫描；MD 自身读取状态单列。"""
+                item["source_kind"] = "external-url"
                 item["source_nature"] = "declared"
                 item["link_state"] = "declared"
-                item["declared_source"] = prov["source"]
-                resolved, status = resolve_declared_source(prov["source"], base)
+                item["accessibility"] = "not-scanned"
+                item["projection_accessibility"] = "accessible"
+                item["hash_check"] = "unknown-scope"
+                if prov.get("source_sha256"):
+                    item["source_sha256_declared"] = prov["source_sha256"]
+                    item["external_hash_note"] = (
+                        "source_sha256 声明针对外部URL；URL 字节未获得，"
+                        "不适用于网页核验（unknown-scope）")
+
+            if local_hits:
+                # 本地来源 = 旧 source/source_path 命中中先出现的非 URL 值
+                # （既有「先出现者优先」语义不变；URL 命中一律走外部通道，
+                #  绝不进入 resolve_declared_source）
+                local_src = local_hits[0]["value"]
+                item["source_kind"] = "mixed" if external_present else "local"
+                item["source_nature"] = "declared"
+                item["link_state"] = "declared"
+                item["declared_source"] = local_src
+                item["declared_via"] = local_hits[0]["via"]
+                resolved, status = resolve_declared_source(local_src, base)
                 if status == "unresolvable":
                     item["hash_check"] = "not-applicable"
-                    _note_unverifiable(report, rel, prov["source"],
+                    _note_unverifiable(report, rel, local_src,
                                        "resolve 失败（观察动作自身失败，"
                                        "非越界非缺失）",
                                        value="inaccessible")
@@ -645,7 +901,7 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                     item["hash_check"] = "not-applicable"
                     item["boundary_violation"] = True
                     report["boundary_violations"].append({
-                        "path": rel, "declared_source": prov["source"],
+                        "path": rel, "declared_source": local_src,
                         "resolved_to": str(resolved),
                         "reason": "声明来源解析后落在当前公司基座之外"
                                   "（绝对路径越界或符号链接跨公司）；"
@@ -661,7 +917,7 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                         acc = accessibility_for_error(stat_err)
                         item["accessibility"] = acc
                         item["hash_check"] = "not-applicable"
-                        _note_unverifiable(report, rel, prov["source"],
+                        _note_unverifiable(report, rel, local_src,
                                            f"stat 失败: "
                                            f"{stat_error_detail(stat_err)}",
                                            value=acc)
@@ -669,7 +925,7 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                         item["accessibility"] = "missing"
                         item["hash_check"] = "not-applicable"
                         note_gap("missing_original", rel,
-                                 {"declared_source": prov["source"]})
+                                 {"declared_source": local_src})
                     else:
                         item["source_accessibility"] = "accessible"
                         if prov.get("source_sha256"):
@@ -682,7 +938,7 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                                 item["hash_check"] = "not-applicable"
                                 item["source_accessibility"] = acc
                                 _note_unverifiable(
-                                    report, rel, prov["source"],
+                                    report, rel, local_src,
                                     f"来源字节读取失败: "
                                     f"{stat_error_detail(read_err)}",
                                     field="source_accessibility", value=acc)
@@ -718,7 +974,7 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                         else:
                             item["hash_check"] = "no-declared-hash"
                             note_gap("missing_hash", rel,
-                                     {"declared_source": prov["source"]})
+                                     {"declared_source": local_src})
                         if full_hash and resolved not in sha_cache:
                             h, h_err = sha_of(resolved)  # full-hash：全量哈希原件
                             if h:
@@ -734,8 +990,26 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                         status != "in-base":
                     # 来源越界/不可解析 → recorded-at-conversion 第②要件不成立
                     cls = {"provenance_class": None, "hash_semantics": "unknown"}
+            elif external_present:
+                # 仅外部URL声明（或旧 source/source_path 文首命中完整值为 URL）：
+                # 来源为有效声明，不进本地路径解析，
+                # 不算 missing_source/missing_original/missing_hash
+                _external_summary()
+                if head_url_hits:
+                    # 旧字段载体声明（原值 + 原字段名保留；非文首区 URL 命中
+                    # 不在此列——它们不是有效网页来源）
+                    item["declared_source"] = head_url_hits[0]["value"]
+                    item["declared_via"] = head_url_hits[0]["via"]
+                if cls.get("_candidate_recorded_at_conversion"):
+                    # recorded-at-conversion 第②要件（同基座内可解析来源）不成立
+                    cls = {"provenance_class": None,
+                           "hash_semantics": "unknown",
+                           "hash_semantics_basis": (
+                               "来源为外部URL，recorded-at-conversion 第②要件"
+                               "（同基座内可解析来源）不成立，不升级")}
+                # 有效外部声明 = 已有来源：不进 need_repair，不生成本地回填候选
             else:
-                # 无声明来源
+                # 无可用声明来源
                 if imported_from.get(p.relative_to(raw_dir).as_posix()):
                     cand = imported_from[p.relative_to(raw_dir).as_posix()]
                     item["source_nature"] = "inferred"
@@ -750,7 +1024,230 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                     item["link_state"] = "unknown-unavailable"
                     item["hash_check"] = "no-declared-hash"
                     note_gap("missing_source", rel)
-                need_repair.append({"path": rel, "kind": kind, "item": item})
+                if url_attempted:
+                    # 仅畸形/不支持协议的URL声明：错误节已列诊断；
+                    # 不得当作「无来源、可自动补本地source」
+                    item["note"] = ("仅存在畸形或不支持协议的URL声明"
+                                    "（见 source_declaration_errors）；"
+                                    "不自动生成本地来源回填候选")
+                else:
+                    need_repair.append({"path": rel, "kind": kind, "item": item})
+
+            # --- D3：独立本地存档观察（仅明确 local_archive 声明，
+            #     不按同名 HTML 推断；当前观察 ≠ 历史输入，不升级真实性）---
+            # 独立复核修复（第二批）：声明采集与发现判定覆盖零路径/多值/
+            # 非法值形态，全部只做加法发现，不放宽既有规则
+            archive_decls = [d for d in decls if d["kind"] == "local-archive"]
+            hash_decls = [d for d in decls
+                          if d["kind"] == "archive-hash-observed"]
+            observed_at_decls = [d for d in decls
+                                 if d["kind"] == "archive-observed-at"]
+            if archive_decls or hash_decls or observed_at_decls:
+                # C4：local_archive 值形态诊断（空值 / URL 形态）——
+                #     非法形态不 resolve、不 stat、不读字节（不猜文件路径）
+                valid_archive_decls: list[dict] = []
+                for d in archive_decls:
+                    v = d["value_normalized"]
+                    if not v:
+                        issue = "empty-value"
+                    elif URL_SCHEME_SHAPED_RE.match(v):
+                        issue = "url-shaped"
+                    else:
+                        issue = None
+                    if issue is not None:
+                        report["local_archive_findings"].append({
+                            "path": rel,
+                            "kind": "invalid-archive-declaration",
+                            "declared_path": d["value"],
+                            "line": d["line"],
+                            "issue": issue,
+                            "detail": ("local_archive 声明值"
+                                       + ("为空，不是路径" if issue ==
+                                          "empty-value"
+                                          else "为 URL 形态，不是基座内路径")
+                                       + "；不做文件系统解析、不猜路径、"
+                                         "不联网，原值保留"),
+                        })
+                    else:
+                        valid_archive_decls.append(d)
+
+                # C2：哈希多值冲突——逐值分列，不选首条为权威比对基准
+                distinct_hashes: list[str] = []
+                for d in hash_decls:
+                    v = d["value_normalized"].lower()
+                    if v not in distinct_hashes:
+                        distinct_hashes.append(v)
+                hash_conflict = len(distinct_hashes) > 1
+                invalid_hash_values = [v for v in distinct_hashes
+                                       if not HEX64_RE.match(v)]
+                declared_sha = (distinct_hashes[0]
+                                if (distinct_hashes and not hash_conflict
+                                    and not invalid_hash_values)
+                                else None)
+
+                # C3：观察时间多值冲突——同样不选首条
+                distinct_observed_at: list[str] = []
+                for d in observed_at_decls:
+                    if d["value_normalized"] not in distinct_observed_at:
+                        distinct_observed_at.append(d["value_normalized"])
+                observed_at_conflict = len(distinct_observed_at) > 1
+                declared_observed_at_value = (
+                    observed_at_decls[0]["value"]
+                    if (observed_at_decls and not observed_at_conflict)
+                    else None)
+
+                distinct_paths: list[str] = []
+                for d in valid_archive_decls:
+                    if d["value_normalized"] not in distinct_paths:
+                        distinct_paths.append(d["value_normalized"])
+                # 游离/冲突哈希只在可唯一绑定（合法格式 + 唯一路径）时挂接；
+                # 零路径、多路径或多值冲突时绑定保持 unresolved，不静默套用
+                hash_bindable = (declared_sha is not None
+                                 and len(distinct_paths) == 1)
+
+                observations: list[dict] = []
+                for d in valid_archive_decls:
+                    declared_path = d["value_normalized"]
+                    obs = {
+                        "declared_path": declared_path,
+                        "declared_line": d["line"],
+                        "accessibility": None,
+                        "sha256_observed": None,
+                        "observed_at": None,
+                        "declared_sha256_observed": (declared_sha
+                                                     if hash_bindable
+                                                     else None),
+                        "declared_observed_at": (
+                            declared_observed_at_value
+                            if hash_bindable else None),
+                        "hash_check": None,
+                    }
+                    a_resolved, a_status = resolve_declared_source(
+                        declared_path, base)
+                    if a_status == "unresolvable":
+                        obs["accessibility"] = "inaccessible"
+                        report["local_archive_findings"].append({
+                            "path": rel, "kind": "read-error",
+                            "declared_path": declared_path,
+                            "detail": "存档路径 resolve 失败（观察动作自身"
+                                      "失败，非越界非缺失）"})
+                    elif a_status == "boundary":
+                        obs["accessibility"] = "boundary-violation"
+                        report["local_archive_findings"].append({
+                            "path": rel, "kind": "boundary",
+                            "declared_path": declared_path,
+                            "resolved_to": str(a_resolved),
+                            "detail": "存档路径解析后落在当前公司基座之外"
+                                      "（跨公司/基座外绝对路径/越界符号链接）；"
+                                      "已停止观察，未读取目标内容，不复用其他"
+                                      "公司同名存档或哈希"})
+                    else:
+                        obs["resolved_path"] = a_resolved.relative_to(
+                            base).as_posix()
+                        a_exists, a_err = safe_exists(a_resolved)
+                        if a_err is not None:
+                            acc = accessibility_for_error(a_err)
+                            obs["accessibility"] = acc
+                            report["local_archive_findings"].append({
+                                "path": rel, "kind": "read-error",
+                                "declared_path": declared_path,
+                                "detail": f"存档 stat 失败: "
+                                          f"{stat_error_detail(a_err)}"})
+                        elif not a_exists:
+                            obs["accessibility"] = "missing"
+                            report["local_archive_findings"].append({
+                                "path": rel, "kind": "missing",
+                                "declared_path": declared_path,
+                                "detail": "声明的存档在当前基座内不存在"
+                                          "（≠ 网页原件不存在，两者分列）"})
+                        else:
+                            # SHA 对当前可读存档实际计算（仅明确关联对象，
+                            # 开销有界；同基座内读取走缓存）
+                            a_sha, a_read_err = sha_of(a_resolved)
+                            if a_read_err is not None:
+                                acc = accessibility_for_error(a_read_err)
+                                obs["accessibility"] = acc
+                                report["local_archive_findings"].append({
+                                    "path": rel, "kind": "read-error",
+                                    "declared_path": declared_path,
+                                    "detail": f"存档字节读取失败: "
+                                              f"{stat_error_detail(a_read_err)}"})
+                            else:
+                                obs["accessibility"] = "accessible"
+                                obs["sha256_observed"] = a_sha
+                                obs["observed_at"] = datetime.now(
+                                    timezone.utc).isoformat()
+                                if hash_bindable:
+                                    obs["hash_check"] = (
+                                        "match-observed"
+                                        if a_sha == declared_sha
+                                        else "mismatch-observed")
+                                    if a_sha != declared_sha:
+                                        report["local_archive_findings"].append({
+                                            "path": rel,
+                                            "kind": "hash-mismatch-observed",
+                                            "declared_path": declared_path,
+                                            "declared_sha256_observed":
+                                                declared_sha,
+                                            "sha256_observed": a_sha,
+                                            "detail": "两时点哈希分列：声明"
+                                                      "观察时点与本次观察"
+                                                      "不一致；不判定哪一侧"
+                                                      "权威，不升级真实性"})
+                                elif hash_decls:
+                                    # 有哈希声明但未绑定（多值冲突/多路径）：
+                                    # 标注 unresolved，不冒充无声明
+                                    obs["hash_check"] = "unresolved-declared-hash"
+                                else:
+                                    obs["hash_check"] = "no-declared-hash"
+                    if obs["hash_check"] is None:
+                        obs["hash_check"] = "not-applicable"  # 未能观察字节
+                    observations.append(obs)
+
+                if len(distinct_paths) > 1:
+                    report["local_archive_findings"].append({
+                        "path": rel, "kind": "archive-conflict",
+                        "declared_paths": sorted(distinct_paths),
+                        "detail": "多个不同 local_archive 声明并存：逐项保留"
+                                  "观察，不选首条为权威"})
+                if hash_conflict:
+                    report["local_archive_findings"].append({
+                        "path": rel, "kind": "declared-hash-conflict",
+                        "declared_sha256_values": sorted(distinct_hashes),
+                        "detail": "多条不同 local_archive_sha256_observed "
+                                  "并存：逐值保留分列，不选首条为权威比对"
+                                  "基准，不静默绑定",
+                    })
+                if invalid_hash_values:
+                    invalid_orig = [d["value"] for d in hash_decls
+                                    if d["value_normalized"].lower()
+                                    in invalid_hash_values]
+                    report["local_archive_findings"].append({
+                        "path": rel, "kind": "invalid-hash",
+                        "value": invalid_orig[0] if invalid_orig else None,
+                        "values": invalid_orig,
+                        "detail": "local_archive_sha256_observed 非 64 位"
+                                  "十六进制，不作为比对基准",
+                    })
+                elif declared_sha is not None and len(distinct_paths) != 1:
+                    # 零路径或多路径：合法单一哈希无法唯一绑定
+                    report["local_archive_findings"].append({
+                        "path": rel, "kind": "unresolved-hash-binding",
+                        "declared_sha256_observed": declared_sha,
+                        "declared_paths": sorted(distinct_paths),
+                        "detail": ("零路径" if not distinct_paths else "多路径")
+                                  + "无法唯一绑定观察哈希：绑定保持"
+                                  " unresolved，不静默应用到任何一条",
+                    })
+                if observed_at_conflict:
+                    report["local_archive_findings"].append({
+                        "path": rel, "kind": "observed-at-conflict",
+                        "declared_observed_at_values": [
+                            d["value"] for d in observed_at_decls],
+                        "detail": "多条不同 local_archive_observed_at 并存："
+                                  "逐条保留，不选首条为权威观察时点",
+                    })
+                item["local_archive_observations"] = observations
 
             for key in ("provenance_class", "hash_semantics", "class_basis",
                         "hash_semantics_basis"):
@@ -976,7 +1473,14 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                 continue
             ev = {"path": s["path"], "declared_source":
                   item.get("declared_source")}
-            if item.get("boundary_violation"):
+            if item.get("source_kind") == "external-url":
+                # 外部URL声明：未联网核验，绝不落 resolvable-in-base
+                ev["source_kind"] = "external-url"
+                ev["verifiability"] = "external-not-verified"
+                ev["suggestion"] = ("外部网页来源未联网核验；人工核验，"
+                                    "或补充明确 local_archive 声明后再观察，"
+                                    "不自动回填本地 source")
+            elif item.get("boundary_violation"):
                 ev["verifiability"] = "boundary-violation"
                 ev["suggestion"] = "声明来源越界，人工核查来源指向"
             elif item.get("accessibility") == "missing" or \
@@ -1004,11 +1508,31 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                 "invalid_projections", "hash_mismatches",
                 "unverifiable_sources"):
         report[key] = sorted(report[key], key=lambda e: e["path"])
+    report["external_sources_unverified"] = sorted(
+        report["external_sources_unverified"],
+        key=lambda e: (e["path"], e["url"]))
+    report["source_declaration_errors"] = sorted(
+        report["source_declaration_errors"],
+        key=lambda e: (e["path"], e["field"], e["line"]))
+    report["source_declaration_conflicts"] = sorted(
+        report["source_declaration_conflicts"], key=lambda e: e["path"])
+    report["local_archive_findings"] = sorted(
+        report["local_archive_findings"],
+        key=lambda e: (e["path"], e.get("kind", ""),
+                       e.get("declared_path", "")))
     for key in report["gaps"]:
         report["gaps"][key] = sorted(report["gaps"][key],
                                      key=lambda e: e["path"])
     report["scan"]["complete"] = not (
         report["scan"]["inaccessible"] or report["scan"]["discovery_errors"])
+    # scan.complete 只覆盖声明的本地扫描范围；外部URL声明一律未核验
+    report["external_verification"] = {
+        "status": ("not-performed"
+                   if report["external_sources_unverified"]
+                   else "no-external-declarations"),
+        "note": "本工具绝不联网；外部URL声明未核验（unverified），"
+                "scan.complete 不包含外部来源可达性",
+    }
     return report
 
 
@@ -1020,6 +1544,10 @@ def has_findings(report: dict) -> bool:
         or report["invalid_projections"]
         or report["hash_mismatches"]
         or report["unverifiable_sources"]
+        or report["external_sources_unverified"]
+        or report["source_declaration_conflicts"]
+        or report["source_declaration_errors"]
+        or report["local_archive_findings"]
         or report["scan"]["inaccessible"]
         or report["scan"]["discovery_errors"]
     )
