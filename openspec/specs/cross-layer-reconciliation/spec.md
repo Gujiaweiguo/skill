@@ -2,9 +2,11 @@
 
 ## Purpose
 Defines the three pairwise reconciliation views (ontology-PRD, PRD-code, ontology-code), their drift/uncertainty/decision outcome vocabulary, evidence and coverage duties, and review-gated resolutions across the product layers.
+
 ## Requirements
+
 ### Requirement: The three product layers SHALL be reconciled pairwise
-For each in-scope product, governance SHALL be able to record separate reconciliation results for ontology-to-PRD, PRD-to-code, and ontology-to-code. Each result SHALL identify the compared artifact versions/revisions, timestamp, coverage and known scan limitations, evidence references, outcome, owner/reviewer, and required follow-up. A single aggregate status SHALL NOT replace the three pairwise results.
+For each in-scope product, governance SHALL be able to record separate reconciliation results for ontology-to-PRD, PRD-to-code, and ontology-to-code. Each result SHALL identify the compared artifact versions/revisions, timestamp, coverage and known scan limitations, evidence references, outcome, owner/reviewer, and required follow-up. A single aggregate status SHALL NOT replace the three pairwise results. A record produced for an incremental delivery SHALL declare its reconciliation scope explicitly (increment-scoped by default, or product-wide when a full scan was actually performed) and SHALL NOT present increment-scoped evidence as a product-level complete reconciliation; each record SHALL retain its pair, scope, compared revisions, coverage, and limitations regardless of scope kind. When a promotion or absorption touches only some layers, the three pairwise relations SHALL each be stated as affected, not-affected, not-checked, or not-applicable — a not-affected or not-applicable statement SHALL carry its basis — so that a small incremental correction does not mechanically require three full reports.
 
 #### Scenario: Full product reconciliation is requested
 - **WHEN** an owner requests a three-layer reconciliation for a product
@@ -13,6 +15,18 @@ For each in-scope product, governance SHALL be able to record separate reconcili
 #### Scenario: Only one pair can be inspected
 - **WHEN** a run has evidence for only one pair of layers
 - **THEN** it SHALL report that pair and mark the other comparisons not scanned or unavailable rather than implying full synchronization
+
+#### Scenario: Increment delivery closes with reconciliation
+- **WHEN** an incremental PRD is promoted or its returns are absorbed
+- **THEN** the reconciliation records SHALL declare increment-scoped coverage by default and SHALL NOT be reported as product-level complete alignment
+
+#### Scenario: Untouched pairs in an increment
+- **WHEN** an increment provably affects only one layer pair
+- **THEN** the other two pairs MAY be recorded as not-affected or not-applicable with their basis, instead of full per-pair reports
+
+#### Scenario: Impact check with no ontology change
+- **WHEN** an increment does not change product semantics and a reasoned no-change impact check is recorded
+- **THEN** the reconciliation SHALL accept the evidence-based no-change record for the ontology-related pairs without demanding a full comparison
 
 ### Requirement: Reconciliation SHALL distinguish drift from uncertainty and decisions
 Pairwise outcomes SHALL distinguish aligned, drifted, conflicting, missing, not-scanned, inaccessible, deferred, intentionally unsupported, and false-positive-corrected states as applicable. Findings SHALL record evidence and SHALL identify whether resolution requires ontology review, PRD/product decision, implementation work, scanner coverage, or no action.
@@ -51,3 +65,21 @@ When code/spec/test evidence is used to recover an existing product's ontology o
 - **WHEN** a code scan is used to draft ontology or PRD content
 - **THEN** reconciliation SHALL retain the code revision and coverage, identify generated content as proposed, and require OPC review before canonical promotion
 
+### Requirement: Reconciliation and return lifecycle statuses SHALL advance on completed facts, not elapsed time
+Advancing a reconciliation record or implementation return from `reviewed` to `absorbed` SHALL require completed facts and per-item disposition of every proposed update; advancement SHALL NOT occur because a status has dwelled for any number of days. Accepted canonical, code implemented, change archived, and published SHALL be recorded as independent facts without mutual inference.
+
+#### Scenario: Long-dwelling reviewed return is not auto-absorbed
+- **WHEN** a return has stayed at `reviewed` for an extended period
+- **THEN** its status SHALL NOT advance to `absorbed` without the per-item dispositions being completed, and the dwelling duration itself SHALL NOT be recorded as evidence of absorption
+
+#### Scenario: Takeover of a dwelling reviewed return
+- **WHEN** a session considers finishing the absorption of a `reviewed` return left by another session
+- **THEN** it SHALL first verify whether the absorption evidence is committed history or in-flight workspace state, and SHALL NOT take over in-flight half-finished work
+
+#### Scenario: Separate lifecycle facts recorded independently
+- **WHEN** a slice has been implemented and archived but not published, and its increment promoted to canonical
+- **THEN** each of accepted-canonical, implemented, archived, and published SHALL be recorded as independent facts without inferring any one from another
+
+#### Scenario: Optional reconciliation scope is absent
+- **WHEN** a legacy record omits reconciliation_scope
+- **THEN** readers SHALL report scope kind as undeclared, not infer product-wide or increment-scoped; the optional field SHALL NOT supply an implicit scope and new increment writers must explicitly declare their scope
