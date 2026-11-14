@@ -233,3 +233,66 @@ material-importer SHALL 维护唯一的证据边界 reference 文件，承载图
 
 - **WHEN** 报告输出需与共享 evidence_state 词表对齐
 - **THEN** 每一项映射 SHALL 在共享 reference 中给出语义依据（如 permission-denied→inaccessible），语义不满足的项 SHALL 保留本工具原生字段，SHALL NOT 强行映射
+
+### Requirement: 网页抓取声明 SHALL 与本地来源分开识别
+
+只读体检 SHALL 识别raw MD有界首部注释中的中文“来源 URL”“抓取时间”及source_url字段，并保留原字段、值、位置与声明性质。HTTP(S)来源 SHALL 不经文件路径解析且不访问网络，表达为declared、not-scanned、unknown-scope；SHALL NOT 因未联网而报告missing_source、missing_original或本地missing_hash，SHALL NOT 将声明抓取日期当作已核验历史事实。
+
+#### Scenario: 既有中文抓取头无需改写
+
+- **WHEN** raw MD首部注释含合法来源URL及抓取时间，正文或索引没有额外来源证据
+- **THEN** 工具 SHALL 保留URL及抓取时间声明，标明external-url与未联网核验，不输出该项missing_source或missing_original，不写回MD
+
+#### Scenario: 显式source中的网页URL不走文件系统
+
+- **WHEN** source或source_path的完整值为合法HTTP(S)URL
+- **THEN** 工具 SHALL 进入外部声明分支，不调用本地来源存在性或哈希检查，不报告该URL为缺失文件
+
+#### Scenario: URL只在声明位置识别
+
+- **WHEN** 正文、代码块或非首部注释中出现来源URL文字，或声明值不是合法HTTP(S)URL
+- **THEN** 工具 SHALL 不将其自动认定为有效网页来源；对首部畸形或不支持协议的URL声明列出诊断并保留原值，不尝试网络访问或猜测文件路径
+
+#### Scenario: 多项声明并存不被隐藏
+
+- **WHEN** 本地source、网页URL及多条URL声明同时存在
+- **THEN** 工具 SHALL 分别保留并校验本地来源和外部声明；相同URL可按去首尾空白后的精确值归组但保留全部位置，不同URL列声明冲突，不推断哪条更权威，也不以有效URL掩盖本地来源缺失或越界
+
+#### Scenario: 外部声明仍是未核验发现
+
+- **WHEN** 一项仅有网页来源声明且未联网核验
+- **THEN** 工具 SHALL 在独立外部来源未核验清单中稳定排序输出，发现退出码为3；该项不自动生成本地来源回填候选，不自动升级recorded-at-conversion或verified-historical
+
+### Requirement: 本地网页存档 SHALL 作为独立候选关系观察
+
+只读体检 SHALL 仅在存在明确local_archive声明时读取该关系，按当前公司边界检查路径并分开记录声明值、可访问性及当前哈希。网页URL、存档身份与存档哈希语义 SHALL 不互相替代；当前哈希 SHALL 标明观察时点，不冒充抓取时或转换时哈希。无明确关联声明时 SHALL NOT 按同名文件自动建立存档关系或写入元数据。
+
+#### Scenario: 当前存档存在与声明哈希分列
+
+- **WHEN** 明确local_archive在本公司内存在且可读
+- **THEN** 工具 SHALL 记录其当前路径、字节哈希和观察时点；如含local_archive_sha256_observed及观察时间，保留为既有声明并单列当前比对结果，哈希一致也只证明当前字节一致，不提升网页来源真实性
+
+#### Scenario: 存档缺失或读取失败与网页来源区分
+
+- **WHEN** 外部URL已声明但local_archive缺失、无权限或读取失败
+- **THEN** 工具 SHALL 分别保留外部未核验状态与存档检查失败原因，列为发现，不将本地存档问题解释成网页原件不存在
+
+#### Scenario: 存档越界不读取
+
+- **WHEN** local_archive为跨公司路径、基座外绝对路径或越界符号链接
+- **THEN** 工具 SHALL 报告边界问题且不读取目标内容，不复用其他公司的同名存档或哈希
+
+#### Scenario: 无存档声明不推断匹配
+
+- **WHEN** raw MD含来源URL，附近有同名HTML但没有明确local_archive声明
+- **THEN** 工具 SHALL 仅报告已声明URL，不自动将同名HTML列为已确认存档，不新增写入或转换时溯源分类
+
+#### Scenario: 旧本地来源行为与业务字节保留
+
+- **WHEN** 新版工具扫描原有本地source记录、旧backfilled记录及两家公司同名素材
+- **THEN** 原有本地分级、错误及公司隔离语义 SHALL 保留，全部公司业务文件字节不变；新增URL或存档声明不得隐藏原有本地缺口、伪造转换器签名或触发回填写入
+
+#### Scenario: 存档多声明与孤立哈希不任意绑定
+
+- **WHEN** 同一头部含不同local_archive路径，或只有游离的存档哈希而缺少可唯一绑定的路径
+- **THEN** 工具 SHALL 保留全部声明并报告冲突或未解决绑定，不选择首条存档为权威，不将一个哈希静默应用于多条存档
