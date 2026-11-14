@@ -77,3 +77,11 @@
 
 `check_docs_consistency.sh` exit 0（36 PASS）｜`check_skill_ecosystem.sh` exit 0｜四文件 pytest 113 passed exit 0｜`openspec validate --strict` exit 0｜tracked 改动 = 授权清单 10 文件，无越界；compat helper 与 pyproject 零改动；未 commit/archive/push。
 
+
+## 最终收尾状态（2026-11-14 追加）
+
+- **适用时点声明**：上文「实施验证记录」全部命令与计数（pytest 113 passed、双 script exit 0、strict validate exit 0、真实回执 CLI exit 1×2、样例 exit 0×2）是 2026-11-13/14 归档前工作区时点的实测，其内容对应实施提交 `111c9c0` 的树；本节追加时**未在新 HEAD 上重新执行**全套测试，不将旧证据改述为新 HEAD 复跑结果。
+- **实施提交**：`111c9c0b4820eeb2ba29f4116a24a63dd8674ba7`（feat(governance)：契约实施 12 文件 +879/−24，pre-commit 生态审计 PASS）。
+- **规格同步提交**：`70c83d952128754125726d7644b74d6c6e18e762`（docs(openspec)：主规格同步 3 文件 +190；111c9c0 为其祖先）。
+- **归档目录**：`openspec/changes/archive/2026-11-14-align-governance-handoff-contracts/`（gitignored 本地历史）；五坑后检全绿（Purpose 逐字带入、无 delta 头残留、MODIFIED 逐字承接）。
+- **推送状态**：本节写入时 push 尚未执行（上文「未 commit/archive/push」检查点适用于 2026-11-13/14 归档前时点，此后已被本节记录的提交与归档超越）；实际推送结果以会话内推后核验报告为准，不在本件预填。
