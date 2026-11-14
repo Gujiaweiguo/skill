@@ -40,6 +40,26 @@ compatibility: >
     PEP 723 inline deps in the script header document requirements but are not the primary run path.
   Cert expiry: pytesseract (optional, CPU-only, lightweight).
 change: >
+  v8.3 — 2026-11-14（inspect-material-source-fragments）
+  • provenance_inventory materials 片段来源观察：frontmatter source 完整字面路径
+  优先（含 #/括号/空格/分号），仅明确不存在（ENOENT）且符合受限 .jsonl 片段
+  语法时按首个 # 拆分容器与 fragment；ENOTDIR/EACCES/ELOOP 等观察失败不冒充
+  不存在、不触发截断回退（完整字面路径 resolve 遇 ELOOP 自环——pathlib 包成
+  RuntimeError 非 OSError——同样承接为观察失败，附 errno 证据，不崩溃不回退）；
+  容器检查沿用同公司边界与观察失败语义
+  • 新增 item 字段 source_expression_kind=local-file-fragment /
+  source_container / source_fragment / anchor_verification=not-performed /
+  container_accessibility / projection_accessibility 与顶层
+  material_source_fragment_findings（kind=anchor-not-verified|
+  container-missing|container-check-failed|container-boundary-violation，
+  纳入 rc=3）；--full-hash 容器观察字段 container_sha256_observed/
+  container_observed_at（当前观察，不冒充转换时哈希），默认不读容器正文、
+  不核验锚点；missing_original 在容器缺失时记容器并保留原声明与 fragment
+  • wrong_source_suspects 片段分支：fragment-not-verified / container-missing /
+  container-check-failed / boundary-violation（--full-hash 容器字节读取失败
+  同落 container-check-failed），不落 resolvable-in-base/
+  无需修复，不进回填候选，不建议自动重转；非片段/none/缺来源/描述性
+  source/raw 网页行为保持不变
   v8.2 — 2026-11-14（recognize-web-capture-provenance 复核遗漏补充，第三批）
   • 文首旧 source/source_path 一条 URL 一条本地路径（两种顺序）不再只取首条：
   双方都保留（URL 进声明表与 external_sources_unverified；本地取先出现的
@@ -208,7 +228,7 @@ uv run {baseDir}/scripts/provenance_inventory.py [--base $COMPANY_BASE] [--repor
   声明来源解析（含 symlink）越出基座 → `boundary-violation` 单列且不读取目标内容。
 - **退出码**：0=完成无缺口 / 1=工具失败 / 2=用法错误 / 3=完成且有发现（缺口清单含缺来源、
   缺哈希、缺原件、歧义匹配、manifest 损坏/记录冲突/产物缺失、边界问题、**未核验外部
-  网页声明、声明冲突/错误、存档发现**）。
+  网页声明、声明冲突/错误、存档发现、materials 片段锚点未核验**）。
   **「有发现」不是工具故障**——rc=3 时报告仍是完整可用的证据；URL-only 文章"未核验"
   即 rc=3，**不承诺体检归零**。
 - `--repair-candidates`：对缺溯源产物产候选（唯一 basename 匹配 → candidate-association
@@ -305,6 +325,49 @@ uv run {baseDir}/scripts/provenance_inventory.py [--base $COMPANY_BASE] [--repor
   套用到任何一条）。
 - **本 capability 不改**：source 回填写入（backfill_source.py）、转换器签名/代际、
   fragment 或描述性复合来源的自然语言拆分——均留独立范围。
+
+#### materials 片段来源观察（.jsonl#锚点，受限回退，v8.3）
+
+只针对 **materials frontmatter `source`** 的受限片段形态（真实锚点：
+`raw/_extracted/slides.jsonl#溯源系统证书-1.png`——OCR 抽取登记的"容器#图片名"）：
+
+- **字面路径优先**：完整 source 先按原流程解析；同公司内**现存普通文件**（文件名
+  含 `#`、括号、空格、分号也算）直接沿用完整字面来源，不拆、不检查另一条截断
+  路径。越界/resolve 错误/stat 错误直接终止（保留该诊断），**不借截断回退掩盖**；
+  现存目录/非普通文件按观察失败报告（不当作有效文件或缺失）。
+- **受限语法**（唯一回退条件 = 完整路径明确 ENOENT）：首个 `#` 两侧非空，左侧以
+  `.jsonl` 结尾且非 `scheme://`、无控制字符/中文分号；右侧无空白、控制字符、
+  中文分号、ASCII/全角括号。额外 `#` 与 `%xx` **原样保留不解码**，不把 fragment
+  当路径。空片段/URL/描述性文本/非 .jsonl 一律不拆，保留原有 missing_original
+  诊断（联友其余四条描述性来源即此类，缺口靠人工复核解释，不由工具猜测消除）。
+- **容器观察**（`container_accessibility`：accessible|missing|permission-denied|
+  inaccessible|not-regular-file|boundary-violation）：沿用同公司边界与观察失败
+  语义；越界（含跨公司 symlink）不读目标内容、不跨公司复用同名容器。容器可访问
+  时 `source`=容器基座内相对路径、`hash_check=unknown-scope`、
+  `projection_accessibility` 单列材料自身读取状态；**锚点一律
+  `anchor_verification=not-performed`**——默认不读容器正文、不在内容中匹配
+  fragment、不做文本解码（容器坏编码不是锚点失败），`scan.complete` 不代表锚点
+  已核验。
+- **报告**：顶层 `material_source_fragment_findings[]`（始终存在，按 path/kind/
+  容器/fragment 稳定排序；每项含 declared_source 原整串、source_container、
+  source_fragment、kind、reason），独立计入 rc=3——容器存在也是发现
+  （anchor-not-verified）。容器缺失时 `missing_original` 记**容器**而非原整串，
+  并保留原声明与 fragment。`--full-hash` 观察容器记
+  `container_sha256_observed`/`container_observed_at`（当前观察，**不写
+  source_sha256、不冒充转换时哈希**）；字节读取失败（任意 OSError：EACCES/
+  EIO/…）与 stat 存在分开表达——`container_accessibility` 仍记 stat 观察、
+  `container_hash_error` 保留 errno、`container_hash_check=not-completed`、
+  `hash_check=not-applicable`，finding kind 与 repair 诊断一致为
+  container-check-failed，不产生容器哈希、`anchor_verification` 保持
+  not-performed。
+- **修复诊断**：片段条目已有声明，永不进 `repair_candidates`、不自动生成来源
+  回填；`wrong_source_suspects` 记 verifiability=fragment-not-verified /
+  container-missing / container-check-failed / boundary-violation（附人工核查
+  建议），不落 resolvable-in-base/无需修复，不建议自动重转。
+- **非目标**：不解析四条描述性/复合来源、不剥括号、不推断"同名.md"、不扩大
+  materials URL 支持、不改 raw 网页识别、不改转换器与回填写入、不要求公司资料
+  增补字段；本能力不承诺全库清零（未核验计数独立存在）。后续片段类型（非
+  .jsonl）需独立扩展用例与范围，不做通用 fragment 解析框架。
 
 ### 转换指纹与增量重跑（convert_doc / convert_excel）
 

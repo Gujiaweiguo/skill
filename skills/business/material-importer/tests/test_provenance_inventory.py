@@ -5,6 +5,7 @@
 核心纪律断言：零业务写入（前后 {relpath: sha256} 快照完全相等）。
 """
 
+import errno
 import hashlib
 import json
 import os
@@ -1583,6 +1584,633 @@ class ReviewGapFixRegressionTest(unittest.TestCase):
                           for e in report["external_sources_unverified"]],
                          [("raw/b6.md", WEB_URL)])
         self.assertEqual(snapshot(self.base), before)  # 零写入
+
+
+# --- inspect-material-source-fragments：materials 片段来源回归（任务 1.1 / 2.1）---
+# 真实锚点（只读登记于 tests/fixtures_registry.json，正文不复制）：
+#   lianyou materials frontmatter source = raw/_extracted/slides.jsonl#溯源系统证书-1.png
+#   —— 完整字面文件不存在、容器存在。旧实现把整串当文件路径误报 missing_original。
+# 核心测试全部合成基座；语法守卫以联友其余四条描述性/复合来源为同构校准，
+# 保证它们保持 missing_original 诊断不变（不借猜测拆分消除真实缺口）。
+
+
+def write_material_md(base: Path, rel: str, source: str | None) -> Path:
+    p = base / "materials" / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    if source is None:
+        p.write_text("无 frontmatter 正文\n", encoding="utf-8")
+    else:
+        p.write_text(f"---\nsource: {source}\n---\n\n正文\n", encoding="utf-8")
+    return p
+
+
+def snapshot_all(root: Path) -> dict:
+    """零写入断言用全树快照（覆盖基座外哨兵/双公司文件）。
+
+    普通文件按字节哈希；symlink 按链接目标记录（自环/越界链接的目标字节
+    既不可读也不该读——链接身份即其内容）。
+    """
+    out = {}
+    for cur, dirs, files in os.walk(root):
+        for name in dirs + files:
+            p = Path(cur) / name
+            rel = p.relative_to(root).as_posix()
+            if p.is_symlink():
+                out[rel] = "symlink:" + os.readlink(p)
+            elif p.is_file():
+                out[rel] = sha(p.read_bytes())
+    return out
+
+
+FRAG_CERT = "raw/_extracted/slides.jsonl#溯源系统证书-1.png"
+
+
+class MaterialFragmentSourceSyntaxTest(unittest.TestCase):
+    """任务 1.1：字面路径优先 + 受限 .jsonl 片段语法 + 兼容守卫（先红后绿）。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.base = make_base(self.root)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _frag_findings(self, report: dict) -> list[dict]:
+        return report.get("material_source_fragment_findings", [])
+
+    def _gaps_for(self, report: dict, rel: str) -> dict:
+        return {k: [g for g in v if g["path"] == rel]
+                for k, v in report["gaps"].items()}
+
+    # 完整#文件与截断容器同时存在 → 字面完整路径优先，不拆
+    def test_literal_hash_path_wins_over_truncated_container(self):
+        (self.base / "raw" / "deck.jsonl").write_bytes(b"CONTAINER")
+        literal = self.base / "raw" / "deck.jsonl#slide 1.png"
+        literal.write_bytes(b"LITERAL-FILE")
+        write_material_md(self.base, "幻灯.md", "raw/deck.jsonl#slide 1.png")
+        before = snapshot_all(self.root)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["materials/幻灯.md"]
+        self.assertEqual(item["source_nature"], "declared")
+        self.assertEqual(item["source"], "raw/deck.jsonl#slide 1.png")
+        self.assertEqual(item["source_accessibility"], "accessible")
+        self.assertNotIn("source_expression_kind", item)   # 不拆 fragment
+        self.assertNotIn("source_container", item)
+        self.assertNotIn("source_fragment", item)
+        self.assertEqual(self._gaps_for(report, "materials/幻灯.md")
+                         ["missing_original"], [])
+        self.assertEqual(
+            [f for f in self._frag_findings(report)
+             if f["path"] == "materials/幻灯.md"], [])
+        self.assertEqual(snapshot_all(self.root), before)      # 零写入
+
+    # .jsonl 合法片段：容器可访问 → 锚点未核验单列，rc3，不再误报 missing_original
+    def test_jsonl_fragment_container_accessible_anchor_not_verified(self):
+        container = self.base / "raw" / "_extracted" / "slides.jsonl"
+        container.parent.mkdir(parents=True)
+        container.write_bytes(b'{"image": "\xff\x00\xfebinary"}')  # 坏编码容器
+        write_material_md(self.base, "证书.md", FRAG_CERT)
+        before = snapshot_all(self.root)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["materials/证书.md"]
+        self.assertEqual(item["source_nature"], "declared")
+        self.assertEqual(item["link_state"], "declared")
+        self.assertEqual(item["declared_source"], FRAG_CERT)   # 原整串保留
+        self.assertEqual(item["source_expression_kind"],
+                         "local-file-fragment")
+        self.assertEqual(item["source_container"],
+                         "raw/_extracted/slides.jsonl")
+        self.assertEqual(item["source_fragment"], "溯源系统证书-1.png")
+        self.assertEqual(item["anchor_verification"], "not-performed")
+        self.assertEqual(item["container_accessibility"], "accessible")
+        self.assertEqual(item["projection_accessibility"], "accessible")
+        self.assertEqual(item["source"], "raw/_extracted/slides.jsonl")
+        self.assertEqual(item["hash_check"], "unknown-scope")
+        # 默认不读容器正文：无哈希观察字段；坏编码不是锚点失败
+        self.assertNotIn("container_sha256_observed", item)
+        findings = [f for f in self._frag_findings(report)
+                    if f["path"] == "materials/证书.md"]
+        self.assertEqual(len(findings), 1)
+        f = findings[0]
+        self.assertEqual(f["kind"], "anchor-not-verified")
+        self.assertEqual(f["declared_source"], FRAG_CERT)
+        self.assertEqual(f["source_container"], "raw/_extracted/slides.jsonl")
+        self.assertEqual(f["source_fragment"], "溯源系统证书-1.png")
+        self.assertTrue(f["reason"])
+        # 不再误报 missing_original；未核验独立计数 → 有发现
+        self.assertEqual(self._gaps_for(report, "materials/证书.md")
+                         ["missing_original"], [])
+        self.assertTrue(pi.has_findings(report))
+        r = run_cli(self.base)
+        self.assertEqual(r.returncode, 3)
+        self.assertEqual(snapshot_all(self.root), before)      # 零写入
+
+    # 多个 # 与 %2F 原样保留：按首个 # 拆分，不做 URL 解码
+    def test_fragment_multiple_hash_and_percent_untouched(self):
+        (self.base / "raw" / "s.jsonl").write_bytes(b"S")
+        write_material_md(self.base, "多号.md", "raw/s.jsonl#a#b%2Fc.png")
+        report = pi.run_inventory(self.base)
+        item = report["items"]["materials/多号.md"]
+        self.assertEqual(item["source_container"], "raw/s.jsonl")
+        self.assertEqual(item["source_fragment"], "a#b%2Fc.png")  # 原样
+        self.assertEqual(item["source"], "raw/s.jsonl")           # 不解码
+
+    # 兼容守卫：空值/空片段/URL/非 .jsonl/说明文本 → 保留完整路径诊断，不拆
+    def test_restricted_syntax_guards_keep_full_path_diagnosis(self):
+        cases = [
+            ("空片段.md", "raw/x.jsonl#"),
+            ("非jsonl.md", "raw/notes.csv#frag"),
+            ("url.md", "https://mp.example.invalid/a.jsonl#f"),
+            ("scheme.md", "file:///opt/x/slides.jsonl#f"),
+            ("片段空白.md", "raw/x.jsonl#证 书.png"),
+            ("片段括注.md", "raw/x.jsonl#证书（见附注）.png"),
+            ("片段分号.md", "raw/x.jsonl#证书；见附注"),
+            ("左侧分号.md", "raw/a.jsonl；见附注#证书"),
+            ("左侧括注.md", "raw/考证/slides.jsonl（OCR版）#证书"),
+            ("控制字符.md", "raw/x.jsonl#证书\t.png"),
+        ]
+        for rel, src in cases:
+            write_material_md(self.base, rel, src)
+        before = snapshot_all(self.root)
+        report = pi.run_inventory(self.base)
+        for rel, src in cases:
+            mrel = f"materials/{rel}"
+            item = report["items"][mrel]
+            self.assertEqual(item["declared_source"], src, mrel)
+            self.assertNotIn("source_expression_kind", item, mrel)
+            self.assertNotIn("source_container", item, mrel)
+            self.assertEqual(
+                len(self._gaps_for(report, mrel)["missing_original"]), 1, mrel)
+            self.assertEqual(
+                [f for f in self._frag_findings(report) if f["path"] == mrel],
+                [], mrel)
+        self.assertEqual(snapshot_all(self.root), before)      # 零写入
+
+    # 兼容守卫：联友其余四条描述性/复合来源同构 → 诊断保持不变
+    def test_four_descriptive_shapes_unchanged(self):
+        shapes = [
+            "incoming/战略分析素材/微信图片×2；出处已确认（2026-08-28）＝竞品方案"
+            "文件《某建议》§三（materials/13-competitors/某建议.md）——截图为局部",
+            "国家/省两级政策文件（incoming PDF OCR）+ 政府官网核验（gov.cn）",
+            "联网检索（厂商官网/行业报道，厂商自述未实测）+ 用户补充画像"
+            "（2026-08-27 会话，待第二来源核验）",
+            "incoming/战略分析素材/某方案.pdf（竞品方案文件，2026-08-20，7 页；"
+            "出自哪家竞品待确认 #12）；转换件 raw/战略分析素材/同名.md（pypdf 文本层）",
+        ]
+        for i, src in enumerate(shapes):
+            write_material_md(self.base, f"描述{i}.md", src)
+        report = pi.run_inventory(self.base)
+        for i, src in enumerate(shapes):
+            mrel = f"materials/描述{i}.md"
+            item = report["items"][mrel]
+            self.assertEqual(item["declared_source"], src, mrel)
+            self.assertNotIn("source_expression_kind", item, mrel)
+            self.assertEqual(
+                len(self._gaps_for(report, mrel)["missing_original"]), 1, mrel)
+        self.assertEqual(self._frag_findings(report), [])
+
+    # 兼容守卫：source:none / 缺来源行为不变，不进片段逻辑
+    def test_none_and_missing_source_unchanged(self):
+        (self.base / "raw" / "c.jsonl").write_bytes(b"C")
+        write_material_md(self.base, "authored.md", "none")
+        write_material_md(self.base, "nosrc.md", None)
+        write_material_md(self.base, "frag.md", "raw/c.jsonl#锚.png")
+        report = pi.run_inventory(self.base)
+        authored = report["items"]["materials/authored.md"]
+        self.assertEqual(authored["source_nature"], "none")
+        nosrc = report["items"]["materials/nosrc.md"]
+        self.assertEqual(nosrc["source_nature"], "none")
+        self.assertEqual(
+            len(self._gaps_for(report, "materials/nosrc.md")["missing_source"]),
+            1)
+        frag = report["items"]["materials/frag.md"]
+        self.assertEqual(frag["source_nature"], "declared")
+        self.assertEqual(
+            len(self._gaps_for(report, "materials/frag.md")["missing_source"]),
+            0)
+
+
+class MaterialFragmentContainerStateTest(unittest.TestCase):
+    """任务 2.1：容器状态矩阵 / 回退阻断 / 越界不读 / full-hash / rc3 / repair。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.base = make_base(self.root)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _frag_findings(self, report: dict) -> list[dict]:
+        return report.get("material_source_fragment_findings", [])
+
+    def _gaps_for(self, report: dict, rel: str) -> dict:
+        return {k: [g for g in v if g["path"] == rel]
+                for k, v in report["gaps"].items()}
+
+    def _finding(self, report: dict, mrel: str) -> dict:
+        f = [x for x in self._frag_findings(report) if x["path"] == mrel]
+        self.assertEqual(len(f), 1, mrel)
+        return f[0]
+
+    # 容器缺失：missing_original 记容器而非原整串，原声明与 fragment 保留
+    def test_container_missing_records_container_not_whole_string(self):
+        write_material_md(self.base, "缺容器.md", FRAG_CERT)
+        before = snapshot_all(self.root)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["materials/缺容器.md"]
+        self.assertEqual(item["container_accessibility"], "missing")
+        self.assertEqual(item["accessibility"], "missing")
+        self.assertEqual(item["declared_source"], FRAG_CERT)
+        self.assertEqual(item["source_container"], "raw/_extracted/slides.jsonl")
+        self.assertEqual(item["source_fragment"], "溯源系统证书-1.png")
+        self.assertEqual(item["anchor_verification"], "not-performed")
+        gaps = self._gaps_for(report, "materials/缺容器.md")["missing_original"]
+        self.assertEqual(len(gaps), 1)
+        self.assertEqual(gaps[0]["declared_source"], FRAG_CERT)
+        self.assertEqual(gaps[0]["source_container"],
+                         "raw/_extracted/slides.jsonl")
+        self.assertEqual(gaps[0]["source_fragment"], "溯源系统证书-1.png")
+        f = self._finding(report, "materials/缺容器.md")
+        self.assertEqual(f["kind"], "container-missing")
+        self.assertTrue(pi.has_findings(report))
+        self.assertEqual(snapshot_all(self.root), before)      # 零写入
+
+    # 容器是目录：不把目录当可用容器，不判锚点无效，不记 missing
+    def test_container_directory_not_usable(self):
+        (self.base / "raw" / "dir.jsonl").mkdir(parents=True)
+        write_material_md(self.base, "目录容器.md", "raw/dir.jsonl#锚.png")
+        report = pi.run_inventory(self.base)
+        item = report["items"]["materials/目录容器.md"]
+        self.assertEqual(item["container_accessibility"], "not-regular-file")
+        f = self._finding(report, "materials/目录容器.md")
+        self.assertEqual(f["kind"], "container-check-failed")
+        self.assertEqual(
+            self._gaps_for(report, "materials/目录容器.md")["missing_original"],
+            [])
+        self.assertTrue(pi.has_findings(report))
+
+    # 容器 stat 观察失败（ELOOP 自环 symlink，root 也生效）：按失败报告，不判缺失
+    def test_container_stat_error_eloop_reported(self):
+        loop = self.base / "incoming" / "loop.jsonl"
+        loop.symlink_to("loop.jsonl")   # 自环
+        write_material_md(self.base, "环容器.md", "incoming/loop.jsonl#锚.png")
+        report = pi.run_inventory(self.base)
+        item = report["items"]["materials/环容器.md"]
+        self.assertEqual(item["container_accessibility"], "inaccessible")
+        self.assertEqual(
+            self._gaps_for(report, "materials/环容器.md")["missing_original"],
+            [])
+        unver = [u for u in report["unverifiable_sources"]
+                 if u["path"] == "materials/环容器.md"]
+        self.assertEqual(len(unver), 1)
+        self.assertIn("ELOOP", unver[0]["reason"])
+        f = self._finding(report, "materials/环容器.md")
+        self.assertEqual(f["kind"], "container-check-failed")
+
+    # 完整字面路径 stat 失败（EACCES）不得触发截断回退
+    @unittest.skipIf(os.geteuid() == 0, "root 无视权限位，chmod 000 不生效")
+    def test_full_literal_stat_error_no_truncation_fallback(self):
+        locked = self.base / "incoming" / "locked"
+        locked.mkdir()
+        (locked / "slides.jsonl").write_bytes(b"CONTAINER-INSIDE")
+        write_material_md(self.base, "锁定.md", "incoming/locked/slides.jsonl#锚.png")
+        os.chmod(locked, 0o000)
+        try:
+            report = pi.run_inventory(self.base)
+        finally:
+            os.chmod(locked, 0o755)
+        item = report["items"]["materials/锁定.md"]
+        self.assertEqual(item["accessibility"], "permission-denied")
+        self.assertNotIn("source_expression_kind", item)   # 不回退拆分
+        self.assertNotIn("source_container", item)
+        self.assertEqual(self._frag_findings(report), [])   # 不产生片段发现
+        unver = [u for u in report["unverifiable_sources"]
+                 if u["path"] == "materials/锁定.md"]
+        self.assertEqual(len(unver), 1)
+        self.assertIn("EACCES", unver[0]["reason"])
+        self.assertEqual(
+            self._gaps_for(report, "materials/锁定.md")["missing_original"], [])
+
+    # 完整字面路径越界不得触发截断回退（哨兵文件字节不变）
+    def test_full_literal_boundary_no_truncation_fallback(self):
+        outside = self.root / "elsewhere" / "slides.jsonl"
+        outside.parent.mkdir(parents=True, exist_ok=True)
+        outside.write_bytes(b"SENTINEL-BYTES")
+        write_material_md(self.base, "越界整串.md", "../elsewhere/slides.jsonl#锚.png")
+        before = snapshot_all(self.root)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["materials/越界整串.md"]
+        self.assertNotIn("source_expression_kind", item)
+        bv = [b for b in report["boundary_violations"]
+              if b["path"] == "materials/越界整串.md"]
+        self.assertEqual(len(bv), 1)
+        self.assertEqual(bv[0]["declared_source"],
+                         "../elsewhere/slides.jsonl#锚.png")  # 整串入报
+        self.assertEqual(self._frag_findings(report), [])
+        self.assertEqual(snapshot_all(self.root), before)      # 零写入
+
+    # 容器为跨公司符号链接 → 越界不读（--full-hash 也不产生容器哈希）
+    def test_container_symlink_cross_company_boundary_not_read(self):
+        co_b = make_base(self.root, "co2")
+        target = co_b / "raw" / "same.jsonl"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"COMPANY-B-SECRET")
+        link = self.base / "incoming" / "link.jsonl"
+        link.symlink_to(target)
+        write_material_md(self.base, "跨链.md", "incoming/link.jsonl#锚.png")
+        before = snapshot_all(self.root)
+        report = pi.run_inventory(self.base, full_hash=True)
+        item = report["items"]["materials/跨链.md"]
+        self.assertEqual(item["container_accessibility"],
+                         "boundary-violation")
+        self.assertNotIn("container_sha256_observed", item)  # 不读目标
+        self.assertNotIn("source", item)                     # 不给解析路径
+        bv = [b for b in report["boundary_violations"]
+              if b["path"] == "materials/跨链.md"]
+        self.assertEqual(len(bv), 1)
+        f = self._finding(report, "materials/跨链.md")
+        self.assertEqual(f["kind"], "container-boundary-violation")
+        self.assertEqual(snapshot_all(self.root), before)      # 零写入（含 co-b）
+
+    # 双公司同名容器：各观察各的，不跨公司复用
+    def test_dual_company_same_container_each_own(self):
+        co_b = make_base(self.root, "co2")
+        for b, data in ((self.base, b"COMPANY-A"), (co_b, b"COMPANY-B")):
+            (b / "raw").mkdir(exist_ok=True)
+            (b / "raw" / "same.jsonl").write_bytes(data)
+            write_material_md(b, "同名.md", "raw/same.jsonl#锚.png")
+        ra = pi.run_inventory(self.base, full_hash=True)
+        rb = pi.run_inventory(co_b, full_hash=True)
+        for rep, data in ((ra, b"COMPANY-A"), (rb, b"COMPANY-B")):
+            item = rep["items"]["materials/同名.md"]
+            self.assertEqual(item["container_accessibility"], "accessible")
+            self.assertEqual(item["container_sha256_observed"], sha(data))
+            self.assertEqual(self._finding(rep, "materials/同名.md")["kind"],
+                             "anchor-not-verified")
+
+    # --full-hash：容器观察命名不冒充转换哈希；默认不读容器正文
+    def test_full_hash_container_observation_fields(self):
+        container = self.base / "raw" / "_extracted" / "slides.jsonl"
+        container.parent.mkdir(parents=True)
+        container.write_bytes(b"JSONL-BYTES")
+        write_material_md(self.base, "哈希.md", FRAG_CERT)
+        default = pi.run_inventory(self.base)
+        self.assertNotIn("container_sha256_observed",
+                         default["items"]["materials/哈希.md"])
+        full = pi.run_inventory(self.base, full_hash=True)
+        item = full["items"]["materials/哈希.md"]
+        self.assertEqual(item["container_sha256_observed"], sha(b"JSONL-BYTES"))
+        self.assertTrue(item["container_observed_at"])
+        self.assertEqual(item["hash_check"], "unknown-scope")
+        for key in item:                                  # 不写 source_sha256*
+            self.assertFalse(key.startswith("source_sha256"), key)
+
+    # --full-hash 容器读取失败：明确列错误，不冒充观察成功
+    @unittest.skipIf(os.geteuid() == 0, "root 无视权限位，chmod 000 不生效")
+    def test_full_hash_container_read_failure_listed(self):
+        container = self.base / "raw" / "slides.jsonl"
+        container.write_bytes(b"SECRET-CONTAINER")
+        write_material_md(self.base, "读失败.md", "raw/slides.jsonl#锚.png")
+        os.chmod(container, 0o000)
+        try:
+            report = pi.run_inventory(self.base, full_hash=True)
+            rep = pi.run_inventory(self.base, full_hash=True,
+                                   repair_candidates=True)
+        finally:
+            os.chmod(container, 0o644)
+        item = report["items"]["materials/读失败.md"]
+        # stat 成功 + read EACCES：stat 存在与读取失败分开表达，
+        # 状态/诊断/repair 一致为 container-check-failed，不假装观察成功
+        self.assertEqual(item["container_accessibility"], "accessible")
+        self.assertEqual(item["hash_check"], "not-applicable")
+        self.assertEqual(item.get("container_hash_check"), "not-completed")
+        self.assertIn("EACCES", item.get("container_hash_error", ""))
+        self.assertNotIn("container_sha256_observed", item)
+        self.assertNotIn("container_observed_at", item)
+        self.assertEqual(item["anchor_verification"], "not-performed")
+        unver = [u for u in report["unverifiable_sources"]
+                 if u["path"] == "materials/读失败.md"]
+        self.assertEqual(len(unver), 1)
+        self.assertIn("EACCES", unver[0]["reason"])
+        self.assertEqual(self._finding(report, "materials/读失败.md")["kind"],
+                         "container-check-failed")
+        suspects = {s["path"]: s for s in rep["wrong_source_suspects"]}
+        self.assertEqual(suspects["materials/读失败.md"]["verifiability"],
+                         "container-check-failed")
+
+    # 仅锚点未核验发现 → rc3；scan.complete 不得解读为锚点已核验
+    def test_anchor_only_finding_drives_rc3(self):
+        container = self.base / "raw" / "_extracted" / "slides.jsonl"
+        container.parent.mkdir(parents=True)
+        container.write_bytes(b"C")
+        write_material_md(self.base, "唯一.md", FRAG_CERT)
+        before = snapshot_all(self.root)
+        r = run_cli(self.base)
+        self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
+        self.assertEqual(snapshot_all(self.root), before)      # 零写入
+        report = json.loads(r.stdout)
+        for kind, entries in report["gaps"].items():
+            self.assertEqual(entries, [], kind)            # 无任何缺口
+        self.assertEqual(report["boundary_violations"], [])
+        self.assertEqual(report["unverifiable_sources"], [])
+        self.assertEqual(len(self._frag_findings(report)), 1)
+        self.assertTrue(report["scan"]["complete"])        # 本地枚举完整
+        self.assertEqual(self._frag_findings(report)[0]["kind"],
+                         "anchor-not-verified")
+
+    # 报告稳定排序：按材料 path、kind、容器、fragment
+    def test_findings_sorted_stably(self):
+        names = ["m2", "m0", "m1"]
+        for n in names:
+            (self.base / "raw" / f"{n}.jsonl").write_bytes(b"X")
+            write_material_md(self.base, f"{n}.md", f"raw/{n}.jsonl#锚{n}.png")
+        report = pi.run_inventory(self.base)
+        findings = self._frag_findings(report)
+        self.assertEqual([f["path"] for f in findings],
+                         ["materials/m0.md", "materials/m1.md",
+                          "materials/m2.md"])
+        keys = [(f["path"], f.get("kind", ""), f.get("source_container", ""),
+                 f.get("source_fragment", "")) for f in findings]
+        self.assertEqual(keys, sorted(keys))
+
+    # repair 模式：fragment-not-verified / 容器错误分支，不落回填候选与无需修复
+    def test_repair_mode_fragment_diagnostics(self):
+        # 可访问 / 缺失 / 越界(symlink) / stat失败(自环)
+        (self.base / "raw" / "ok.jsonl").write_bytes(b"OK")
+        link = self.base / "incoming" / "link.jsonl"
+        outside = self.root / "elsewhere" / "x.jsonl"
+        outside.parent.mkdir(parents=True, exist_ok=True)
+        outside.write_bytes(b"OUT")
+        link.symlink_to(outside)
+        loop = self.base / "incoming" / "loop.jsonl"
+        loop.symlink_to("loop.jsonl")
+        write_material_md(self.base, "a可访问.md", "raw/ok.jsonl#锚.png")
+        write_material_md(self.base, "b缺失.md", "raw/none.jsonl#锚.png")
+        write_material_md(self.base, "c越界.md", "incoming/link.jsonl#锚.png")
+        write_material_md(self.base, "d失败.md", "incoming/loop.jsonl#锚.png")
+        before = snapshot_all(self.root)
+        report = pi.run_inventory(self.base, repair_candidates=True)
+        suspects = {s["path"]: s for s in report["wrong_source_suspects"]}
+        s = suspects["materials/a可访问.md"]
+        self.assertEqual(s["verifiability"], "fragment-not-verified")
+        self.assertNotEqual(s["verifiability"], "resolvable-in-base")
+        self.assertIn("人工", s["suggestion"])
+        self.assertEqual(suspects["materials/b缺失.md"]["verifiability"],
+                         "container-missing")
+        self.assertEqual(suspects["materials/c越界.md"]["verifiability"],
+                         "boundary-violation")
+        self.assertEqual(suspects["materials/d失败.md"]["verifiability"],
+                         "container-check-failed")
+        for s in suspects.values():
+            self.assertNotIn("无需修复", json.dumps(s, ensure_ascii=False))
+            self.assertNotIn("reconvert", json.dumps(s, ensure_ascii=False))
+        rep_paths = [x["path"] for x in report["repair_candidates"]]
+        for mrel in ("materials/a可访问.md", "materials/b缺失.md",
+                     "materials/c越界.md", "materials/d失败.md"):
+            self.assertNotIn(mrel, rep_paths)             # 不进回填候选
+        self.assertEqual(snapshot_all(self.root), before)      # 零写入
+
+    # 旧行为与零业务写入保留：普通本地/none/缺来源/raw网页/materials片段同跑
+    def test_mixed_legacy_and_fragment_in_one_run(self):
+        (self.base / "incoming" / "orig.docx").write_bytes(b"O")
+        write_raw_md(self.base, "doc.md", "incoming/orig.docx", sha(b"O"))
+        head = f"<!--\n来源 URL: {WEB_URL}\n抓取时间: 2026-11-07\n-->\n"
+        write_raw_md_head(self.base, "web.md", head)
+        write_material_md(self.base, "authored.md", "none")
+        write_material_md(self.base, "nosrc.md", None)
+        (self.base / "raw" / "slides.jsonl").write_bytes(b"J")
+        write_material_md(self.base, "frag.md", "raw/slides.jsonl#锚.png")
+        before = snapshot_all(self.root)
+        r = run_cli(self.base, "--repair-candidates")
+        self.assertEqual(r.returncode, 3)
+        self.assertEqual(snapshot_all(self.root), before)      # 零写入
+        report = json.loads(r.stdout)
+        self.assertEqual(report["items"]["raw/doc.md"]["hash_check"], "match")
+        self.assertEqual(report["items"]["raw/web.md"]["source_kind"],
+                         "external-url")
+        self.assertEqual(report["items"]["materials/authored.md"]
+                         ["source_nature"], "none")
+        self.assertEqual(report["items"]["materials/nosrc.md"]
+                         ["source_nature"], "none")
+        frag = report["items"]["materials/frag.md"]
+        self.assertEqual(frag["source_nature"], "declared")
+        self.assertEqual(frag["source_expression_kind"],
+                         "local-file-fragment")
+        self.assertEqual(len(self._frag_findings(report)), 1)
+
+
+class MaterialFragmentGuardedResolveFixTest(unittest.TestCase):
+    """有界修复回归（2026-11-14 第二批）：
+    1) materials 完整字面 source 在 resolve 抛 RuntimeError（pathlib 将 ELOOP
+       自环包成 RuntimeError，非 OSError）时不得崩溃：按观察失败上报
+       （附 ELOOP errno 证据），不回退拆分、不冒充缺失，其余条目继续；
+    2) --full-hash+repair 下容器字节读取失败（任意 OSError，不限于 EACCES）：
+       实际读取失败与 stat 存在分开表达，状态/诊断/repair 一致为
+       container-check-failed，hash_check 明确未完成，不产生容器哈希，
+       不抹去 anchor_verification=not-performed。
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.base = make_base(self.root)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _gaps_for(self, report: dict, rel: str) -> dict:
+        return {k: [g for g in v if g["path"] == rel]
+                for k, v in report["gaps"].items()}
+
+    def _finding(self, report: dict, mrel: str) -> dict:
+        f = [x for x in report["material_source_fragment_findings"]
+             if x["path"] == mrel]
+        self.assertEqual(len(f), 1, mrel)
+        return f[0]
+
+    # 修复1：片段形态与普通完整路径的自环 symlink → run_inventory 不崩溃，
+    # 观察失败（ELOOP 证据），不回退，不误报缺失；正常材料继续处理
+    def test_full_literal_eloop_selfloop_no_crash(self):
+        (self.base / "raw" / "a.jsonl").write_bytes(b"A-CONTAINER")
+        loop_frag = self.base / "raw" / "a.jsonl#image.png"
+        loop_frag.symlink_to("a.jsonl#image.png")          # 自环
+        loop_plain = self.base / "raw" / "loopplain.bin"
+        loop_plain.symlink_to("loopplain.bin")             # 普通完整路径自环
+        write_material_md(self.base, "片段环.md", "raw/a.jsonl#image.png")
+        write_material_md(self.base, "普通环.md", "raw/loopplain.bin")
+        write_material_md(self.base, "正常.md", "raw/a.jsonl")
+        before = snapshot_all(self.root)
+        report = pi.run_inventory(self.base)               # 不得抛 RuntimeError
+        for mrel in ("materials/片段环.md", "materials/普通环.md"):
+            item = report["items"][mrel]
+            self.assertEqual(item["source_nature"], "declared", mrel)
+            self.assertEqual(item["hash_check"], "not-applicable", mrel)
+            self.assertNotIn("source_expression_kind", item, mrel)   # 不回退
+            self.assertNotIn("source_container", item, mrel)
+            unver = [u for u in report["unverifiable_sources"]
+                     if u["path"] == mrel]
+            self.assertEqual(len(unver), 1, mrel)
+            self.assertIn("ELOOP", unver[0]["reason"], mrel)         # errno 证据
+            self.assertEqual(
+                self._gaps_for(report, mrel)["missing_original"], [],
+                mrel)                                                # 不冒充缺失
+            self.assertEqual(
+                [f for f in report["material_source_fragment_findings"]
+                 if f["path"] == mrel], [], mrel)
+        ok = report["items"]["materials/正常.md"]          # 其余条目继续
+        self.assertEqual(ok["source"], "raw/a.jsonl")
+        self.assertEqual(ok["source_accessibility"], "accessible")
+        self.assertEqual(snapshot_all(self.root), before)  # 零写入
+
+    # 修复2：patch Path.read_bytes 注入 EACCES 与 EIO（任意 OSError）——
+    # stat 存在与读取失败分开表达，三处（状态/诊断/repair）一致
+    def test_full_hash_container_read_oserror_check_failed(self):
+        for name in ("a.jsonl", "b.jsonl"):
+            (self.base / "raw" / name).write_bytes(f"{name}-BYTES".encode())
+        write_material_md(self.base, "甲.md", "raw/a.jsonl#锚.png")
+        write_material_md(self.base, "乙.md", "raw/b.jsonl#锚.png")
+        before = snapshot_all(self.root)
+        orig_read_bytes = Path.read_bytes
+
+        def fake_read_bytes(self):
+            if self.name == "a.jsonl":
+                raise PermissionError(errno.EACCES, "Permission denied")
+            if self.name == "b.jsonl":
+                raise OSError(errno.EIO, "Input/output error")
+            return orig_read_bytes(self)
+
+        Path.read_bytes = fake_read_bytes
+        try:
+            report = pi.run_inventory(self.base, full_hash=True,
+                                      repair_candidates=True)
+        finally:
+            Path.read_bytes = orig_read_bytes
+        for mrel, ename in (("materials/甲.md", "EACCES"),
+                            ("materials/乙.md", "EIO")):
+            item = report["items"][mrel]
+            # stat 成功（存在）与读取失败分开表达；不假装观察成功
+            self.assertEqual(item["container_accessibility"], "accessible",
+                             mrel)
+            self.assertEqual(item["hash_check"], "not-applicable", mrel)
+            self.assertEqual(item.get("container_hash_check"), "not-completed",
+                             mrel)
+            self.assertIn(ename, item.get("container_hash_error", ""), mrel)
+            self.assertNotIn("container_sha256_observed", item, mrel)
+            self.assertNotIn("container_observed_at", item, mrel)
+            self.assertEqual(item["anchor_verification"], "not-performed",
+                             mrel)
+            unver = [u for u in report["unverifiable_sources"]
+                     if u["path"] == mrel]
+            self.assertEqual(len(unver), 1, mrel)
+            self.assertIn(ename, unver[0]["reason"], mrel)
+            self.assertEqual(self._finding(report, mrel)["kind"],
+                             "container-check-failed", mrel)
+            suspects = {s["path"]: s for s in report["wrong_source_suspects"]}
+            self.assertEqual(suspects[mrel]["verifiability"],
+                             "container-check-failed", mrel)
+        self.assertEqual(snapshot_all(self.root), before)  # 零写入
 
 
 if __name__ == "__main__":

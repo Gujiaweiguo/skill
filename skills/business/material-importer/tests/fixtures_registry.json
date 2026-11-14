@@ -26,6 +26,25 @@
       }
     },
     {
+      "name": "lianyou-cert-fragment-source",
+      "kind": "material-fragment-source",
+      "comment": "inspect-material-source-fragments 真实观察锚点（只读登记，材料/容器正文不复制进本仓）。materials frontmatter source 为 raw/_extracted/slides.jsonl#溯源系统证书-1.png：完整字面文件不存在、容器存在；容器第69行含图片引用仅为人工背景线索，不定义通用锚点验证。核心测试合成，不依赖本锚点。",
+      "base": "/opt/code/docs/lianyou",
+      "registered_at": "2026-11-14",
+      "files": {
+        "materials/02-qualifications/计算机软件著作权登记证书-溯源防控系统APP-V3.0.md": "eecc55a5664c73638820e6bf0c331689d98e3d4c738fdab2d37554e4a772689f"
+      },
+      "declared_source": "raw/_extracted/slides.jsonl#溯源系统证书-1.png",
+      "source_container": "raw/_extracted/slides.jsonl",
+      "source_container_sha256_observed": "b4fe38dedbd9b2138407610dcaf68922d2cde6a72af3e9eee5d320761a70c687",
+      "expectations": {
+        "literal_full_path_exists": false,
+        "container_regular_file": true,
+        "expected_diagnosis": "anchor-not-verified（独立 rc3 计数，非 missing_original）",
+        "other_four_descriptive_sources": "missing_original 诊断保持，人工复核解释"
+      }
+    },
+    {
       "name": "gdcreia-association-web-capture",
       "kind": "md-head-provenance",
       "comment": "recognize-web-capture-provenance 真实观察锚点（只读登记，正文/HTML 不复制进本仓）。九篇公众号文章 md 统一中文首部 <!-- 来源 URL / 抓取时间 2026-11-07 -->；html/ 为同名网页存档但 MD 未声明 local_archive，工具不得自动建立关系。",

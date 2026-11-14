@@ -296,3 +296,47 @@ material-importer SHALL 维护唯一的证据边界 reference 文件，承载图
 
 - **WHEN** 同一头部含不同local_archive路径，或只有游离的存档哈希而缺少可唯一绑定的路径
 - **THEN** 工具 SHALL 保留全部声明并报告冲突或未解决绑定，不选择首条存档为权威，不将一个哈希静默应用于多条存档
+
+### Requirement: materials片段来源 SHALL 优先核验字面路径并分离容器与锚点
+
+只读体检对materials来源 SHALL 优先保留完整字面路径语义；只有完整路径明确不存在且满足受限文件片段语法时，才允许按首个#分离容器与fragment。容器检查 SHALL 沿用同公司边界和观察失败语义，fragment SHALL 原样保留且标anchor_verification=not-performed，不读取其内容验证锚点，不提升来源分级或修改资料。
+
+#### Scenario: 完整文件名含井号优先
+
+- **WHEN** 完整来源字面路径为同公司内现存文件，文件名包含#、空格、括号或分号
+- **THEN** 工具 SHALL 按完整文件处理，不拆fragment，不检查另一条截断路径
+
+#### Scenario: 容器存在而锚点未核验
+
+- **WHEN** 完整字面路径明确不存在，来源符合受限片段语法且容器为同公司内可访问文件
+- **THEN** 工具 SHALL 保留原声明、容器路径及完整fragment，报告容器可访问与锚点未核验，不将原整串记missing_original；独立未核验发现 SHALL 使退出码为3，不报告已验证或无需修复
+
+#### Scenario: 容器缺失与观察失败区分
+
+- **WHEN** 合法片段声明的容器缺失、无权限、无法resolve或不是普通文件
+- **THEN** 工具 SHALL 按具体原因报告容器缺失或检查失败，不把观察失败记missing，不把目录当可用容器，也不判锚点无效
+
+#### Scenario: 字面路径检查失败不得触发截断回退
+
+- **WHEN** 完整字面路径越界、不可访问或resolve/stat观察失败
+- **THEN** 工具 SHALL 保留该边界或失败诊断，不借fragment截断另选可访问路径掩盖问题
+
+#### Scenario: 容器越界不读
+
+- **WHEN** 容器路径为基座外绝对路径、../越界路径或跨公司符号链接
+- **THEN** 工具 SHALL 报告边界问题且不读取目标内容，不跨公司复用同名容器，不对fragment解码后读盘
+
+#### Scenario: 非受限片段与描述性声明保持现状
+
+- **WHEN** 来源为纯描述、路径与说明混写、URL、空容器/空片段或不符合受限文件片段语法的值
+- **THEN** 本change SHALL 不拆括号、补同名指代、提取句中路径或新增URL语义；保留原有诊断，不以猜测的容器消除真实缺口
+
+#### Scenario: 修复诊断不冒充已解析来源
+
+- **WHEN** --repair-candidates检查片段来源，容器存在但锚点未核验，或容器有错误
+- **THEN** 工具 SHALL 分别报告fragment-not-verified及容器错误，不进入本地回填候选，不建议自动重转或误记resolvable-in-base/无需修复
+
+#### Scenario: 旧行为与零业务写入保留
+
+- **WHEN** 同一运行包含普通本地来源、none标记、缺来源、raw网页声明及materials片段
+- **THEN** 原有非片段行为 SHALL 保持，source_nature仍使用declared/inferred/none，所有业务文件字节不变，报告稳定排序并独立计数未核验片段；当前容器哈希不得冒充历史转换哈希

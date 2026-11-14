@@ -4,6 +4,9 @@
 设计依据：openspec/changes/harden-material-import-provenance/design.md
 D1（独立纯读脚本）/ D5（投影侧候选线索与抽样口径）/ D7（回填 provenance 兼容读取与
 recorded-at-conversion 三要件）/ D10（三维分维表达）/ D11（多公司基座隔离）。
+inspect-material-source-fragments：materials frontmatter 来源完整字面路径优先，
+仅明确不存在且符合受限 .jsonl 片段语法时拆分容器与 fragment（锚点一律
+not-performed，独立 rc3 计数，不改共享 resolver）。
 
 事实纪律（design「事实纪律」节）：
 - 观察.observed / 声明.declared / 推断.inferred / 不可得.unknown-unavailable 四类
@@ -45,6 +48,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import sys
 import traceback
 from datetime import datetime, timezone
@@ -429,6 +433,77 @@ def safe_exists(p: Path) -> tuple[bool, OSError | None]:
         return False, e
 
 
+def stat_or_none(p: Path) -> "os.stat_result | None | OSError":
+    """stat 级存在观察（materials 字面路径优先用，D1）。
+
+    返回三态：stat_result（存在）/ None（明确 FileNotFoundError=ENOENT，
+    唯一允许片段回退的情形）/ OSError 实例（ENOTDIR/EACCES/ELOOP/
+    ENAMETOOLONG 等观察失败——不冒充不存在，不触发回退）。
+    """
+    try:
+        return os.stat(p)
+    except FileNotFoundError:
+        return None
+    except OSError as e:
+        return e
+
+
+def resolve_declared_source_guarded(declared: str, base: Path):
+    """resolve_declared_source 的 RuntimeError 承接包装（materials 局部）。
+
+    pathlib.Path.resolve 将 ELOOP（自环 symlink）包成 RuntimeError（非
+    OSError，Python 3.12 实证）；共享 resolver 语义不动，调用侧局部承接为
+    观察失败。返回 (resolved, status, err_detail|None)；err_detail 附
+    stat 探针取得的原始 errno 证据（pathlib 吞掉了 errno）。
+    """
+    try:
+        resolved, status = resolve_declared_source(declared, base)
+        return resolved, status, None
+    except RuntimeError as e:
+        detail = str(e)
+        p_decl = Path(declared)
+        raw_decl = p_decl if p_decl.is_absolute() else base / p_decl
+        st_probe = stat_or_none(raw_decl)
+        if isinstance(st_probe, OSError):
+            detail += f"; {stat_error_detail(st_probe)}"
+        return None, "unresolvable", detail
+
+
+# --- inspect-material-source-fragments（D1：materials 受限 .jsonl 片段语法）---
+
+def split_material_fragment_source(declared: str) -> tuple[str, str] | None:
+    """materials 来源受限 .jsonl 片段语法判定（保守：宁可不拆，也不猜）。
+
+    只在完整字面路径**明确不存在**（ENOENT）后由调用方调用；返回
+    (容器, fragment) 或 None（不符合受限语法 → 调用方保留完整路径诊断）：
+    - 按首个 # 分割（partition），左右两侧均非空；
+    - 左侧（容器）：以 .jsonl 结尾；非 scheme:// 形态；不含换行/控制字符、
+      中文分号；不剥括号、不推断「同名.md」、不做 URL 解码；
+    - 右侧（fragment）：不含空白、控制字符、中文分号、ASCII/全角括号
+      （括注叙述不是锚点）；额外 # 与 %xx 原样保留，不把 fragment 当路径。
+    """
+    if "#" not in declared:
+        return None
+    left, _, right = declared.partition("#")
+    if not left or not right:
+        return None
+    if not left.endswith(".jsonl"):
+        return None
+    if URL_SCHEME_SHAPED_RE.match(left):
+        return None
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in left):
+        return None
+    if "；" in left:
+        return None
+    if any(ch.isspace() or ord(ch) < 0x20 or ord(ch) == 0x7F for ch in right):
+        return None
+    if "；" in right:
+        return None
+    if any(ch in right for ch in "()（）"):
+        return None
+    return left, right
+
+
 def walk_with_errors(root: Path, root_filter=None, dir_filter=None):
     """os.walk + 显式 onerror（绝不静默跳过不可读目录）。
 
@@ -492,6 +567,8 @@ def run_inventory(base: Path, *, full_hash: bool = False,
         "source_declaration_conflicts": [],
         "source_declaration_errors": [],
         "local_archive_findings": [],
+        # --- inspect-material-source-fragments（D2：materials 片段发现，始终存在）---
+        "material_source_fragment_findings": [],
     }
 
     sha_cache: dict[Path, tuple[str | None, OSError | None]] = {}
@@ -1293,6 +1370,122 @@ def run_inventory(base: Path, *, full_hash: bool = False,
             {"location": f.location, "reason": "permission-denied/unavailable"})
         report["scan"]["discovery_errors"].append(str(f))
 
+    def _observe_material_fragment(item: dict, rel: str, source_val: str,
+                                   container: str, fragment: str,
+                                   full_hash: bool) -> None:
+        """D2：materials 片段来源的容器独立观察。
+
+        只 stat 容器（默认不读正文、不核验锚点、不做文本解码）；观察失败/
+        越界/缺失按既有清单口径分列，同时始终保留 fragment 未核验发现。
+        """
+        item["source_expression_kind"] = "local-file-fragment"
+        item["source_container"] = container
+        item["source_fragment"] = fragment
+        item["anchor_verification"] = "not-performed"
+        item["projection_accessibility"] = "accessible"  # 材料自身读取状态单列
+        finding: dict = {"path": rel, "declared_source": source_val,
+                         "source_container": container,
+                         "source_fragment": fragment}
+        resolve_err: str | None = None
+        c_resolved, c_status, resolve_err = resolve_declared_source_guarded(
+            container, base)
+        if c_status == "unresolvable":
+            detail = f"（{resolve_err}）" if resolve_err else ""
+            item["container_accessibility"] = "inaccessible"
+            item["hash_check"] = "not-applicable"
+            _note_unverifiable(report, rel, source_val,
+                               f"片段容器 resolve 失败{detail}"
+                               "（观察动作自身失败，非越界非缺失）",
+                               value="inaccessible")
+            finding["kind"] = "container-check-failed"
+            finding["reason"] = (f"容器 resolve 失败{detail}"
+                                 "（观察动作自身失败）；锚点亦未核验")
+        elif c_status == "boundary":
+            item["container_accessibility"] = "boundary-violation"
+            item["hash_check"] = "not-applicable"
+            item["boundary_violation"] = True
+            report["boundary_violations"].append({
+                "path": rel, "declared_source": source_val,
+                "resolved_to": str(c_resolved),
+                "reason": "片段容器解析后落在当前公司基座之外（绝对路径越界"
+                          "或符号链接跨公司）；已停止该来源验证，未读取目标内容",
+            })
+            finding["kind"] = "container-boundary-violation"
+            finding["reason"] = ("容器越界（不读取目标内容，不跨公司复用同名"
+                                 "容器）；锚点亦未核验")
+        else:
+            cst = stat_or_none(c_resolved)
+            if isinstance(cst, OSError):
+                acc = accessibility_for_error(cst)
+                item["container_accessibility"] = acc
+                item["accessibility"] = acc
+                item["hash_check"] = "not-applicable"
+                _note_unverifiable(report, rel, source_val,
+                                   f"片段容器 stat 失败: "
+                                   f"{stat_error_detail(cst)}", value=acc)
+                finding["kind"] = "container-check-failed"
+                finding["reason"] = (f"容器 stat 失败: {stat_error_detail(cst)}；"
+                                     "锚点亦未核验")
+            elif cst is None:
+                # 明确 ENOENT：missing_original 记容器（非原整串），原声明保留
+                item["container_accessibility"] = "missing"
+                item["accessibility"] = "missing"
+                item["hash_check"] = "not-applicable"
+                note_gap("missing_original", rel, {
+                    "declared_source": source_val,
+                    "source_container": container,
+                    "source_fragment": fragment,
+                    "container_path": c_resolved.relative_to(base).as_posix(),
+                })
+                finding["kind"] = "container-missing"
+                finding["reason"] = ("容器在当前基座内不存在（missing_original "
+                                     "记容器而非原整串，原声明与 fragment 保留）；"
+                                     "锚点亦未核验")
+            elif not stat.S_ISREG(cst.st_mode):
+                item["container_accessibility"] = "not-regular-file"
+                item["hash_check"] = "not-applicable"
+                finding["kind"] = "container-check-failed"
+                finding["reason"] = ("容器存在但不是普通文件（目录/特殊文件），"
+                                     "不当作可用容器，也不判锚点无效")
+            else:
+                item["container_accessibility"] = "accessible"
+                item["source_accessibility"] = "accessible"
+                item["source"] = c_resolved.relative_to(base).as_posix()
+                item["hash_check"] = "unknown-scope"  # 未验证锚点或历史哈希
+                finding["kind"] = "anchor-not-verified"
+                finding["reason"] = ("容器存在且可访问；锚点未核验（默认不读"
+                                     "容器正文、不在内容中匹配 fragment；"
+                                     "scan.complete 不代表锚点已核验）")
+                if full_hash:
+                    h, h_err = sha_of(c_resolved)
+                    if h is not None:
+                        # 当前观察哈希/时点，不冒充转换时哈希（不写 source_sha256*）
+                        item["container_sha256_observed"] = h
+                        item["container_observed_at"] = datetime.now(
+                            timezone.utc).isoformat()
+                    else:
+                        # 实际读取失败（任意 OSError：EACCES/EIO/…）与 stat
+                        # 存在分开表达，但状态/诊断/repair 一致为
+                        # container-check-failed：不假装观察成功、不产生容器
+                        # 哈希、hash_check 明确未完成、anchor_verification
+                        # 保持 not-performed
+                        item["container_hash_error"] = \
+                            stat_error_detail(h_err)
+                        item["container_hash_check"] = "not-completed"
+                        item["hash_check"] = "not-applicable"
+                        _note_unverifiable(
+                            report, rel, source_val,
+                            f"--full-hash 容器字节读取失败: "
+                            f"{stat_error_detail(h_err)}",
+                            field="container_accessibility",
+                            value="accessible")
+                        finding["kind"] = "container-check-failed"
+                        finding["reason"] = (
+                            f"容器 stat 存在但字节读取失败: "
+                            f"{stat_error_detail(h_err)}（stat 存在与读取失败"
+                            "分开表达）；锚点亦未核验")
+        report["material_source_fragment_findings"].append(finding)
+
     for cur, files in mat_visited:
         for fname in files:
             if not fname.endswith(".md"):
@@ -1331,11 +1524,17 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                 item["source_nature"] = "declared"
                 item["link_state"] = "declared"
                 item["declared_source"] = source_val
-                resolved, status = resolve_declared_source(source_val, base)
+                # pathlib Path.resolve 将 ELOOP（自环 symlink）包成 RuntimeError
+                # （非 OSError）：共享 resolver 不动，materials 局部承接为
+                # 观察失败（附 errno 证据），不回退、不崩溃
+                resolved, status, resolve_err = \
+                    resolve_declared_source_guarded(source_val, base)
                 if status == "unresolvable":
+                    detail = f"（{resolve_err}）" if resolve_err else ""
                     item["hash_check"] = "not-applicable"
                     _note_unverifiable(report, rel, source_val,
-                                       "resolve 失败（观察动作自身失败，"
+                                       f"resolve 失败{detail}"
+                                       "（观察动作自身失败，"
                                        "非越界非缺失）",
                                        value="inaccessible")
                 elif status == "boundary":
@@ -1347,24 +1546,43 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                         "reason": "声明来源越界；已停止验证，未读取目标内容",
                     })
                 else:
-                    exists_ok, stat_err = safe_exists(resolved)
-                    if stat_err is not None:
-                        acc = accessibility_for_error(stat_err)
+                    # D1：完整字面路径优先 —— stat 级区分「明确不存在」与观察
+                    # 失败（ENOTDIR/EACCES/ELOOP 等绝不冒充不存在，不触发回退）
+                    st = stat_or_none(resolved)
+                    if isinstance(st, OSError):
+                        acc = accessibility_for_error(st)
                         item["accessibility"] = acc
                         item["hash_check"] = "not-applicable"
                         _note_unverifiable(report, rel, source_val,
                                            f"stat 失败: "
-                                           f"{stat_error_detail(stat_err)}",
+                                           f"{stat_error_detail(st)}",
                                            value=acc)
-                    elif not exists_ok:
-                        item["accessibility"] = "missing"
+                    elif st is not None and not stat.S_ISREG(st.st_mode):
+                        # 存在但非普通文件：观察失败口径，不当作有效文件或缺失
+                        item["accessibility"] = "not-regular-file"
                         item["hash_check"] = "not-applicable"
-                        note_gap("missing_original", rel,
-                                 {"declared_source": source_val})
-                    else:
+                        _note_unverifiable(
+                            report, rel, source_val,
+                            "声明来源存在但不是普通文件（目录/特殊文件）；"
+                            "不当作有效文件或缺失，不做片段回退",
+                            value="not-regular-file")
+                    elif st is not None:
+                        # 完整字面文件存在（含 #、括号、空格、分号）：直接沿用
                         item["source"] = resolved.relative_to(base).as_posix()
                         item["hash_check"] = "not-applicable"
                         item["source_accessibility"] = "accessible"
+                    else:
+                        # 明确 ENOENT：唯一允许考虑受限片段语法的情形
+                        split = split_material_fragment_source(source_val)
+                        if split is None:
+                            item["accessibility"] = "missing"
+                            item["hash_check"] = "not-applicable"
+                            note_gap("missing_original", rel,
+                                     {"declared_source": source_val})
+                        else:
+                            _observe_material_fragment(
+                                item, rel, source_val, split[0], split[1],
+                                full_hash=full_hash)
                 wrong_source_suspects.append({"path": rel, "item": item})
             if full_hash:
                 h, _e = sha_of(p)
@@ -1473,7 +1691,39 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                 continue
             ev = {"path": s["path"], "declared_source":
                   item.get("declared_source")}
-            if item.get("source_kind") == "external-url":
+            if item.get("source_expression_kind") == "local-file-fragment":
+                # D3：片段来源独立分支——已有声明，永不进回填候选；
+                # 容器状态分别保留原因，不落 resolvable-in-base/无需修复，
+                # 不建议自动重转
+                ev["source_expression_kind"] = "local-file-fragment"
+                ca = item.get("container_accessibility")
+                if item.get("container_hash_error"):
+                    # 容器 stat 存在但 --full-hash 字节读取失败：读取失败与
+                    # stat 存在分开表达，诊断口径与状态一致（不落
+                    # fragment-not-verified，不假装容器观察完成）
+                    ev["verifiability"] = "container-check-failed"
+                    ev["suggestion"] = ("容器 stat 存在但字节读取失败"
+                                        "（container_hash_error 保留 errno）；"
+                                        "人工核查，本工具不读容器正文、"
+                                        "不自动回填来源")
+                elif ca == "accessible":
+                    ev["verifiability"] = "fragment-not-verified"
+                    ev["suggestion"] = ("容器存在但锚点未核验；人工在容器中"
+                                        "核对 fragment，本工具不读容器正文、"
+                                        "不自动回填来源")
+                elif ca == "missing":
+                    ev["verifiability"] = "container-missing"
+                    ev["suggestion"] = ("片段容器在基座内不存在；人工核查，"
+                                        "不建议自动重转")
+                elif ca == "boundary-violation":
+                    ev["verifiability"] = "boundary-violation"
+                    ev["suggestion"] = ("片段容器越界；人工核查来源指向"
+                                        "（未读取目标内容）")
+                else:  # not-regular-file / permission-denied / inaccessible
+                    ev["verifiability"] = "container-check-failed"
+                    ev["suggestion"] = ("片段容器观察失败或不可用（详见对应"
+                                        "清单）；人工核查")
+            elif item.get("source_kind") == "external-url":
                 # 外部URL声明：未联网核验，绝不落 resolvable-in-base
                 ev["source_kind"] = "external-url"
                 ev["verifiability"] = "external-not-verified"
@@ -1520,6 +1770,11 @@ def run_inventory(base: Path, *, full_hash: bool = False,
         report["local_archive_findings"],
         key=lambda e: (e["path"], e.get("kind", ""),
                        e.get("declared_path", "")))
+    report["material_source_fragment_findings"] = sorted(
+        report["material_source_fragment_findings"],
+        key=lambda e: (e["path"], e.get("kind", ""),
+                       e.get("source_container", ""),
+                       e.get("source_fragment", "")))
     for key in report["gaps"]:
         report["gaps"][key] = sorted(report["gaps"][key],
                                      key=lambda e: e["path"])
@@ -1548,6 +1803,7 @@ def has_findings(report: dict) -> bool:
         or report["source_declaration_conflicts"]
         or report["source_declaration_errors"]
         or report["local_archive_findings"]
+        or report["material_source_fragment_findings"]
         or report["scan"]["inaccessible"]
         or report["scan"]["discovery_errors"]
     )
