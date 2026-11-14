@@ -83,7 +83,21 @@ def iter_index_files(base: Path, discovery_errors=None):
         for f in files:
             if f.startswith(".") or f.startswith("_") or f == "_backfill_report.json":
                 continue
-            yield Path(root) / f
+            p = Path(root) / f
+            # Review-fix 1: a file symlink inside the base may point into
+            # another company base — exclude it from the match index so no
+            # candidate path can read outside the base (recorded, not silent).
+            if p.is_symlink():
+                try:
+                    p.resolve().relative_to(base)
+                except ValueError:
+                    discovery_errors.append(
+                        f"{p}: symlink resolves outside base, excluded from index")
+                    continue
+                except OSError as e:
+                    discovery_errors.append(f"{p}: {e}")
+                    continue
+            yield p
 
 
 def _rep_sorted(paths, base: Path):
@@ -190,27 +204,189 @@ def source_value_for(orig: Path, base: Path, raw_by_orig):
     return orig.relative_to(base).as_posix(), "incoming"
 
 
-FM_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n", re.S)
+FM_RE = re.compile(
+    r"\A(?P<open>---\r?\n)(?P<fm>.*?)(?P<close>\r?\n---)(?:\r?\n|\Z)", re.S)
+
+PROVENANCE_CLASS = "candidate-association"
 
 
-def insert_source(md_path: Path, value: str):
-    text = md_path.read_text(encoding="utf-8")
+def insert_source(md_path: Path, value: str, sha256_at_backfill: str = None,
+                  backfilled_at: str = None):
+    """Insert source frontmatter. When sha256_at_backfill is given (backfill
+    of an associated original), persist provenance class + at-backfill hash
+    semantics into the product itself (D7: candidate-association must not
+    live only in the one-shot report). authored rows (source: "none") pass
+    no hash → no provenance_class field (authored is not a backfill).
+
+    Review-fix 3: a closing `---` at EOF without a trailing newline is a
+    valid frontmatter and MUST match (otherwise a second frontmatter block
+    would be prepended). Appending inserts new lines INSIDE the original
+    block (before the closing `---`) as a pure string splice — the original
+    block's bytes and newline style are preserved, no regex re-flow."""
+    text = md_path.read_bytes().decode("utf-8")
     m = FM_RE.match(text)
-    line = f'source: "{value}"'
+    lines = [f'source: "{value}"']
+    if sha256_at_backfill is not None:
+        lines.append(f"provenance_class: {PROVENANCE_CLASS}")
+        lines.append(f"source_sha256_at_backfill: {sha256_at_backfill}")
+        lines.append(f"backfilled_at: {backfilled_at}")
+    line = "\n".join(lines)
     if m:
-        fm = m.group(1)
+        fm = m.group("fm")
         if re.search(r"^source:", fm, re.M):
             return None  # already has source
-        new_fm = fm + "\n" + line
-        new_text = FM_RE.sub(lambda _: f"---\n{new_fm}\n---\n", text, count=1)
-        md_path.write_text(new_text, encoding="utf-8")
+        nl = "\r\n" if m.group("close").startswith("\r\n") else "\n"
+        new_text = text[:m.end("fm")] + nl + line + text[m.start("close"):]
+        md_path.write_bytes(new_text.encode("utf-8"))
         return "frontmatter-appended"
     new_text = f"---\n{line}\n---\n\n" + text
-    md_path.write_text(new_text, encoding="utf-8")
+    md_path.write_bytes(new_text.encode("utf-8"))
     return "frontmatter-created"
 
 
 PROV_MARK = "source_sha256"
+SOURCE_MARK = "<!-- source:"
+HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
+CONVERTER_SIG_RE = re.compile(r"via convert_\w+\.py(?:\s+v\d+)?")
+
+
+def raw_provenance_block(source_rel: str, sha: str, today: str) -> str:
+    """Backfill provenance comment block. Deliberately does NOT use the bare
+    `source_sha256` field name — that name is shared with converter-time
+    hashes (the ambiguity this change fixes); the at-backfill observation
+    gets its own explicit field name."""
+    return (f"<!-- source: {source_rel} -->\n"
+            f"<!-- provenance_class: {PROVENANCE_CLASS} -->\n"
+            f"<!-- source_sha256_at_backfill: {sha} -->\n"
+            f"<!-- backfilled_at: {today} -->\n"
+            f"<!-- extracted_by: markitdown (pre-existing artifact, "
+            f"backfilled {today}) -->\n")
+
+
+def _header_fields(header_text: str) -> dict:
+    """Parse `key: value` pairs from an HTML-comment provenance block and/or
+    frontmatter-style lines (first occurrence wins for each key)."""
+    fields = {}
+    for m in re.finditer(r"<!--\s*([A-Za-z0-9_]+):\s*(.*?)\s*-->", header_text):
+        fields.setdefault(m.group(1), m.group(2))
+    for m in re.finditer(r"^([A-Za-z0-9_]+):\s*(.*)$", header_text, re.M):
+        fields.setdefault(m.group(1), m.group(2).strip().strip('"'))
+    return fields
+
+
+def _resolves_inside_base(src: str, base: Path) -> bool:
+    if not src or src == "none":
+        return False
+    p = Path(src)
+    if not p.is_absolute():
+        p = base / p
+    try:
+        p.resolve().relative_to(base.resolve())
+        return True
+    except (ValueError, OSError):
+        return False
+
+
+def classify_record(header_text: str, base: Path) -> dict:
+    """Compatibility reader for provenance headers (D7).
+
+    - extracted_by carries a "backfilled" marker → backfill nature is kept:
+      provenance_class=candidate-association, hash_semantics=at-backfill,
+      regardless of whether the hash field uses the old name
+      (`source_sha256`) or the new one (`source_sha256_at_backfill`).
+    - converter signature (e.g. `markitdown via convert_doc.py vN`, or the
+      convert_excel manifest extractor field shape) AND a source path that
+      resolves inside the same base AND a valid 64-hex recorded hash →
+      recorded-at-conversion candidate. This only certifies that a
+      conversion-time source declaration EXISTS; it does not assert
+      historical authenticity and does NOT require the current original
+      hash to equal the recorded one (freshness is a separate dimension).
+    - old bare `source_sha256` with neither marker → hash_semantics=unknown.
+    - Never upgrades a record to conversion-time-verified merely because
+      the field name matches.
+    """
+    fields = _header_fields(header_text)
+    extracted_by = fields.get("extracted_by", "") or ""
+    hash_val = (fields.get("source_sha256_at_backfill")
+                or fields.get("source_sha256") or "")
+    if "backfilled" in extracted_by.lower():
+        return {"provenance_class": PROVENANCE_CLASS,
+                "hash_semantics": "at-backfill"}
+    sig = any(CONVERTER_SIG_RE.search(fields.get(k, "") or "")
+              for k in ("extracted_by", "extractor"))
+    if sig:
+        if _resolves_inside_base(fields.get("source")
+                                 or fields.get("source_path", ""), base) and \
+                HEX64_RE.match(hash_val):
+            return {"provenance_class": "recorded-at-conversion",
+                    "hash_semantics": "at-conversion"}
+        return {"provenance_class": None, "hash_semantics": "unknown"}
+    if "source_sha256" in fields or "source_sha256_at_backfill" in fields:
+        return {"provenance_class": None, "hash_semantics": "unknown"}
+    return {"provenance_class": None, "hash_semantics": "no-declared-hash"}
+
+
+FM_SOURCE_RE = re.compile(r'^source:\s*"?([^"\n]+?)"?\s*$', re.M)
+RAW_SOURCE_RE = re.compile(r"<!--\s*source:\s*(.*?)\s*-->")
+
+
+def resolve_in_base(value: str, base: Path):
+    """Review-fix 1 boundary guard for paths that will actually be READ
+    (mapping targets). Normalize (absolute/relative) → resolve() following
+    symlinks → must stay inside base. Returns (resolved|None, status):
+    status "ok" | "boundary-violation" | "resolve-error: ...". An OSError
+    during resolve/stat is an observation failure (reported separately),
+    NOT a boundary violation."""
+    p = Path(value)
+    if not p.is_absolute():
+        p = base / p
+    try:
+        rp = p.resolve()
+        rp.relative_to(base.resolve())
+    except ValueError:
+        return None, "boundary-violation"
+    except OSError as e:
+        return None, f"resolve-error: {e}"
+    return rp, "ok"
+
+
+def read_strict(p: Path) -> str:
+    """Strict UTF-8 decode (review-fix 2): anything written back to disk must
+    come from a strict decode — errors="replace" output must NEVER be
+    persisted (it would silently corrupt the original bytes)."""
+    return p.read_bytes().decode("utf-8")
+
+
+def _fail(report, file_rel: str, reason: str, stage: str):
+    report["failed"].append({"file": file_rel, "reason": reason,
+                             "stage": stage})
+
+
+def evaluate_declared_source(value: str, base: Path):
+    """Assess an already-declared source for wrong_source_suspects.
+    Returns None when the source resolves to an existing file inside the
+    base, else (assessment, suggestion). Suggest only — never rewrite."""
+    if not value or value == "none":
+        return None
+    p = Path(value)
+    if not p.is_absolute():
+        p = base / p
+    try:
+        rp = p.resolve()
+        rp.relative_to(base.resolve())
+    except (ValueError, OSError):
+        return ("boundary-violation",
+                "声明来源解析后落在公司基座之外；人工确认后修正 source 为基座内路径")
+    if not rp.is_file():
+        return ("missing",
+                "声明来源在基座内不存在（原件可能被移动/重命名）；人工核实后修正 source")
+    return None
+
+
+def suspect_entry(file_rel: str, declared: str, assessment: str, suggestion: str):
+    return {"file": file_rel, "declared_source": declared,
+            "assessment": assessment, "suggestion": suggestion}
+
 
 
 def raw_suffix_keys(md_stem: str):
@@ -311,6 +487,9 @@ def main():
 
     report = {"matched": [], "unmatched": [], "skipped": [], "written": 0,
               "mapping_missing": mapping_missing,
+              "mapping_target_out_of_base": [],
+              "wrong_source_suspects": [],
+              "failed": [],
               "discovery_errors": discovery_errors}
     today = datetime.date.today().isoformat()
 
@@ -318,96 +497,171 @@ def main():
     mat_files = [p for p in materials.rglob("*.md") if p.is_file()]
     for md in mat_files:
         rel = md.relative_to(base).as_posix()
-        text = md.read_text(encoding="utf-8", errors="replace")
-        if re.search(r"^source:", text[:4000], re.M):
-            report["skipped"].append({"file": rel, "reason": "has-source"})
+        try:
+            text = read_strict(md)
+        except UnicodeDecodeError as e:
+            _fail(report, rel, f"encoding-invalid: {e}", "read")
             continue
+        except OSError as e:
+            _fail(report, rel, f"read-error: {e}", "read")
+            continue
+        try:
+            if re.search(r"^source:", text[:4000], re.M):
+                report["skipped"].append({"file": rel, "reason": "has-source"})
+                m = FM_RE.match(text)
+                sm = FM_SOURCE_RE.search(m.group("fm")) if m else None
+                declared = sm.group(1) if sm else ""
+                bad = evaluate_declared_source(declared, base)
+                if bad:
+                    report["wrong_source_suspects"].append(
+                        suspect_entry(rel, declared, *bad))
+                continue
 
-        # approved mapping takes precedence (accept → source, authored → "none")
-        if rel in mapping:
-            proposed, bucket = mapping[rel]
-            if bucket == "authored":
+            # approved mapping takes precedence (accept → source, authored → "none")
+            if rel in mapping:
+                proposed, bucket = mapping[rel]
+                if bucket == "authored":
+                    if not args.dry_run:
+                        insert_source(md, "none")
+                        report["written"] += 1
+                    report["matched"].append({"file": rel, "source": "none",
+                                              "confidence": "authored",
+                                              "applied_rule": "mapping-authored"})
+                    continue
+                target, tstat = resolve_in_base(proposed, base)
+                if tstat == "boundary-violation":
+                    report["mapping_target_out_of_base"].append(
+                        {"file": rel, "proposed": proposed, "status": tstat})
+                    report["unmatched"].append(
+                        {"file": rel, "reason": "mapping-target-out-of-base"})
+                    continue
+                if tstat != "ok":
+                    _fail(report, rel, tstat, "mapping-target-resolve")
+                    continue
+                if not target.is_file():
+                    mapping_missing.append({"file": rel, "missing_target": proposed})
+                    report["unmatched"].append({"file": rel,
+                                                "reason": "mapping-target-missing"})
+                    continue
+                sha = hashlib.sha256(target.read_bytes()).hexdigest()
                 if not args.dry_run:
-                    insert_source(md, "none")
+                    insert_source(md, proposed, sha256_at_backfill=sha,
+                                  backfilled_at=today)
                     report["written"] += 1
-                report["matched"].append({"file": rel, "source": "none",
-                                          "confidence": "authored",
-                                          "applied_rule": "mapping-authored"})
+                report["matched"].append({"file": rel, "source": proposed,
+                                          "confidence": "mapping-accept",
+                                          "applied_rule": "mapping",
+                                          "provenance_class": PROVENANCE_CLASS,
+                                          "hash_semantics": "at-backfill"})
                 continue
-            target = base / proposed
-            if not target.is_file():
-                mapping_missing.append({"file": rel, "missing_target": proposed})
-                report["unmatched"].append({"file": rel,
-                                            "reason": "mapping-target-missing"})
-                continue
-            if not args.dry_run:
-                insert_source(md, proposed)
-                report["written"] += 1
-            report["matched"].append({"file": rel, "source": proposed,
-                                      "confidence": "mapping-accept",
-                                      "applied_rule": "mapping"})
-            continue
 
-        orig, conf, rule = match_material(md, by_basename, by_stem, raw_by_orig,
-                                          base_stem_index=base_by_stem, base=base)
-        if not orig:
-            report["unmatched"].append({"file": rel, "reason": conf})
-            continue
-        value, root = source_value_for(orig, base, raw_by_orig)
-        entry = {"file": rel, "source": value,
-                 "confidence": conf, "root": root,
-                 "applied_rule": rule,
-                 "original": str(orig.relative_to(base))}
-        if not args.dry_run:
-            insert_source(md, value)
-            report["written"] += 1
-        report["matched"].append(entry)
+            orig, conf, rule = match_material(md, by_basename, by_stem,
+                                              raw_by_orig,
+                                              base_stem_index=base_by_stem,
+                                              base=base)
+            if not orig:
+                report["unmatched"].append({"file": rel, "reason": conf})
+                continue
+            value, root = source_value_for(orig, base, raw_by_orig)
+            sha = hashlib.sha256(orig.read_bytes()).hexdigest()
+            entry = {"file": rel, "source": value,
+                     "confidence": conf, "root": root,
+                     "applied_rule": rule,
+                     "provenance_class": PROVENANCE_CLASS,
+                     "hash_semantics": "at-backfill",
+                     "original": str(orig.relative_to(base))}
+            if not args.dry_run:
+                insert_source(md, value, sha256_at_backfill=sha,
+                              backfilled_at=today)
+                report["written"] += 1
+            report["matched"].append(entry)
+        except UnicodeDecodeError as e:
+            _fail(report, rel, f"encoding-invalid: {e}", "process")
+        except OSError as e:
+            _fail(report, rel, f"io-error: {e}", "process")
 
     # --- raw top-level md ---
     for md in sorted(raw.glob("*.md")):
         rel = md.relative_to(base).as_posix()
+        try:
+            text = read_strict(md)
+        except UnicodeDecodeError as e:
+            _fail(report, rel, f"encoding-invalid: {e}", "read")
+            continue
+        except OSError as e:
+            _fail(report, rel, f"read-error: {e}", "read")
+            continue
+        try:
+            head = text[:2000]
 
-        # approved mapping first (deterministic suffix rule stays as fallback)
-        if rel in mapping and PROV_MARK not in \
-                md.read_text(encoding="utf-8", errors="replace")[:2000]:
-            proposed, bucket = mapping[rel]
-            target = base / proposed
-            if not target.is_file():
-                mapping_missing.append({"file": rel, "missing_target": proposed})
+            # already-declared source: skip writing, assess only (suggest, never rewrite)
+            if PROV_MARK in head or SOURCE_MARK in head:
+                sm = RAW_SOURCE_RE.search(head)
+                declared = sm.group(1) if sm else ""
+                bad = evaluate_declared_source(declared, base)
+                if bad:
+                    report["wrong_source_suspects"].append(
+                        suspect_entry(rel, declared, *bad))
                 report["unmatched"].append({"file": rel,
-                                            "reason": "mapping-target-missing"})
+                                            "reason": "already-has-provenance"})
                 continue
-            sha = hashlib.sha256(target.read_bytes()).hexdigest()
-            entry = {"file": rel, "source": proposed,
-                     "confidence": "mapping-accept", "applied_rule": "mapping",
-                     "sha256": sha}
+
+            # approved mapping first (deterministic suffix rule stays as fallback)
+            if rel in mapping:
+                proposed, bucket = mapping[rel]
+                target, tstat = resolve_in_base(proposed, base)
+                if tstat == "boundary-violation":
+                    report["mapping_target_out_of_base"].append(
+                        {"file": rel, "proposed": proposed, "status": tstat})
+                    report["unmatched"].append(
+                        {"file": rel, "reason": "mapping-target-out-of-base"})
+                    continue
+                if tstat != "ok":
+                    _fail(report, rel, tstat, "mapping-target-resolve")
+                    continue
+                if not target.is_file():
+                    mapping_missing.append({"file": rel, "missing_target": proposed})
+                    report["unmatched"].append({"file": rel,
+                                                "reason": "mapping-target-missing"})
+                    continue
+                sha = hashlib.sha256(target.read_bytes()).hexdigest()
+                entry = {"file": rel, "source": proposed,
+                         "confidence": "mapping-accept", "applied_rule": "mapping",
+                         "provenance_class": PROVENANCE_CLASS,
+                         "hash_semantics": "at-backfill",
+                         "sha256": sha}
+                if not args.dry_run:
+                    # write back the STRICT-decoded text only — a replace-
+                    # decoded variant would corrupt bad bytes on disk
+                    md.write_text(
+                        raw_provenance_block(proposed, sha, today) + text,
+                        encoding="utf-8")
+                    report["written"] += 1
+                report["matched"].append(entry)
+                continue
+
+            orig, reason, rule = backfill_raw_md(md, base, base_by_basename)
+            if not orig:
+                report["unmatched"].append({"file": rel,
+                                            "reason": f"raw/{reason}"})
+                continue
+            sha = hashlib.sha256(orig.read_bytes()).hexdigest()
+            entry = {"file": rel,
+                     "source": str(orig.relative_to(base)),
+                     "confidence": "suffix", "applied_rule": rule,
+                     "provenance_class": PROVENANCE_CLASS,
+                     "hash_semantics": "at-backfill", "sha256": sha}
             if not args.dry_run:
-                block = (f"<!-- source: {proposed} -->\n"
-                         f"<!-- source_sha256: {sha} -->\n"
-                         f"<!-- extracted_by: markitdown (pre-existing artifact, backfilled {today}) -->\n")
-                cur = md.read_text(encoding="utf-8", errors="replace")
-                md.write_text(block + cur, encoding="utf-8")
+                md.write_text(
+                    raw_provenance_block(
+                        orig.relative_to(base).as_posix(), sha, today) + text,
+                    encoding="utf-8")
                 report["written"] += 1
             report["matched"].append(entry)
-            continue
-
-        orig, reason, rule = backfill_raw_md(md, base, base_by_basename)
-        if not orig:
-            report["unmatched"].append({"file": str(md.relative_to(base)),
-                                        "reason": f"raw/{reason}"})
-            continue
-        sha = hashlib.sha256(orig.read_bytes()).hexdigest()
-        entry = {"file": str(md.relative_to(base)),
-                 "source": str(orig.relative_to(base)),
-                 "confidence": "suffix", "applied_rule": rule, "sha256": sha}
-        if not args.dry_run:
-            block = (f"<!-- source: {orig.relative_to(base).as_posix()} -->\n"
-                     f"<!-- source_sha256: {sha} -->\n"
-                     f"<!-- extracted_by: markitdown (pre-existing artifact, backfilled {today}) -->\n")
-            cur = md.read_text(encoding="utf-8", errors="replace")
-            md.write_text(block + cur, encoding="utf-8")
-            report["written"] += 1
-        report["matched"].append(entry)
+        except UnicodeDecodeError as e:
+            _fail(report, rel, f"encoding-invalid: {e}", "process")
+        except OSError as e:
+            _fail(report, rel, f"io-error: {e}", "process")
 
     total = len(report["matched"]) + len(report["unmatched"])
     by_rule = {}
@@ -422,6 +676,16 @@ def main():
         print(f"  rule {rule}: {n}")
     if mapping_missing:
         print(f"mapping targets missing (skipped): {len(mapping_missing)}")
+    if report["mapping_target_out_of_base"]:
+        print(f"mapping targets out of base (not read): "
+              f"{len(report['mapping_target_out_of_base'])}")
+    if report["failed"]:
+        print(f"failed files (skipped, bytes untouched): {len(report['failed'])}")
+        for f in report["failed"]:
+            print(f"  {f['file']} [{f['stage']}]: {f['reason']}")
+    if report["wrong_source_suspects"]:
+        print(f"wrong source suspects (assessment only, no rewrite): "
+              f"{len(report['wrong_source_suspects'])}")
     if discovery_errors:
         print(f"discovery errors (unreadable paths skipped): {len(discovery_errors)}")
         for e in discovery_errors:

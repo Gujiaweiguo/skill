@@ -7,6 +7,7 @@
 
 from datetime import datetime
 from pathlib import Path
+import json
 import sys
 import unittest
 
@@ -462,6 +463,283 @@ class HeaderScanTest(unittest.TestCase):
         headers, rows, preface = convert_excel.read_sheet_data(ws)
         self.assertEqual(headers[:2], ["", "H1"])
         self.assertEqual([r[1] for r in rows], ["2023-03-15", "2023-03-30"])
+
+
+class LockFileBatchTest(unittest.TestCase):
+    """批量枚举 ~$ 前缀锁文件在 openpyxl/libreoffice 调用之前列 skipped（3.1）。"""
+
+    def test_batch_lock_file_skipped_others_produced(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            tmp_path = Path(tmp)
+            src_dir = tmp_path / "in"
+            out_dir = tmp_path / "out"
+            src_dir.mkdir()
+            # 锁文件：非 PK 头任意字节 = 触发 openpyxl BadZipFile 的形态
+            (src_dir / "~$t.xlsx").write_bytes(b"\x00\x01office-lock-garbage")
+            wb = Workbook()
+            wb.active.append(["H1", "H2"])
+            wb.active.append(["a", 1])
+            wb.save(src_dir / "ok.xlsx")
+
+            rc = convert_excel.main([str(src_dir), str(out_dir)])
+            self.assertEqual(rc, 0, "锁文件 skip 不得使批量 rc 非零")
+            self.assertTrue((out_dir / "ok.md").exists(), "其余文件必须照常产出")
+            # manifest 只登记正常文件
+            import json
+
+            records = json.loads(
+                (out_dir / "_manifest.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(len(records), 1)
+            self.assertIn("ok.xlsx", records[0]["source_path"])
+
+
+class ManifestPrewriteCheckTest(unittest.TestCase):
+    """manifest 预写检查（D8）：任何输出写入前解析+结构校验；失败字节保留。"""
+
+    def _setup_with_output(self) -> tuple[Path, Path, dict[str, str]]:
+        import tempfile
+
+        tmp_path = Path(tempfile.mkdtemp(dir="/tmp/opencode"))
+        self.addCleanup(__import__("shutil").rmtree, tmp_path, True)
+        src_dir = tmp_path / "in"
+        out_dir = tmp_path / "out"
+        src_dir.mkdir()
+        out_dir.mkdir()
+        wb = Workbook()
+        wb.active.append(["H1"])
+        wb.active.append(["a"])
+        wb.save(src_dir / "t.xlsx")
+        convert_excel.process_file(src_dir / "t.xlsx", out_dir)
+        return src_dir, out_dir, None
+
+    def test_unparseable_manifest_blocks_writes(self) -> None:
+        import hashlib
+
+        src_dir, out_dir, _ = self._setup_with_output()
+        manifest = out_dir / "_manifest.json"
+        manifest.write_text("{ this is not json", encoding="utf-8")
+        before = {
+            p.relative_to(out_dir).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in out_dir.rglob("*") if p.is_file()
+        }
+        rc = convert_excel.main([str(src_dir), str(out_dir)])
+        self.assertEqual(rc, 1, "损坏 manifest 必须非零 rc 收尾")
+        after = {
+            p.relative_to(out_dir).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in out_dir.rglob("*") if p.is_file()
+        }
+        self.assertEqual(after, before, "manifest 与已有输出字节都必须原样保留")
+
+    def test_invalid_structure_manifest_blocks_writes(self) -> None:
+        import hashlib
+
+        src_dir, out_dir, _ = self._setup_with_output()
+        (out_dir / "_manifest.json").write_text(
+            json.dumps({"not": "a list"}), encoding="utf-8"
+        )
+        before = {
+            p.relative_to(out_dir).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in out_dir.rglob("*") if p.is_file()
+        }
+        rc = convert_excel.main([str(src_dir), str(out_dir)])
+        self.assertEqual(rc, 1)
+        after = {
+            p.relative_to(out_dir).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in out_dir.rglob("*") if p.is_file()
+        }
+        self.assertEqual(after, before)
+
+    def test_record_missing_source_path_invalid(self) -> None:
+        src_dir, out_dir, _ = self._setup_with_output()
+        (out_dir / "_manifest.json").write_text(
+            json.dumps([{"source_sha256": "x"}]), encoding="utf-8"
+        )
+        rc = convert_excel.main([str(src_dir), str(out_dir)])
+        self.assertEqual(rc, 1)
+
+    def test_conflicting_duplicate_records_block_item(self) -> None:
+        """同 source_path 重复且内容冲突 → 该项失败、字节保留。"""
+        import hashlib
+
+        src_dir, out_dir, _ = self._setup_with_output()
+        manifest = out_dir / "_manifest.json"
+        rec = json.loads(manifest.read_text(encoding="utf-8"))[0]
+        dup = dict(rec, source_sha256="0" * 64)  # 内容不同 → 冲突
+        manifest.write_text(
+            json.dumps([rec, dup], ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        before = {
+            p.relative_to(out_dir).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in out_dir.rglob("*") if p.is_file()
+        }
+        rc = convert_excel.main([str(src_dir), str(out_dir)])
+        self.assertEqual(rc, 1)
+        after = {
+            p.relative_to(out_dir).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in out_dir.rglob("*") if p.is_file()
+        }
+        self.assertEqual(after, before)
+
+    def test_identical_duplicates_silently_deduped(self) -> None:
+        """完全相同的重复条目 → 静默去重，不失败。"""
+        src_dir, out_dir, _ = self._setup_with_output()
+        manifest = out_dir / "_manifest.json"
+        rec = json.loads(manifest.read_text(encoding="utf-8"))[0]
+        manifest.write_text(
+            json.dumps([rec, dict(rec)], ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        result = convert_excel.process_file(src_dir / "t.xlsx", out_dir)
+        self.assertIn("Markdown", result)
+        records = json.loads(manifest.read_text(encoding="utf-8"))
+        self.assertEqual(len(records), 1)
+
+    def test_upsert_failure_after_outputs_is_explicit_half_success(self):
+        """输出写而 manifest 更新失败 → ConversionFailure(stage=manifest) 结构化报告。"""
+        import tempfile
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            tmp_path = Path(tmp)
+            src_dir = tmp_path / "in"
+            out_dir = tmp_path / "out"
+            src_dir.mkdir()
+            wb = Workbook()
+            wb.active.append(["H1"])
+            wb.active.append(["a"])
+            wb.save(src_dir / "t.xlsx")
+            with mock.patch.object(
+                convert_excel,
+                "_upsert_manifest",
+                side_effect=convert_excel.ManifestError(
+                    "write-failed", "simulated OSError"
+                ),
+            ):
+                with self.assertRaises(convert_excel.ConversionFailure) as ctx:
+                    convert_excel.process_file(src_dir / "t.xlsx", out_dir)
+            rpt = ctx.exception.report
+            self.assertEqual(rpt["stage"], "manifest")
+            self.assertEqual(rpt["source"], "t.xlsx")
+            self.assertFalse(rpt["manifest_updated"])
+            self.assertEqual(rpt["written_paths"], ["t.md"])
+            self.assertIn("t.md", rpt["possibly_affected"])
+            self.assertIn("半成功", rpt["recovery"])
+
+
+class StagedWriteFailureTest(unittest.TestCase):
+    """修复 7：多输出部分写入失败 → 结构化失败报告，不回滚、批量继续、非零 rc。"""
+
+    def _make_multi(self, src_dir: Path, name: str) -> None:
+        wb = Workbook()
+        wb.remove(wb.active)
+        for sheet in ("S1", "S2"):
+            ws = wb.create_sheet(sheet)
+            ws.append(["H1", "H2"])
+            ws.append(["a", 1])
+        wb.save(src_dir / name)
+
+    def test_second_output_write_failure_structured_report(self) -> None:
+        import tempfile
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            tmp_path = Path(tmp)
+            src_dir = tmp_path / "in"
+            out_dir = tmp_path / "out"
+            src_dir.mkdir()
+            self._make_multi(src_dir, "t.xlsx")
+            real_write_csv = convert_excel.write_csv
+
+            def flaky(path, headers, rows):
+                if path.name == "t_S2.csv":
+                    raise OSError("simulated disk full")
+                return real_write_csv(path, headers, rows)
+
+            with mock.patch.object(convert_excel, "write_csv", side_effect=flaky):
+                with self.assertRaises(convert_excel.ConversionFailure) as ctx:
+                    convert_excel.process_file(src_dir / "t.xlsx", out_dir)
+            rpt = ctx.exception.report
+            self.assertEqual(rpt["stage"], "write")
+            self.assertIn("OSError", rpt["error"])
+            self.assertEqual(rpt["source"], "t.xlsx")
+            self.assertEqual(rpt["written_paths"], ["csv/t_S1.csv"])
+            # possibly_affected = 全部预期输出（首写失败也不能宣称零影响）
+            self.assertEqual(
+                set(rpt["possibly_affected"]),
+                {"csv/t_S1.csv", "csv/t_S2.csv"},
+            )
+            self.assertFalse(rpt["manifest_updated"])
+            self.assertIn("重跑", rpt["recovery"])
+            # 第 1 个已写文件保留；manifest 未更新（不存在）
+            self.assertTrue((out_dir / "csv" / "t_S1.csv").is_file())
+            self.assertFalse((out_dir / "_manifest.json").exists())
+
+    def test_first_output_failure_still_lists_all_affected(self) -> None:
+        """首写即败：written_paths 为空，但 possibly_affected 仍列全部预期输出。"""
+        import tempfile
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            tmp_path = Path(tmp)
+            src_dir = tmp_path / "in"
+            out_dir = tmp_path / "out"
+            src_dir.mkdir()
+            self._make_multi(src_dir, "t.xlsx")
+            with mock.patch.object(
+                convert_excel, "write_csv",
+                side_effect=OSError("fail on first write"),
+            ):
+                with self.assertRaises(convert_excel.ConversionFailure) as ctx:
+                    convert_excel.process_file(src_dir / "t.xlsx", out_dir)
+            rpt = ctx.exception.report
+            self.assertEqual(rpt["stage"], "write")
+            self.assertEqual(rpt["written_paths"], [])
+            self.assertEqual(
+                set(rpt["possibly_affected"]),
+                {"csv/t_S1.csv", "csv/t_S2.csv"},
+            )
+
+    def test_batch_continues_other_sources_rc_nonzero(self) -> None:
+        """写失败源 → 批量继续其他独立源、汇总失败清单、rc=1。"""
+        import io
+        import contextlib
+        import tempfile
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            tmp_path = Path(tmp)
+            src_dir = tmp_path / "in"
+            out_dir = tmp_path / "out"
+            src_dir.mkdir()
+            # t1 = 简单单 sheet → MD 路由（不经 write_csv）；t2 = 多 sheet → 中断
+            wb1 = Workbook()
+            wb1.active.append(["H1"])
+            wb1.active.append(["ok"])
+            wb1.save(src_dir / "t1.xlsx")
+            self._make_multi(src_dir, "t2.xlsx")
+            real_write_csv = convert_excel.write_csv
+
+            def flaky(path, headers, rows):
+                if path.name == "t2_S2.csv":
+                    raise OSError("simulated disk full")
+                return real_write_csv(path, headers, rows)
+
+            buf, err_buf = io.StringIO(), io.StringIO()
+            with mock.patch.object(convert_excel, "write_csv", side_effect=flaky):
+                with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(err_buf):
+                    rc = convert_excel.main([str(src_dir), str(out_dir)])
+            self.assertEqual(rc, 1)
+            self.assertTrue((out_dir / "t1.md").is_file(), "其他源必须照常产出")
+            self.assertTrue((out_dir / "csv" / "t2_S1.csv").is_file())
+            out = buf.getvalue()
+            self.assertIn("t2.xlsx", out)
+            self.assertIn("失败阶段=write", out)
+            self.assertIn("可能受影响=2", out)
+            self.assertIn("失败汇总", out)
 
 
 if __name__ == "__main__":

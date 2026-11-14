@@ -29,15 +29,32 @@
   - 批注 / list 类数据验证导出（CSV 路径 → 同名 .csv.notes.md 边车；MD 路径 → 追加文末）
   - 尾部全空列裁剪（不做前导空列裁剪）
   - 溯源：每次转换写 {output_dir}/_manifest.json（source 路径/sha256/时间/extractor
-    版本/产物清单/fidelity）；MD 产物文首附 <!-- provenance --> 注释块（CSV 无内联头，
-    由 manifest 覆盖）
+    版本/产物清单/fidelity + 指纹字段 options/outputs/backend/fingerprint_format）；
+    MD 产物文首附 <!-- provenance --> 注释块（CSV 无内联头，由 manifest 覆盖）
   - MD 表格单元格转义：换行 → <br>，| → 转义竖线（CSV 路径由 csv 模块原生引号处理）
   - .xls / 误标 .xlsx（OLE2）自动用 libreoffice 转换
+
+增量重跑与守卫（harden-material-import-provenance）：
+  - 指纹七态状态机与模式×状态矩阵见 scripts/_fingerprint.py（唯一权威）。
+  - `--check`：只读状态检查（含路由变化 orphan-outputs 盘点 + needs_recheck
+    清单），零业务写入；.xls 且 soffice 不可得 → 该项 backend-unavailable。
+  - `--skip-up-to-date`：up-to-date 跳过；unknown 且已有输出 → 保留并报告需
+    显式重转；output-modified/conflict 任何模式不静默覆盖。
+  - `--force-overwrite-modified`：覆盖已检出人工修改输出的唯一显式例外。
+  - manifest 预写检查（D8）：任何输出写入前解析+结构校验目标 _manifest.json
+    （不可解析 / 结构非法 / 同 source_path 冲突记录三分类失败）；失败 → 该目录
+    全部失败、manifest 与已有输出字节原样保留、非零 rc；半成功（输出写而
+    manifest 更新失败）显式报错并给修复指引。
+  - 批量枚举跳过 basename `~$` 前缀的 Office 锁文件（列 skipped，不崩批量）。
+
+退出码：0=完成；1=工具失败（manifest 损坏/冲突、写入失败等）；3=完成且有
+发现（--check 检出非 up-to-date 状态；写模式存在被保护跳过/unknown 保留）。
 """
 
 from __future__ import annotations
 
 import csv
+import functools
 import hashlib
 import json
 import os
@@ -48,11 +65,15 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
+import _fingerprint
+
 SIMPLE_MAX_COLS = 8
 EXCEL_EPOCH = datetime(1899, 12, 30)
 TEMP_CONVERT = Path("/tmp/opencode/excel-convert")
 EXTRACTOR_VERSION = 3
 MANIFEST_NAME = "_manifest.json"
+# 指纹元数据格式版本（独立于 EXTRACTOR_VERSION，设计 D6）
+FINGERPRINT_FORMAT = _fingerprint.FINGERPRINT_FORMAT
 # 静态保真度说明（extractor 级预期，非逐文件分析）
 FIDELITY = {
     "text": "high",
@@ -73,6 +94,48 @@ def file_sha256(path: Path) -> str:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+class ManifestError(Exception):
+    """manifest 预写检查失败（D8 三分类 + 写入失败）。
+
+    kind ∈ unparseable / unreadable / invalid-structure / manifest-conflict /
+    write-failed
+    """
+
+    def __init__(self, kind: str, detail: str):
+        super().__init__(f"{kind}: {detail}")
+        self.kind = kind
+        self.detail = detail
+
+
+class ConversionFailure(Exception):
+    """多输出转换部分写入失败的结构化报告（修复 7）。
+
+    不强求事务、不宣称回滚；半成品文件不删除。report 字段：
+    {source, stage: write|hash|manifest, error, written_paths（已确认写完的）,
+    possibly_affected（该源全部预期输出——首写即败也不能凭成功计数宣称零影响）,
+    manifest_updated, recovery}
+    """
+
+    def __init__(self, report: dict):
+        super().__init__(str(report.get("error", "")))
+        self.report = report
+
+
+@functools.lru_cache(maxsize=1)
+def _soffice_version() -> str | None:
+    """libreoffice 版本字符串；不可得时 None（不猜测）。"""
+    try:
+        proc = subprocess.run(
+            ["soffice", "--version"], capture_output=True, text=True, timeout=30
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    lines = (proc.stdout or proc.stderr or "").strip().splitlines()
+    return lines[0].strip() if lines else None
 
 
 def is_ole2(path: Path) -> bool:
@@ -381,7 +444,7 @@ def write_csv(path: Path, headers: list[str], rows: list[list[str]]) -> None:
 
 
 def _md_escape_cell(s: str) -> str:
-    """MD 表格单元格转义：换行 → <br>（去掉 \\r），| → \\|。"""
+    """MD 表格单元格转义：换行 → <br>（去掉 \\\\r），| → \\\\|。"""
     return s.replace("\r\n", "\n").replace("\r", "").replace("\n", "<br>").replace("|", "\\|")
 
 
@@ -415,20 +478,368 @@ def write_md(
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _upsert_manifest(output_dir: Path, record: dict) -> None:
-    """按 source_path 覆盖旧记录后追加（重跑幂等）。"""
+# ─── manifest 预写检查（设计 D8）───────────────────────────────────
+
+
+def _validate_manifest_records(records: object) -> list[dict]:
+    """结构校验 + 同 source_path 重复去重/冲突检测。失败 raise ManifestError。"""
+    if not isinstance(records, list):
+        raise ManifestError(
+            "invalid-structure", f"manifest 顶层不是记录数组: {type(records).__name__}"
+        )
+    seen: dict[str, dict] = {}
+    out: list[dict] = []
+    for r in records:
+        if not isinstance(r, dict) or "source_path" not in r:
+            raise ManifestError(
+                "invalid-structure", f"记录缺必需键 source_path 或非对象: {r!r:.200}"
+            )
+        sp = r["source_path"]
+        if sp in seen:
+            if seen[sp] != r:
+                raise ManifestError(
+                    "manifest-conflict",
+                    f"同 source_path 重复且内容冲突的既有记录: {sp}",
+                )
+            continue  # 完全相同的重复条目 → 静默去重
+        seen[sp] = r
+        out.append(r)
+    return out
+
+
+def _load_manifest(output_dir: Path) -> list[dict]:
+    """解析+结构校验目标 _manifest.json（预写检查）。失败 raise ManifestError。
+
+    不存在 → []（首转）。
+    """
     manifest = output_dir / MANIFEST_NAME
-    records: list[dict] = []
-    if manifest.exists():
-        try:
-            records = json.loads(manifest.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            records = []
+    if not manifest.exists():
+        return []
+    try:
+        data = json.loads(manifest.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ManifestError("unparseable", str(exc)) from exc
+    except OSError as exc:
+        raise ManifestError("unreadable", str(exc)) from exc
+    return _validate_manifest_records(data)
+
+
+def _upsert_manifest(output_dir: Path, record: dict) -> None:
+    """按 source_path 覆盖旧记录后追加（重跑幂等）。
+
+    写入前先做与预写检查相同的解析+结构校验；任何失败上抛 ManifestError，
+    不再静默清空历史记录。
+    """
+    records = _load_manifest(output_dir)
     records = [r for r in records if r.get("source_path") != record["source_path"]]
     records.append(record)
-    manifest.write_text(
-        json.dumps(records, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    manifest = output_dir / MANIFEST_NAME
+    try:
+        manifest.write_text(
+            json.dumps(records, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+    except OSError as exc:
+        raise ManifestError(
+            "write-failed",
+            f"输出可能已写而 manifest 更新失败（半成功状态，不可接受）— "
+            f"修复指引: 解决 {exc} 后重跑以重建 manifest，或人工核对 {manifest} "
+            f"与目录内产物后修复该文件",
+        ) from exc
+
+
+def _find_record(records: list[dict], source_path: str) -> dict | None:
+    for r in records:
+        if r.get("source_path") == source_path:
+            return r
+    return None
+
+
+def _safe_output_path(output_dir: Path, rel: object) -> Path | None:
+    """manifest 记录中的相对输出路径 → 绝对路径；越界/非法 → None。"""
+    if not isinstance(rel, str) or not rel:
+        return None
+    if rel.startswith("/") or rel.startswith("\\") or ".." in rel.replace("\\", "/").split("/"):
+        return None
+    return output_dir / rel
+
+
+def _disk_stem_family(output_dir: Path, stem: str) -> set[str]:
+    """磁盘上属本源 stem 家族的输出文件（相对 output_dir posix 路径）。
+
+    家族：{stem}.md、csv/{stem}.csv、csv/{stem}_*.csv 及其 .notes.md 边车。
+    精确字符串匹配（不用 glob，stem 可含 [] 等特殊字符）；只盘点存在文件。
+    """
+    family: set[str] = set()
+    if (output_dir / f"{stem}.md").is_file():
+        family.add(f"{stem}.md")
+    csv_dir = output_dir / "csv"
+    if csv_dir.is_dir():
+        single = f"{stem}.csv"
+        under = stem + "_"
+        for name in os.listdir(csv_dir):
+            is_family = (
+                name == single
+                or name == single + ".notes.md"
+                or (
+                    name.startswith(under)
+                    and (name.endswith(".csv") or name.endswith(".csv.notes.md"))
+                )
+            )
+            if is_family and (csv_dir / name).is_file():
+                family.add(f"csv/{name}")
+    return family
+
+
+# ─── 指纹评估 ──────────────────────────────────────────────────────
+
+
+def _options_snapshot(
+    date_coerce: bool, header_row: int | None, header_scan: bool
+) -> dict:
+    return {
+        "date_coerce": bool(date_coerce),
+        "header_row": header_row,
+        "header_scan": bool(header_scan),
+    }
+
+
+def _record_factors(record: dict) -> _fingerprint.RecordFactors:
+    return _fingerprint.RecordFactors(
+        source_sha256=record.get("source_sha256"),
+        options=record.get("options"),
+        converter_version=record.get("extractor_version"),
+        outputs=record.get("outputs"),
+        fingerprint_format=record.get("fingerprint_format"),
     )
+
+
+def _observed_for(
+    src: Path,
+    output_dir: Path,
+    record: dict,
+    options: dict,
+) -> tuple[_fingerprint.Observed, bool]:
+    """当前观测 + 该源是否已有任何输出文件落盘（unknown 保留规则用）。
+
+    has_existing_output = record outputs/artifacts 命中磁盘 ∪ 磁盘保守候选
+    （stem 家族任一文件在磁盘，复用 _disk_stem_family）——修复 5：record 存在
+    但 outputs/artifacts 缺失或为空（旧/不完整记录）时，若只按 record 推导，
+    unknown 态会在 --skip-up-to-date 下走补齐语义覆盖磁盘上无指纹的旧产物。
+    """
+    existing: list[dict] = []
+    has_output = False
+    recorded = record.get("outputs") or []
+    legacy = record.get("artifacts") or []
+    checked: set[str] = set()
+    for o in recorded + [{"path": a} for a in legacy]:
+        rel = o.get("path")
+        if not isinstance(rel, str) or rel in checked:
+            continue
+        checked.add(rel)
+        p = _safe_output_path(output_dir, rel)
+        if p is not None and p.is_file():
+            has_output = True
+            if isinstance(o.get("sha256"), str):
+                existing.append({"path": rel, "sha256": file_sha256(p)})
+    if not has_output and _disk_stem_family(output_dir, src.stem):
+        has_output = True  # 磁盘保守候选命中：旧产物无指纹、修改不可检测
+    return (
+        _fingerprint.Observed(
+            source_sha256=file_sha256(src),
+            options=options,
+            converter_version=EXTRACTOR_VERSION,
+            existing_outputs=existing,
+        ),
+        has_output,
+    )
+
+
+# ─── 路由规划（纯读；供 process_file 写盘与 check_file 预期产物共用）──
+
+
+def _collect_artifacts(
+    xlsx: Path,
+    src: Path,
+    output_dir: Path,
+    date_coerce: bool,
+    header_row: int | None,
+    header_scan: bool,
+) -> tuple[str, list[dict], str]:
+    """纯读：按当前路由计算产物数据。返回 (route, items, result_str)。
+
+    items 每项 {kind: md|csv|notes, rel, ...payload}；不写任何文件。
+    """
+    stem = src.stem
+    simple = file_is_simple(xlsx, header_row=header_row, header_scan=header_scan)
+
+    wb = load_workbook(xlsx, data_only=True, read_only=False)
+    visible = [
+        ws for ws in wb.worksheets
+        if getattr(ws, "state", "visible") == "visible"
+    ]
+
+    items: list[dict] = []
+    if simple and len(visible) == 1:
+        headers, rows, preface = read_sheet_data(
+            visible[0], date_coerce=date_coerce,
+            header_row=header_row, header_scan=header_scan,
+        )
+        if not headers:
+            wb.close()
+            return "md", items, ""
+        notes = build_notes_lines(visible[0], multi_sheet=False)
+        items.append({
+            "kind": "md", "rel": f"{stem}.md", "title": stem,
+            "headers": headers, "rows": rows, "notes": notes, "preface": preface,
+        })
+        wb.close()
+        return (
+            "md",
+            items,
+            f"Markdown({sum(1 for h in headers if h)}c/{len(rows)}r)",
+        )
+
+    # 复杂：每 sheet 一个 CSV（+ notes 边车）
+    multi = len(visible) > 1
+    for ws in visible:
+        headers, rows, preface = read_sheet_data(
+            ws, date_coerce=date_coerce,
+            header_row=header_row, header_scan=header_scan,
+        )
+        if not headers:
+            continue
+        safe = ws.title.replace("/", "_").replace(" ", "_")
+        name = f"{stem}_{safe}.csv" if multi else f"{stem}.csv"
+        rel = f"csv/{name}"
+        items.append({
+            "kind": "csv", "rel": rel, "headers": headers, "rows": rows,
+        })
+        notes = build_notes_lines(ws, multi_sheet=multi, preface=preface)
+        if notes:
+            items.append({"kind": "notes", "rel": f"{rel}.notes.md", "notes": notes})
+    wb.close()
+    return "csv", items, f"CSV({len(visible)}s)"
+
+
+# ─── 只读状态检查（--check）────────────────────────────────────────
+
+
+def check_file(
+    src: Path,
+    output_dir: Path,
+    date_coerce: bool = True,
+    header_row: int | None = None,
+    header_scan: bool = True,
+) -> dict:
+    """单文件只读状态检查（零业务写入）。
+
+    返回 {file, state, missing_paths, modified_paths, orphans, needs_recheck,
+    note}；orphan-outputs 只盘点永不删除；.xls 且 soffice 不可得 →
+    backend-unavailable（不整体失败）。missing/modified 为叠加诊断（修复 6）：
+    并存时主状态仍是 output-modified/conflict，两侧清单同时携带。
+    """
+    info: dict = {
+        "file": src.name,
+        "state": None,
+        "missing_paths": [],
+        "modified_paths": [],
+        "orphans": [],
+        "needs_recheck": False,
+        "note": None,
+    }
+    try:
+        records = _load_manifest(output_dir)
+    except ManifestError as exc:
+        info.update(state="manifest-invalid", note=str(exc), needs_recheck=True)
+        return info
+
+    record = _find_record(records, str(src.resolve()))
+    if record is None:
+        info.update(state="unknown", note="no manifest record", needs_recheck=True)
+        return info
+
+    options = _options_snapshot(date_coerce, header_row, header_scan)
+    factors = _record_factors(record)
+    detail = {"state": "unknown", "missing_paths": [], "modified_paths": []}
+    if (
+        factors.source_sha256 is None
+        or factors.options is None
+        or factors.outputs is None
+        or factors.converter_version is None
+    ):
+        detail["state"] = "unknown"
+        note = "旧记录缺指纹字段（options/outputs/version）"
+    else:
+        observed, _ = _observed_for(src, output_dir, record, options)
+        detail = _fingerprint.evaluate_detail(factors, observed)
+        note = detail["state"]
+    state = detail["state"]
+
+    # 路由预期（纯读）→ orphan-outputs 盘点
+    expected: set[str] = set()
+    needs_soffice = src.suffix == ".xls" or is_ole2(src)
+    if needs_soffice and _soffice_version() is None:
+        info.update(
+            state="backend-unavailable",
+            note="soffice 不可得，无法判定 .xls 路由（其余指纹检查照常）",
+            needs_recheck=True,
+        )
+        return info
+    try:
+        xlsx = ensure_xlsx(src)
+        if is_ole2(xlsx):
+            info.update(
+                state=state, note=f"{note}; route-check-failed: OLE2 转换失败",
+                needs_recheck=True,
+            )
+            return info
+        _route, items, _r = _collect_artifacts(
+            xlsx, src, output_dir, date_coerce, header_row, header_scan
+        )
+        expected = {it["rel"] for it in items}
+    except Exception as exc:  # 路由检查失败不掩盖已得状态
+        info.update(
+            state=state,
+            note=f"{note}; route-check-failed: {type(exc).__name__}: {exc}",
+            needs_recheck=True,
+        )
+        return info
+
+    recorded_paths = {
+        o.get("path") for o in (record.get("outputs") or []) if isinstance(o, dict)
+    } or {a for a in (record.get("artifacts") or []) if isinstance(a, str)}
+    orphans = [
+        {"path": p, "origin": "manifest-recorded"}
+        for p in sorted(recorded_paths - expected) if p
+    ]
+    # disk-untracked 口径：磁盘上属本源 stem 家族、既不在当前路由预期、也不在
+    # 本目录 manifest 任何 record 的 outputs/artifacts 里的文件（"不在任何
+    # record"是保守护栏——同 stem 异扩展名或他人产物不误报）。默认重转后
+    # manifest 刷新不再列旧输出，此口径保证残留仍可盘点（tasks 2.6）。
+    if expected:
+        tracked: set[str] = set()
+        for r in records:
+            for o in (r.get("outputs") or []):
+                if isinstance(o, dict) and isinstance(o.get("path"), str):
+                    tracked.add(o["path"])
+            for a in (r.get("artifacts") or []):
+                if isinstance(a, str):
+                    tracked.add(a)
+        for rel in sorted(_disk_stem_family(output_dir, src.stem)):
+            if rel not in expected and rel not in tracked:
+                orphans.append({"path": rel, "origin": "disk-untracked"})
+    info.update(
+        state=state,
+        note=note,
+        orphans=orphans,
+        missing_paths=detail.get("missing_paths", []),
+        modified_paths=detail.get("modified_paths", []),
+        needs_recheck=(state != "up-to-date") or bool(orphans),
+    )
+    return info
+
+
+# ─── 转换入口 ──────────────────────────────────────────────────────
 
 
 def process_file(
@@ -437,20 +848,67 @@ def process_file(
     date_coerce: bool = True,
     header_row: int | None = None,
     header_scan: bool = True,
+    mode: str = _fingerprint.MODE_DEFAULT,
+    force_overwrite_modified: bool = False,
 ) -> str:
-    """处理一个文件，返回产出的格式（'Markdown' / 'CSV' / 'skip'）。
+    """处理一个文件，返回产出的格式（'Markdown(...)' / 'CSV(...)' / 'skip(...)'）。
 
-    同时写/更新 {output_dir}/_manifest.json（provenance + fidelity，按 source_path 幂等）。
-    header_row（1-based 显式表头行）/ header_scan（自动前言区检测）逐层透传。
+    同时写/更新 {output_dir}/_manifest.json（provenance + fidelity + 指纹字段，
+    按 source_path 幂等）。header_row（1-based 显式表头行）/ header_scan
+    （自动前言区检测）逐层透传。
+
+    顺序（D8）：预检 manifest → 指纹状态评估 → （按矩阵）转换写输出 →
+    upsert manifest（内部同样先校验）。任何输出写入之前 manifest 损坏 →
+    ManifestError；输出写而 manifest 更新失败 → ManifestError（半成功显式报错）。
     """
     if src.suffix == ".docx":
         return "skip"
+
+    # 预写检查：在本项目任何输出写入之前
+    records = _load_manifest(output_dir)
 
     xlsx = ensure_xlsx(src)
     if is_ole2(xlsx):
         return "skip"
 
     source_path = str(src.resolve())
+    record = _find_record(records, source_path)
+    options = _options_snapshot(date_coerce, header_row, header_scan)
+
+    if record is not None:
+        factors = _record_factors(record)
+        observed, has_output = _observed_for(src, output_dir, record, options)
+        detail = _fingerprint.evaluate_detail(factors, observed)
+        state = detail["state"]
+        decision = _fingerprint.decide_action(
+            state, mode,
+            has_existing_output=has_output,
+            force_overwrite_modified=force_overwrite_modified,
+            missing_paths=detail["missing_paths"],
+            modified_paths=detail["modified_paths"],
+        )
+        if decision.action == "skip":
+            if decision.protected:
+                print(
+                    f"skip: {src.name} — {decision.note}", file=sys.stderr
+                )
+            return f"skip({decision.note})"
+        if (
+            force_overwrite_modified
+            and state in (
+                _fingerprint.STATE_OUTPUT_MODIFIED, _fingerprint.STATE_CONFLICT
+            )
+        ):
+            covered = sorted(
+                o.get("path", "")
+                for o in (record.get("outputs") or [])
+                if isinstance(o, dict)
+            )
+            print(
+                "force-overwrite-modified: 覆盖已检出人工修改的输出: "
+                + ", ".join(p for p in covered if p)
+            )
+
     source_sha = file_sha256(src)
     source_size = src.stat().st_size
     extracted_at = datetime.now().isoformat(timespec="seconds")
@@ -463,76 +921,103 @@ def process_file(
         f"text={FIDELITY['text']}; structure={FIDELITY['structure']}; "
         f"notes: {FIDELITY['notes']}",
     ]
+
+    route, items, result = _collect_artifacts(
+        xlsx, src, output_dir, date_coerce, header_row, header_scan
+    )
+    if route == "md" and not items:
+        return "skip"  # 空 sheet → 旧语义：不写 manifest
+
+    # 分阶段失败报告（修复 7）：不强求事务、不回滚；半成品如实列受影响面。
+    expected_rels = [it["rel"] for it in items]
+
+    def _fail(stage: str, exc: Exception, written: list[str]) -> ConversionFailure:
+        recovery = {
+            "write": (
+                "重跑 convert_excel（默认模式）修复输出；manifest 未更新，"
+                "指纹状态仍指向失败前"
+            ),
+            "hash": (
+                "重跑 convert_excel（默认模式）重算输出指纹；manifest 未更新，"
+                "指纹状态仍指向失败前"
+            ),
+            "manifest": (
+                "输出已写而 manifest 未更新（半成功，不可接受状态）：解决 "
+                "_manifest.json 写入问题后重跑以重建该源 record；期间不要手工"
+                "编辑该源输出"
+            ),
+        }[stage]
+        return ConversionFailure({
+            "source": src.name,
+            "stage": stage,
+            "error": f"{type(exc).__name__}: {exc}",
+            "written_paths": list(written),
+            # 首写即败也不能凭"成功计数=0"宣称零影响——截断文件也可能存在
+            "possibly_affected": list(expected_rels),
+            "manifest_updated": False,
+            "recovery": recovery,
+        })
+
     artifacts: list[str] = []
+    outputs_meta: list[dict] = []
+    written: list[str] = []  # 已确认写完（write+hash 均成功）的输出
+    for it in items:
+        p = output_dir / it["rel"]
+        try:
+            if it["kind"] == "md":
+                write_md(
+                    p, it["title"], it["headers"], it["rows"], notes=it["notes"],
+                    provenance_lines=provenance_lines, preface=it["preface"],
+                )
+            elif it["kind"] == "csv":
+                write_csv(p, it["headers"], it["rows"])
+            else:
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text("\n".join(it["notes"]) + "\n", encoding="utf-8")
+        except Exception as exc:
+            raise _fail("write", exc, written) from exc
+        try:
+            sha = file_sha256(p)
+            size = p.stat().st_size
+        except Exception as exc:
+            raise _fail("hash", exc, written) from exc
+        written.append(it["rel"])
+        artifacts.append(it["rel"])
+        outputs_meta.append({"path": it["rel"], "sha256": sha, "bytes": size})
 
-    stem = src.stem
-    simple = file_is_simple(xlsx, header_row=header_row, header_scan=header_scan)
-
-    wb = load_workbook(xlsx, data_only=True, read_only=False)
-    visible = [
-        ws for ws in wb.worksheets
-        if getattr(ws, "state", "visible") == "visible"
-    ]
-
-    if simple and len(visible) == 1:
-        headers, rows, preface = read_sheet_data(
-            visible[0], date_coerce=date_coerce,
-            header_row=header_row, header_scan=header_scan,
+    try:
+        _upsert_manifest(output_dir, {
+            "source_path": source_path,
+            "source_sha256": source_sha,
+            "source_size": source_size,
+            "extracted_at": extracted_at,
+            "extractor": "convert_excel.py",
+            "extractor_version": EXTRACTOR_VERSION,
+            "artifacts": artifacts,
+            "fidelity": dict(FIDELITY),
+            "options": options,
+            "outputs": outputs_meta,
+            "backend": _soffice_version(),
+            "fingerprint_format": FINGERPRINT_FORMAT,
+        })
+    except ManifestError as exc:
+        print(
+            f"ERROR: 半成功状态 — {src.name} 输出已写而 manifest 更新失败: {exc}",
+            file=sys.stderr,
         )
-        if not headers:
-            wb.close()
-            return "skip"
-        notes = build_notes_lines(visible[0], multi_sheet=False)
-        md_path = output_dir / f"{stem}.md"
-        write_md(
-            md_path, stem, headers, rows, notes=notes,
-            provenance_lines=provenance_lines, preface=preface,
-        )
-        artifacts.append(md_path.relative_to(output_dir).as_posix())
-        wb.close()
-        result = f"Markdown({sum(1 for h in headers if h)}c/{len(rows)}r)"
-    else:
-        # 复杂：每 sheet 一个 CSV
-        csv_dir = output_dir / "csv"
-        multi = len(visible) > 1
-        for ws in visible:
-            headers, rows, preface = read_sheet_data(
-                ws, date_coerce=date_coerce,
-                header_row=header_row, header_scan=header_scan,
-            )
-            if not headers:
-                continue
-            safe = ws.title.replace("/", "_").replace(" ", "_")
-            name = f"{stem}_{safe}.csv" if multi else f"{stem}.csv"
-            write_csv(csv_dir / name, headers, rows)
-            artifacts.append(f"csv/{name}")
-            notes = build_notes_lines(ws, multi_sheet=multi, preface=preface)
-            if notes:
-                sidecar = csv_dir / f"{name}.notes.md"
-                sidecar.write_text("\n".join(notes) + "\n", encoding="utf-8")
-                artifacts.append(f"csv/{name}.notes.md")
-        wb.close()
-        result = f"CSV({len(visible)}s)"
-
-    _upsert_manifest(output_dir, {
-        "source_path": source_path,
-        "source_sha256": source_sha,
-        "source_size": source_size,
-        "extracted_at": extracted_at,
-        "extractor": "convert_excel.py",
-        "extractor_version": EXTRACTOR_VERSION,
-        "artifacts": artifacts,
-        "fidelity": dict(FIDELITY),
-    })
+        raise _fail("manifest", exc, written) from exc
     return result
 
 
-def main() -> int:
-    argv = sys.argv[1:]
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else list(argv)
     positional: list[str] = []
     date_coerce = True
     header_scan = True
     header_row: int | None = None
+    check_mode = False
+    skip_mode = False
+    force = False
     i = 0
     while i < len(argv):
         a = argv[i]
@@ -545,6 +1030,12 @@ def main() -> int:
             header_row = int(argv[i])
         elif a.startswith("--header-row="):
             header_row = int(a.split("=", 1)[1])
+        elif a == "--check":
+            check_mode = True
+        elif a == "--skip-up-to-date":
+            skip_mode = True
+        elif a == "--force-overwrite-modified":
+            force = True
         else:
             positional.append(a)
         i += 1
@@ -552,28 +1043,144 @@ def main() -> int:
     if len(positional) < 2:
         print(
             f"用法: {sys.argv[0]} <input_dir> <output_dir> "
-            "[--no-date-coerce] [--header-row N] [--no-header-scan]"
+            "[--no-date-coerce] [--header-row N] [--no-header-scan] "
+            "[--check] [--skip-up-to-date] [--force-overwrite-modified]\n"
+            "  旗标互斥: --check / --skip-up-to-date / --force-overwrite-modified "
+            "不可组合使用"
         )
         return 1
+    if skip_mode and force:
+        print(
+            "error: --skip-up-to-date 与 --force-overwrite-modified 不支持组合使用；"
+            "请用默认转换模式 + --force-overwrite-modified",
+            file=sys.stderr,
+        )
+        return 2
+    if check_mode and (skip_mode or force):
+        print(
+            "error: --check 与 --skip-up-to-date/--force-overwrite-modified 互斥",
+            file=sys.stderr,
+        )
+        return 2
+    mode = (
+        _fingerprint.MODE_CHECK if check_mode
+        else (_fingerprint.MODE_SKIP_UP_TO_DATE if skip_mode
+              else _fingerprint.MODE_DEFAULT)
+    )
 
     input_dir = Path(positional[0])
     output_dir = Path(positional[1])
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     files = sorted(
         f for f in os.listdir(input_dir)
         if f.endswith((".xlsx", ".xls"))
     )
+    # Office 锁文件守卫（D5 输入侧）：在 openpyxl/libreoffice 调用之前列 skipped
+    lock_files = [f for f in files if f.startswith("~$")]
+    files = [f for f in files if not f.startswith("~$")]
+    for f in lock_files:
+        print(f"  ⊘ {f}: skipped (office lock file)")
     print(f"处理 {len(files)} 个 Excel 文件...\n")
 
+    if mode == _fingerprint.MODE_CHECK:
+        # --check：零业务写入（不 mkdir output_dir）
+        needs_recheck: list[str] = []
+        errors = 0
+        for filename in files:
+            try:
+                info = check_file(
+                    input_dir / filename, output_dir,
+                    date_coerce=date_coerce, header_row=header_row,
+                    header_scan=header_scan,
+                )
+            except Exception as exc:
+                errors += 1
+                print(f"  ✗ {filename}: check-error: {type(exc).__name__}: {exc}")
+                continue
+            symbol = "✓" if not info["needs_recheck"] else "⊘"
+            line = f"  {symbol} {filename}: {info['state']}"
+            if info.get("note") and info["note"] != info["state"]:
+                line += f" ({info['note']})"
+            if info["orphans"]:
+                line += " | orphan-outputs: " + ", ".join(
+                    f"{o['path']} ({o['origin']})" for o in info["orphans"]
+                )
+            if info.get("missing_paths"):
+                line += " | missing: " + ", ".join(info["missing_paths"])
+            if info.get("modified_paths"):
+                line += " | modified: " + ", ".join(info["modified_paths"])
+            print(line)
+            if info["needs_recheck"]:
+                needs_recheck.append(str((input_dir / filename).resolve()))
+                needs_recheck.extend(
+                    str((output_dir / o["path"]).resolve())
+                    for o in info["orphans"]
+                )
+        if errors:
+            print(f"\n{errors} 个文件检查失败（工具错误）")
+            return 1
+        if needs_recheck:
+            print("\nneeds_recheck（仅路径引用；不自动删除/不改写人工 needs_review）:")
+            for p in sorted(set(needs_recheck)):
+                print(f"  - {p}")
+            return 3
+        print("\n全部 up-to-date")
+        return 0
+
+    # 写模式（default / skip-up-to-date）
+    output_dir.mkdir(parents=True, exist_ok=True)
+    failures: list[str] = []
+    findings: list[str] = []
     for filename in files:
-        result = process_file(
-            input_dir / filename, output_dir,
-            date_coerce=date_coerce, header_row=header_row, header_scan=header_scan,
-        )
-        symbol = "✓" if result != "skip" else "⊘"
+        try:
+            result = process_file(
+                input_dir / filename, output_dir,
+                date_coerce=date_coerce, header_row=header_row,
+                header_scan=header_scan, mode=mode,
+                force_overwrite_modified=force,
+            )
+        except ManifestError as exc:
+            failures.append(filename)
+            print(f"  ✗ {filename}: manifest 预写检查失败 — {exc}", file=sys.stderr)
+            print(f"  ✗ {filename}: manifest failure ({exc.kind})")
+            continue
+        except ConversionFailure as exc:
+            failures.append(filename)
+            rpt = exc.report
+            print(
+                f"  ✗ {filename}: stage={rpt['stage']} {rpt['error']} | "
+                f"written={rpt['written_paths']} | "
+                f"possibly_affected={rpt['possibly_affected']} | "
+                f"manifest_updated={rpt['manifest_updated']}",
+                file=sys.stderr,
+            )
+            print(
+                f"  ✗ {filename}: 失败阶段={rpt['stage']}；"
+                f"可能受影响={len(rpt['possibly_affected'])} 个输出；"
+                f"修复: {rpt['recovery']}"
+            )
+            continue
+        except Exception as exc:
+            failures.append(filename)
+            print(f"  ✗ {filename}: {type(exc).__name__}: {exc}", file=sys.stderr)
+            continue
+        symbol = "✓" if not result.startswith("skip") else "⊘"
+        if result.startswith("skip") and result != "skip":
+            # skip(<原因>) — up-to-date 跳过不算发现，其余算
+            if "up-to-date" not in result:
+                findings.append(filename)
         print(f"  {symbol} {filename}: {result}")
 
+    if failures:
+        print(f"\n失败汇总（{len(failures)} 个）: {', '.join(failures)}", file=sys.stderr)
+        print(
+            f"\n失败汇总: {len(failures)} 个（manifest 预写失败项：manifest 未被改动、"
+            "已有输出字节不变；转换中断项：半成品不删除不回滚，受影响面见 possibly_affected）"
+        )
+        return 1
+    if findings:
+        print(f"\n发现需注意项（{len(findings)} 个）: {', '.join(findings)}")
+        return 3
     return 0
 
 

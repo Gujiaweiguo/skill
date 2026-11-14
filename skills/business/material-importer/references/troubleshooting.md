@@ -112,3 +112,36 @@
 - 撞名：incoming 内部重复包展平后同名 → 按 sha256 去重，或嵌入源父目录段消歧，禁止 `~hash` 作为最终名（破坏后缀解析约定）；
 - Errno 36：文件名 >255 字节 → fit() 截断至 ≤240 字节，产物从暂存区按映射归位；
 - 错扩展名：按内容判别（`<!--` 开头 = markdown）重命名 `.md`，勿信扩展名。
+
+## 16. 损坏 manifest 预写检查（convert_excel 静默清空历史事故）
+
+**症状（v6 及以前）**：`raw/<dir>/_manifest.json` 损坏（截断/坏 JSON）后重跑 convert_excel，
+`_upsert_manifest` 捕获 JSONDecodeError 后 `records=[]` 重建——**全部历史溯源记录被静默清空**，
+且当时已写的输出与 manifest 处于半成功状态无人报错。
+**修复（v7，设计 D8）**：在本项目任何输出写入**之前**解析+结构校验目标 manifest。失败三分类：
+①不可解析（JSONDecodeError）②结构非法（非记录数组/元素缺 `source_path`）③同 `source_path`
+重复且内容冲突的既有记录（完全相同的重复可静默去重）。任一失败 → 该项目（=目标输出目录）
+失败：manifest 原样保留、已有输出字节不变、显式报告；批量继续其他独立项目并汇总失败清单
+非零收尾。半成功（输出已写而 manifest 未更新，如写盘 OSError）必须报错并给修复指引，
+**未来授权真实写入后同样不允许半成功**。
+**纪律**：修复 manifest 本身属人工操作——不要为了"让批量过"去改写损坏 manifest。
+
+## 17. Office `~$` 锁文件（批量崩溃 + 投影混入双向坑）
+
+**症状 A（输入侧崩溃）**：incoming 里有 `~$xxx.xlsx`（Office 打开文档时的 owner 锁文件，
+内容非 zip）→ openpyxl `BadZipFile` 未捕获，**整批转换崩溃**；`~$xxx.docx/pptx` 走魔数守卫
+被报成格式错误（rc=1，语义误导——它不是坏文件，是别人开着文件）。
+**症状 B（投影侧混入）**：历史投影文件名**中部**含 `~$`（实证：
+`materials/09-market-expansion/.../~$1 招标管理培训2021.3.2.md`，455B 含 56 个 NUL）——
+疑似锁文件被当正文转换进了素材库。
+**修复（v7，设计 D5 两侧规则）**：
+- **输入侧**：basename `startswith("~$")` 在 openpyxl/libreoffice/markitdown 调用**之前**拦截。
+  convert_doc / extract_images 单文件 → exit 3 + skipped 说明（区别于 1=转换错、2=用法错）；
+  convert_excel 批量枚举 → 列 skipped、其余文件正常处理。前缀约定比解析锁文件内容可靠
+  （内容格式随 Office 版本变化）。
+- **投影侧**：文件名中部 `~$` 只是 `provenance_inventory.py` 的 `garbage-candidate`
+  候选线索（不拦截、不删除、不单独定罪）；处置属 Owner 授权批次，工具只产清单。
+- **两侧是两回事，互不套用**：不能拿输入侧前缀规则去删历史投影，也不能拿"中部 ~$"去
+  拦截输入文件。
+**既有魔数守卫不弱化**：非 `~$` 前缀但字节非法的文件（非 PK 的 .pptx/.docx、非 %PDF- 的
+.pdf）照常 rc=1 拒绝。

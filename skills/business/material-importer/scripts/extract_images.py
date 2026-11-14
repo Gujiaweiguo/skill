@@ -277,6 +277,13 @@ def main(argv: list[str] | None = None) -> int:
 
     use_json = parsed.json
     target = parsed.target.rstrip("/\\")
+
+    # Office 锁文件守卫（单文件模式；批量枚举已有 ~$ 跳过）：
+    # basename 前缀 ~$ 在进入提取逻辑之前拦截，专用退出码 3（skipped 语义）。
+    if not os.path.isdir(target) and os.path.basename(target).startswith("~$"):
+        print(f"  ⏭️ 跳过 (office lock file): {target}")
+        return 3
+
     raw_dir = str(resolve_raw_dir(parsed.raw_dir))
 
     results = []

@@ -14,15 +14,34 @@
      undetermined (detect-error: 原因)（检测失败，永不渲染成 none）。
      检测是 advisory：失败不影响文本转换产物，原因进信号行 + stderr。
   5. 输出 = provenance 注释块 + 转换内容；覆盖已有输出允许（重提取幂等）。
+  6. MD 内联指纹（harden-material-import-provenance，设计 D3）：文首注释块
+     追加 `output_body_sha256`（正文范围哈希：文首连续 <!-- ... --> 注释块
+     结束之后到 EOF 的全部字节，先算 content 哈希再拼头，无自引用）与
+     `output_digest_scope: post-provenance-header`。头块自身不在内联保护内
+     （残余风险 R2，明示不掩饰）；整文件完整性由外置记录（manifest）提供。
+     extracted_by 行内的日期不参与状态判定（只解析 vN）。
+  7. 状态机（scripts/_fingerprint.py，七态 + 模式×状态矩阵）：
+     - `--check`：只读报告状态，零写入。
+     - `--skip-up-to-date`：up-to-date 跳过；unknown 且已有输出 → 保留并报告
+       需显式重转；首转/output-missing 补齐不受拦截。
+     - `--force-overwrite-modified`：覆盖已检出人工修改输出的唯一显式例外。
+     本脚本无选项域 → options-changed 永不出现（不凭空报）。
+  8. 输入侧锁文件守卫（设计 D5）：basename `~$` 前缀在魔数检查与 markitdown
+     调用之前拦截 → skipped + exit 3。
 
 用法：uv run scripts/convert_doc.py <input.(pptx|docx|pdf)> <output.md>
+      [--check] [--skip-up-to-date] [--force-overwrite-modified]
 （非 PEP 723 独立脚本 —— markitdown 在 skill venv pyproject 里。）
+
+退出码：0=成功/up-to-date 跳过；1=转换错误；2=用法错误；3=skipped（锁文件）
+或检查/写模式检出发现（output-modified/conflict/unknown 保留等需注意状态）。
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from datetime import date
@@ -43,6 +62,12 @@ TEXT_SPARSE_MAX_VISIBLE_CHARS = 50  # 同 slide 正文可见字符（非空白�
 TEXT_SPARSE_MIN_PICS = 1            # 同 slide 图片形状 ≥ 1
 RULESET_VERSION = "ppt-evidence-ruleset-v1"
 SKILL_DIR = Path(__file__).resolve().parent.parent
+
+# 共享状态机（scripts/ 同目录）
+_SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
+import _fingerprint  # noqa: E402
 
 
 def file_sha256(path: Path) -> str:
@@ -75,6 +100,86 @@ def run_markitdown(src: Path) -> str:
         print(f"markitdown failed (rc={proc.returncode}):\n{proc.stderr}", file=sys.stderr)
         raise SystemExit(1)
     return proc.stdout
+
+
+# ─── MD 内联指纹（设计 D3）────────────────────────────────────────
+
+
+def parse_provenance_header(path: Path) -> tuple[dict[str, str], int]:
+    """解析文首连续 <!-- ... --> 注释块。返回 (字段映射, 正文起始字节偏移)。
+
+    头块 = 文件开头起逐行 fullmatch `<!-- ... -->` 的最大连续段。正文偏移
+    取 **`output_digest_scope` 标记行**的换行符之后 —— 该行是 provenance 头
+    的确定性结尾（markitdown 的 pptx 输出自身也以 `<!-- Slide number -->`
+    注释行开头，若按"连续注释段尾"取边界会把正文首部注释行并入头块，导致
+    写入端/读取端口径漂移）。头块内无该标记（旧产物）→ 回退连续注释段尾
+    （此类文件本就判 unknown，不参与指纹判定）。
+    """
+    data = path.read_bytes()
+    fields: dict[str, str] = {}
+    pos = 0
+    scope_offset: int | None = None
+    while True:
+        nl = data.find(b"\n", pos)
+        line = data[pos:nl] if nl != -1 else data[pos:]
+        m = re.fullmatch(rb"<!--\s*(.*?)\s*-->", line)
+        if not m:
+            break
+        inner = m.group(1).decode("utf-8", "replace")
+        if ":" in inner:
+            k, v = inner.split(":", 1)
+            fields[k.strip()] = v.strip()
+        if nl == -1:
+            pos = len(data)
+            break
+        pos = nl + 1
+        if scope_offset is None and "output_digest_scope" in fields:
+            scope_offset = pos
+    if scope_offset is not None:
+        return fields, scope_offset
+    return fields, pos
+
+
+
+def _evaluate_doc_state(src: Path, out: Path) -> tuple[str | None, dict[str, str], dict]:
+    """评估输出 MD 的指纹状态。
+
+    返回 (state, header_fields, detail)；out 不存在 → (None, {}, {})（首转）；
+    detail = evaluate_detail 的 {state, missing_paths, modified_paths}（单输出
+    天然最多只有其一）。指纹要素：source_sha256、extracted_by 的 vN、
+    output_body_sha256；缺任一（旧产物）→ unknown。
+    """
+    empty = {"state": _fingerprint.STATE_UNKNOWN,
+             "missing_paths": [], "modified_paths": []}
+    if not out.exists():
+        return None, {}, {}
+    fields, body_offset = parse_provenance_header(out)
+    body_sha = fields.get("output_body_sha256")
+    version_match = re.search(r"v(\d+)", fields.get("extracted_by", ""))
+    if (
+        not _fingerprint.valid_sha256(fields.get("source_sha256"))
+        or not _fingerprint.valid_sha256(body_sha)
+        or version_match is None
+        or fields.get("output_digest_scope") != "post-provenance-header"
+    ):
+        return _fingerprint.STATE_UNKNOWN, fields, empty
+    record = _fingerprint.RecordFactors(
+        source_sha256=fields["source_sha256"],
+        options={},
+        converter_version=int(version_match.group(1)),
+        outputs=[{"path": out.name, "sha256": body_sha}],
+    )
+    observed = _fingerprint.Observed(
+        source_sha256=file_sha256(src),
+        options={},
+        converter_version=EXTRACTOR_VERSION,
+        existing_outputs=[{
+            "path": out.name,
+            "sha256": hashlib.sha256(out.read_bytes()[body_offset:]).hexdigest(),
+        }],
+    )
+    detail = _fingerprint.evaluate_detail(record, observed)
+    return detail["state"], fields, detail
 
 
 def _warn(what: str, reason: str) -> None:
@@ -216,11 +321,42 @@ def _outcome_summary(outcome: tuple[str, list, str | None]) -> str:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 2:
-        print(f"用法: {argv[0]} <input.(pptx|docx|pdf)> <output.md>", file=sys.stderr)
+    flags = {
+        "--check": False,
+        "--skip-up-to-date": False,
+        "--force-overwrite-modified": False,
+    }
+    positional: list[str] = []
+    for a in argv:
+        if a in flags:
+            flags[a] = True
+        elif a.startswith("--"):
+            print(f"error: unknown flag {a}", file=sys.stderr)
+            return 2
+        else:
+            positional.append(a)
+    if flags["--check"] and (flags["--skip-up-to-date"] or flags["--force-overwrite-modified"]):
+        print("error: --check 与 --skip-up-to-date/--force-overwrite-modified 互斥", file=sys.stderr)
         return 2
-    src = Path(argv[0]).resolve()
-    out = Path(argv[1])
+    if flags["--skip-up-to-date"] and flags["--force-overwrite-modified"]:
+        print(
+            "error: --skip-up-to-date 与 --force-overwrite-modified 不支持组合使用；"
+            "请用默认转换模式 + --force-overwrite-modified",
+            file=sys.stderr,
+        )
+        return 2
+
+    if len(positional) != 2:
+        print(
+            f"用法: convert_doc.py <input.(pptx|docx|pdf)> <output.md> "
+            "[--check] [--skip-up-to-date] [--force-overwrite-modified]\n"
+            "  旗标互斥: --check / --skip-up-to-date / --force-overwrite-modified "
+            "不可组合使用",
+            file=sys.stderr,
+        )
+        return 2
+    src = Path(positional[0]).resolve()
+    out = Path(positional[1])
     if not src.is_file():
         print(f"error: not found: {src}", file=sys.stderr)
         return 2
@@ -228,6 +364,13 @@ def main(argv: list[str]) -> int:
     if suffix not in (".pptx", ".docx", ".pdf"):
         print(f"error: unsupported suffix {suffix!r} (expect .pptx/.docx/.pdf)", file=sys.stderr)
         return 2
+
+    # Office 锁文件守卫（设计 D5 输入侧）：在魔数检查与 markitdown 之前拦截。
+    # 锁文件内容格式随 Office 版本变化不可靠，前缀约定稳定。
+    if src.name.startswith("~$"):
+        print(f"skipped: office lock file — {src.name}（Office 打开时的锁文件，不转换）")
+        print(f"skipped: office lock file — {src.name}", file=sys.stderr)
+        return 3
 
     # markitdown 对垃圾字节可能按纯文本 rc=0 输出（实测），先做魔数校验拦截
     magic = src.open("rb").read(5)
@@ -237,6 +380,50 @@ def main(argv: list[str]) -> int:
     if suffix == ".pdf" and magic != b"%PDF-":
         print(f"error: {src} is not a valid PDF file — refusing to convert", file=sys.stderr)
         return 1
+
+    # 指纹状态评估（纯读；extracted_by 日期不参与判定）
+    state, _fields, detail = _evaluate_doc_state(src, out)
+    mode = (
+        _fingerprint.MODE_CHECK if flags["--check"]
+        else (_fingerprint.MODE_SKIP_UP_TO_DATE if flags["--skip-up-to-date"]
+              else _fingerprint.MODE_DEFAULT)
+    )
+    if state is None:
+        # 首转（无输出文件）
+        if mode == _fingerprint.MODE_CHECK:
+            print(f"check: {out} state=unknown (首次转换，尚无输出)")
+            return 3
+    else:
+        decision = _fingerprint.decide_action(
+            state, mode,
+            has_existing_output=out.exists(),
+            force_overwrite_modified=flags["--force-overwrite-modified"],
+            missing_paths=detail.get("missing_paths", []),
+            modified_paths=detail.get("modified_paths", []),
+        )
+        if mode == _fingerprint.MODE_CHECK:
+            # --check 一律零写入；叠加诊断（missing/modified）与主状态同报
+            line = f"check: {out} state={state}"
+            if detail.get("modified_paths"):
+                line += " | modified: " + ", ".join(detail["modified_paths"])
+            if detail.get("missing_paths"):
+                line += " | missing: " + ", ".join(detail["missing_paths"])
+            print(line)
+            return 0 if state == _fingerprint.STATE_UP_TO_DATE else 3
+        if decision.action == "skip":
+            if state == _fingerprint.STATE_UP_TO_DATE:
+                print(f"skip: up-to-date — {out}")
+                return 0
+            print(f"skip: {out} — {decision.note}", file=sys.stderr)
+            print(f"skip: {out} state={state}（已有输出保留）")
+            return 3
+        if (
+            flags["--force-overwrite-modified"]
+            and state in (
+                _fingerprint.STATE_OUTPUT_MODIFIED, _fingerprint.STATE_CONFLICT
+            )
+        ):
+            print(f"force-overwrite-modified: 覆盖已检出人工修改的输出: {out}")
 
     source_rel = resolve_source_relpath(src)
     sha = file_sha256(src)
@@ -249,6 +436,10 @@ def main(argv: list[str]) -> int:
         suspects_out = detect_pptx_suspects(src)
         sparse_out = detect_text_sparse(src)
 
+    # MD 内联指纹：先算正文范围哈希再拼头（无自引用）
+    body_bytes = content.encode("utf-8")
+    body_sha = hashlib.sha256(body_bytes).hexdigest()
+
     header_lines = [
         f"<!-- source: {source_rel} -->",
         f"<!-- source_sha256: {sha} -->",
@@ -259,9 +450,13 @@ def main(argv: list[str]) -> int:
         header_lines.append(f"<!-- {render_suspects_line(suspects_out)} -->")
         header_lines.append(f"<!-- {render_text_sparse_line(sparse_out)} -->")
         header_lines.append(f"<!-- pptx_evidence_ruleset: {RULESET_VERSION} -->")
+    header_lines.append(f"<!-- output_body_sha256: {body_sha} -->")
+    header_lines.append("<!-- output_digest_scope: post-provenance-header -->")
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text("\n".join(header_lines) + "\n" + content, encoding="utf-8")
+    out.write_bytes(
+        "\n".join(header_lines).encode("utf-8") + b"\n" + body_bytes
+    )
 
     summary = ""
     if suffix == ".pptx":

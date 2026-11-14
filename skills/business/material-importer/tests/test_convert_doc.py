@@ -32,9 +32,9 @@ SKILL_DIR = Path(__file__).resolve().parent.parent
 SCRIPT = SKILL_DIR / "scripts" / "convert_doc.py"
 
 
-def run_script(src: Path, out: Path):
+def run_script(src: Path, out: Path, extra_args: list[str] | None = None):
     return subprocess.run(
-        [sys.executable, str(SCRIPT), str(src), str(out)],
+        [sys.executable, str(SCRIPT), str(src), str(out), *(extra_args or [])],
         cwd=str(SKILL_DIR),
         capture_output=True,
         text=True,
@@ -365,6 +365,96 @@ class ConvertDocFailureTest(unittest.TestCase):
             proc = run_script(bad, out)
             self.assertEqual(proc.returncode, 1)
             self.assertFalse(out.exists(), "失败时不得写出部分产物")
+
+    def test_corrupt_docx_magic_guard_regression(self):
+        """非 ~$ 前缀但字节非法的 .docx（非 PK）→ rc=1，行为与改动前一致。"""
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            root = Path(tmp)
+            bad = root / "bad.docx"
+            bad.write_bytes(b"\xd0\xcf\x11\xe0ole2-bytes-mislabeled")
+            out = root / "bad.docx.md"
+            proc = run_script(bad, out)
+            self.assertEqual(proc.returncode, 1)
+            self.assertFalse(out.exists())
+
+    def test_corrupt_pdf_magic_guard_regression(self):
+        """非 %PDF- 的 .pdf → rc=1 报错，不写产物。"""
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            root = Path(tmp)
+            bad = root / "bad.pdf"
+            bad.write_bytes(b"clearly not a pdf document")
+            out = root / "bad.pdf.md"
+            proc = run_script(bad, out)
+            self.assertEqual(proc.returncode, 1)
+            self.assertFalse(out.exists())
+
+
+class ConvertDocLockFileTest(unittest.TestCase):
+    """Office 锁文件守卫（D5 输入侧）：~$ 前缀在魔数/markitdown 之前拦截。"""
+
+    def test_single_lock_file_exit3_no_markitdown(self):
+        mod = load_convert_doc()
+        called: list[Path] = []
+
+        def spy(src):
+            called.append(src)
+            return "should never run\n"
+
+        mod.run_markitdown = spy
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            root = Path(tmp)
+            # 非 PK 头的任意字节 = 触发 BadZipFile 的真实锁文件形态
+            lock = root / "~$海鼎.pptx"
+            lock.write_bytes(b"\x00\x01office-lock-garbage-not-zip")
+            out = root / "out" / "~$海鼎.pptx.md"
+            stdout_buf, stderr_buf = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(stdout_buf), contextlib.redirect_stderr(stderr_buf):
+                rc = mod.main([str(lock), str(out)])
+            self.assertEqual(rc, 3)
+            self.assertFalse(out.exists())
+            self.assertEqual(called, [], "锁文件必须先于 markitdown 被拦截")
+            self.assertIn("office lock file", stdout_buf.getvalue())
+            self.assertIn("skipped", stderr_buf.getvalue())
+
+    def test_single_lock_file_via_subprocess_exit3(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            root = Path(tmp)
+            lock = root / "~$xxx.docx"
+            lock.write_bytes(b"non-zip lock bytes")
+            out = root / "~$xxx.docx.md"
+            proc = run_script(lock, out)
+            self.assertEqual(proc.returncode, 3)
+            self.assertIn("office lock file", proc.stdout + proc.stderr)
+            self.assertFalse(out.exists())
+
+
+class ConvertDocFlagCombinationTest(unittest.TestCase):
+    """修复 8：--skip-up-to-date + --force-overwrite-modified → 用法错误 rc=2。"""
+
+    def test_combo_usage_error_rc2(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            root = Path(tmp)
+            src = root / "s.pptx"
+            src.write_bytes(b"PK\x03\x04body")
+            out = root / "s.pptx.md"
+            proc = run_script(src, out, extra_args=[
+                "--skip-up-to-date", "--force-overwrite-modified",
+            ])
+            self.assertEqual(proc.returncode, 2)
+            msg = proc.stdout + proc.stderr
+            self.assertIn("不支持组合使用", msg)
+            self.assertIn("默认转换模式 + --force-overwrite-modified", msg)
+            self.assertFalse(out.exists())
+
+    def test_check_plus_skip_usage_error_rc2(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as tmp:
+            root = Path(tmp)
+            src = root / "s.docx"
+            src.write_bytes(b"PK\x03\x04body")
+            proc = run_script(src, root / "s.docx.md", extra_args=[
+                "--check", "--skip-up-to-date",
+            ])
+            self.assertEqual(proc.returncode, 2)
 
 
 if __name__ == "__main__":

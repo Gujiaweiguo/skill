@@ -40,6 +40,21 @@ compatibility: >
     PEP 723 inline deps in the script header document requirements but are not the primary run path.
   Cert expiry: pytesseract (optional, CPU-only, lightweight).
 change: >
+  v7 — 2026-11-14（harden-material-import-provenance）
+  • 新增 scripts/provenance_inventory.py：只读溯源体检（四类链接状态 + source_nature/
+    accessibility/hash_check 三维分维、boundary-violation 单列、抽样口径显式、退出码
+    0/1/2/3、--repair-candidates 候选分级、多公司基座隔离）
+  • 转换指纹与增量重跑：convert_excel manifest 新增 options/outputs/backend/
+    fingerprint_format；convert_doc MD 内联 output_body_sha256（正文范围哈希）；
+    两入口新增 --check（零写入）/ --skip-up-to-date / --force-overwrite-modified，
+    模式×状态矩阵逐格实现（见「溯源生命周期」专节）
+  • manifest 预写检查：任何输出写入前校验目标 _manifest.json，损坏/结构非法/记录冲突
+    → 该项失败且已有字节保留，不再静默清空历史
+  • Office ~$ 锁文件输入侧守卫（convert_doc/extract_images 单文件 exit 3，convert_excel
+    批量 skip）；文件名中部 ~$ 投影只进体检 garbage-candidate 候选清单
+  • backfill_source.py：回填分级持久化（provenance_class + source_sha256_at_backfill
+    + backfilled_at），兼容读取旧 backfilled 记录，新增 wrong_source_suspects
+  • 新增唯一共享证据边界 references/provenance-evidence-boundary.md（消费方引用不复制）
   v6 — 2026-10-30
   • convert_doc.py v2：pptx 新增页级 text-sparse 复核信号（同 slide 正文 ≤50 字且 ≥1 图，
     规则集 ppt-evidence-ruleset-v1，常量不建配置系统）
@@ -126,6 +141,90 @@ $COMPANY_BASE/                     ← 🏢 当前公司根（config/company.yam
 - 存量投影溯源回填：`uv run scripts/backfill_source.py <base> [--dry-run] [--json-report PATH]`
   （materials 补 `source:` 指向 incoming 原件；raw/*.md 文首补 source+sha256 注释块；
   仅唯一匹配才写，未匹配清单见报告 JSON。2026-10-16 已跑：materials 701→971，raw 369 个）。
+  v7 起：回填写入随产物持久化分级（`provenance_class: candidate-association` +
+  `source_sha256_at_backfill` + `backfilled_at`，不再用裸 `source_sha256` 字段名）；
+  已有 source 的文件不改写，但声明来源不可解析时会进报告 `wrong_source_suspects`（仅建议）。
+
+## 溯源生命周期（只读体检 / 转换指纹 / 增量重跑，v7）
+
+图片 / text-sparse / OCR 的**证据边界规则**唯一权威源：
+`references/provenance-evidence-boundary.md`（检测三态、页级锚点、OCR=检索线索、
+fresh-clone 三项要求、evidence_state 逐项映射表）。本 skill 与消费方（competitor-product-analyzer）
+引用该文件，不复制规则文本。
+
+### 只读溯源体检（provenance_inventory.py）
+
+```bash
+uv run {baseDir}/scripts/provenance_inventory.py [--base $COMPANY_BASE] [--report PATH] \
+    [--full-hash] [--repair-candidates] [--sample-bytes N]
+```
+
+- **零业务写入**：纯读盘点 incoming/raw(.md/.csv/.notes.md)/_manifest.json/materials，
+  报告写 stdout 或显式 `--report` 路径（绝不默认写 docs 基座）；运行前后基座字节不变（测试钉死）。
+- **分维表达**（不压缩合并）：每条目 `source_nature`（declared/inferred/none）×
+  `accessibility`（accessible/missing/permission-denied/not-scanned/backend-unavailable）×
+  `hash_check`（match/mismatch/not-applicable/no-declared-hash/unknown-scope），
+  另有 `link_state`（observed/declared/inferred/unknown-unavailable）描述来源链接定性。
+- **推断永不升级**：路径结构/文件名/`_index.json` 的 imported_from 推断一律 `inferred`
+  （附候选与依据），唯一候选也不等于已验证原件身份。
+- **默认哈希策略**：只哈希有声明哈希需比对的对象；`--full-hash` opt-in 全量。
+- **抽样口径显式**：无效投影诊断默认读前 64 KiB，报 `sampled_bytes`/`sample_nul_count`
+  /`nul_scope`（sample|full，全文件计数仅在完整读取时报）；UTF-8 严格解码失败报
+  `encoding-invalid`；短文档/空白文档不判垃圾；文件名中部含 `~$` 的投影只进
+  `garbage-candidate` 候选清单（不拦截、不删除、不单独定罪）。
+- **多公司隔离**：复用 `_company_base.resolve_company_base()`（无静默默认公司）；
+  匹配索引/指纹/manifest 只在当前基座内构建，同名原件/相同相对路径不跨公司匹配复用；
+  声明来源解析（含 symlink）越出基座 → `boundary-violation` 单列且不读取目标内容。
+- **退出码**：0=完成无缺口 / 1=工具失败 / 2=用法错误 / 3=完成且有发现（缺口清单含缺来源、
+  缺哈希、缺原件、歧义匹配、manifest 损坏/记录冲突/产物缺失、边界问题）。
+  **「有发现」不是工具故障**——rc=3 时报告仍是完整可用的证据。
+- `--repair-candidates`：对缺溯源产物产候选（唯一 basename 匹配 → candidate-association
+  级，附候选原件当前哈希；多候选/无依据 CSV↔sheet 映射 → unresolved；已有 source →
+  wrong_source_suspects 仅评估建议）。recorded-at-conversion 只按 D7 三要件对既有记录判定
+  （转换器签名 + 同基座来源 + 合法转换时哈希），仅证明存在转换时点的来源声明；
+  verified-historical 为更高独立核验概念，本工具永不自动授予。历史回填/重转/清理
+  **必须**由 Owner 基于本工具 dry-run 报告另行授权后才执行。
+
+### 转换指纹与增量重跑（convert_doc / convert_excel）
+
+指纹五要素：原件身份+字节哈希、转换器代际（EXTRACTOR_VERSION）、有效选项快照
+（convert_excel：date_coerce/header_row/header_scan）、可得时后端版本、预期输出清单+输出指纹。
+- convert_excel：指纹记在 `raw/<dir>/_manifest.json`（`options`/`outputs[{path,sha256,bytes}]`/
+  `backend`/`fingerprint_format: 1`；整文件哈希只在 manifest 外置记录）。
+- convert_doc：MD 文首 provenance 块内联 `output_body_sha256` +
+  `output_digest_scope: post-provenance-header`（范围哈希 = 排除文首溯源头的正文范围，
+  以 `output_digest_scope` 标记行为头的确定性边界——markitdown 正文自身可能以注释行开头，
+  按"连续注释段尾"取边界会漂移；**不做整文件自引用**）。已知残余风险 R2：头块自身被改写
+  不在内联保护范围内，完整性要求高的场景走 manifest 外置记录。旧产物无指纹行 = unknown。
+- `fingerprint_format`（指纹元数据格式）与 `EXTRACTOR_VERSION`（转换内容语义）分离维护、
+  互不倒推；旧产物缺指纹 = `unknown`（不判 up-to-date、不强制重转）。
+
+**模式×状态矩阵**（六态×三模式，`scripts/_fingerprint.py` 为唯一实现，测试逐格钉死）：
+
+| 状态 | 旧默认（无旗标） | `--check` | `--skip-up-to-date` |
+|---|---|---|---|
+| unknown（有已有输出） | 重转覆盖（=现状，无从检测修改） | 报告 unknown，零写入 | **保留已有输出**+报告需显式重转 |
+| unknown（首转/无输出） | 重转 | 报告 unknown，零写入 | 重转（补齐语义不被拦截） |
+| up-to-date | 重转（=现状幂等重写） | 报告 | 跳过 |
+| source/options/converter-changed | 重转覆盖 | 报告对应状态 | 重转 |
+| output-missing | 重转补齐 | 报告 | 重转补齐 |
+| output-modified / conflict | **不覆盖**：跳过+报告证据 | 报告+两侧证据 | 跳过+报告 |
+
+`--force-overwrite-modified` 是唯一显式覆盖例外（打印被覆盖清单）；`--check` 任何情况零业务
+写入。下游影响只输出 needs_recheck 路径清单，不触碰 `_index.json` 人工 `needs_review`；
+多 sheet/改名/路由变化产生的旧输出进 orphan-outputs 盘点，**永不自动删除**。
+
+### manifest 预写检查与锁文件守卫
+
+- convert_excel 在本项目**任何输出写入前**解析+结构校验目标 `_manifest.json`：不可解析/
+  结构非法（非记录数组、缺 source_path）/同 source_path 内容冲突 → 该项失败、manifest 与
+  已有输出字节保留、显式报告；批量继续其他独立项目并汇总失败。半成功（输出写而 manifest
+  未更新）必须报错，不是可接受状态。
+- Office `~$` 锁文件：**输入侧** basename 前缀在调用 openpyxl/libreoffice/markitdown 之前
+  拦截——convert_doc / extract_images 单文件 exit 3（skipped 语义，非格式错误），convert_excel
+  批量列 skipped 不阻断整批；**投影侧**文件名中部 `~$` 只是体检候选线索（见上）。
+  前缀规则只作用输入侧，不适用于历史投影。既有 OOXML(PK)/PDF(%PDF-)/OLE2 魔数守卫保持不变。
+
 
 ## Pipeline
 
@@ -453,6 +552,8 @@ Agent:
 - `text-sparse` 阈值常量（≤50 字 + ≥1 图）对封面/目录/章节分隔页有**预期误报**；v1 不做页型豁免，信号仅为回看提示、不阻断流程
 - **text-sparse 实测基线（2026-10-30 海鼎试点）**：81 页混合型方案 PPT 检出 17 页（21%），其中真实"界面截图+标签文字"页约 2/3、封面/分隔/致谢预期误报约 1/3；text-sparse 页回看可能**修正业务语义**（实证：正文标签"线上商城商品录入"回看实为"商品数量录入单含审批流"），但回看不改变证据层级上限（proposal 仍 medium）。回看入口优先用既有 `_media` 投影（`image_s<N>_*`），原件 python-pptx 提取为备选
 - 检测失败语义 = `undetermined (detect-error: 原因)`，与 `none`（成功无发现）严格区分；v1 及更早转换的旧 raw 产物没有 `pptx_text_sparse` 行仍是合法产物（不回填、不重转），该行只出现在 v2 起重新转换的文件
+- **MD 内联指纹不保护头块自身（R2，设计 D3 明示）**：convert_doc 的 `output_body_sha256` 只覆盖文首注释块之后的正文；头块被手工改写无法内联检出（自引用无解），完整性要求高的走 manifest 外置记录
+- **exit 3 / 新旗标对既有调用方是新增枚举**：convert_doc/extract_images 单文件遇 `~$` 锁文件 exit 3（skipped 语义）；目前无调用方依赖"非 0 即崩"语义
 - 更多坑位与修复规则见 `references/troubleshooting.md`
 
 ## 设计决策
@@ -466,6 +567,11 @@ Agent:
 - **检测三态语义（v2）**：`none` 仅表示「检测成功且无发现」；检测失败渲染 `undetermined (detect-error: 原因)`——修复 v1 把 guard 失败渲染成 `pptx_suspects: none` 的语义混淆；检测是 advisory，失败不阻断转换产物
 - **EXTRACTOR_VERSION 1→2**：输出新增 text-sparse/ruleset 注释行，按维护规则 bump 代际（manifest 溯源依赖它区分产物代际）；旧 raw 产物不回填不重转
 - **扫描行宽基准**：表头占比用尾部裁剪后的行宽计算（香格里拉 257 列事故），`_trim_trailing` 必须先于 `_detect_preface`
+- **模式×状态矩阵取代"默认覆盖 vs 冲突不覆盖"并存表述（v7，设计 D2）**：unknown 态旧默认保持现状覆盖（兼容性来源）；一旦指纹在册且检出 output-modified/conflict，**全部模式**不静默覆盖，`--force-overwrite-modified` 为唯一例外——"新安全模式不覆盖人工修改"是全模式统一约束，不是新旗标专属
+- **MD 内联指纹用正文范围哈希（设计 D3）**：文件内字段不可能包含自身的整文件 SHA-256（自引用无解）；范围 = 文首 provenance 块之后到 EOF；整文件哈希只在 manifest 外置记录
+- **溯源修复候选三级不互相冒充（设计 D7）**：candidate-association / recorded-at-conversion / reconverted 随产物持久化；recorded-at-conversion 须 D7 三要件齐备且仅证明存在转换时点来源声明；当前原件哈希≠历史记录哈希属 freshness 维度（source-changed），不算记录不可信
+- **多公司基座隔离（设计 D11）**：体检/匹配索引/指纹以单一基座为 scope；无效公司上下文沿用 resolver 失败语义（无 lanlnk 回退）；越界声明只报告不跟随读取
+- **锁文件两侧规则（设计 D5）**：输入侧 basename `~$` 前缀拦截（在格式转换/外部依赖调用之前）；投影侧文件名中部 `~$` 仅候选线索——两侧是两回事，互不套用
 
 ## 维护规则
 
@@ -473,5 +579,6 @@ Agent:
 - 改 SKILL.md / AGENTS.md 触发 pre-commit 的 `check_skill_ecosystem.sh --ci`——提交前本地先跑
 - 共享文件 `references/domain-tags.md` 被 product-prd-generator / compound-learning 读取，改动需同步 AGENTS.md「Shared files」表和 `check_docs_consistency.sh` 的 `SHARED_FILES` 数组
 - 修复新坑 → 先加回归测试再修代码；驱动修复的金样例登记在 `tests/fixtures_registry.json`（引用外部仓路径+sha，不复制二进制）
-- convert_excel 逻辑变更须 bump `EXTRACTOR_VERSION`（manifest 溯源依赖它区分产物代际）
+- convert_excel 逻辑变更须 bump `EXTRACTOR_VERSION`（manifest 溯源依赖它区分产物代际）；指纹元数据格式变化（加字段/改语义）则 bump `fingerprint_format`——两者分离维护、互不倒推（v7 设计 D6）
+- 共享文件 `references/provenance-evidence-boundary.md`（证据边界唯一权威源）被 competitor-product-analyzer 读取，改动需同步 AGENTS.md「Shared files」表和 `check_docs_consistency.sh` 的 `SHARED_FILES` 数组
 - 批量导入 ≥50 件必须分层抽样质检：抽 20 份分层样本（厂商×来源型×子目录），按 5 维准则评分——内容健全性 / frontmatter 准确性（含 id 唯一性）/ 溯源链可解析 / 表格完整性 / OCR 可信度；批级通过率 <90% 的维度视为批缺陷。依据 2026-10-17 质检实证：4 个缺陷中 3 个纯机械流程不可见。

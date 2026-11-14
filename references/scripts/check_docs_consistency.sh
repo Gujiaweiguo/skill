@@ -64,6 +64,7 @@ print_result() {
 # update both sides together. Any drift flagged by the script indicates one side is stale.
 SHARED_FILES=(
   "skills/business/material-importer/references/domain-tags.md|material-importer,product-prd-generator,compound-learning"
+  "skills/business/material-importer/references/provenance-evidence-boundary.md|material-importer,competitor-product-analyzer"
   "skills/business/product-prd-generator/references/term-aliases.yaml|product-prd-generator,competitor-product-analyzer"
   "skills/business/product-prd-generator/references/product-governance/source-reference.schema.json|product-prd-generator,material-importer,competitor-product-analyzer"
   "skills/business/product-prd-generator/references/product-governance/layer-reference.schema.json|product-prd-generator,openspec-practice"
