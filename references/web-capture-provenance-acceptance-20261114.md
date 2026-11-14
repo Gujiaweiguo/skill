@@ -230,3 +230,11 @@ fixtures_registry.json、backfill/转换器/索引、任何 /opt/code/docs 字�
 - 实施方式：第一批任务 1-4（规划→apply）+ 第二批独立复核修复（tasks §5 / §7，C1-C5 五类）+ 第三批复核遗漏补充（tasks §6 / §8，G1/G2 两类）。
 - 零业务写入边界：/opt/code/docs 全程只读输入（多轮 18/18、115 文件 sha256 前后对照全等）；CLI 报告全部写基座外（tmpdir / /tmp/opencode）；未运行历史补丁、未重写既有报告、未改 fixtures 之外任何公司资料。
 - 本件为 git tracked 长期验收记录（`openspec/changes/archive/` 为 gitignored 本地历史，change 目录内 verification.md 随归档移入）；「最终收尾状态」在归档提交后另行追加。
+
+## 最终收尾状态（2026-11-14 归档后追加）
+
+- **适用时点声明**：§1-§8 各批命令与计数为各批次工作区时点实测（§9 为归档/提交前最终时点重跑），其内容对应实施提交 `d6b17ca1b1aeb25170eae7f7fb66087b3bfb1657` 的树；「未 commit/push/归档」等检查点表述适用于各自时点，此后已被本节记录的提交与归档超越，不改述旧证据。
+- **实施提交**：`d6b17ca1b1aeb25170eae7f7fb66087b3bfb1657`（feat(material-importer)：4 实施文件 +2029/−16 + 本验收记录；pre-commit 生态审计 PASS）。
+- **规格同步/归档提交**：`c80b5345fa4e0bf29b000d8d895dafc624d8bf32`（docs(openspec)：主规格 ADDED 2 Requirement 纯追加 +63；d6b17ca1b1aeb25170eae7f7fb66087b3bfb1657 为其祖先）。
+- **归档目录**：`openspec/changes/archive/2026-11-14-recognize-web-capture-provenance/`（gitignored 本地历史）；五坑后检全绿（无 delta 头残留、无 TBD Purpose、ADDED 无同名冲突、无未暂存删除）。
+- **推送状态**：本节写入时 push 尚未执行；实际推送与远端核验结果（真实远端 SHA、upstream 双向计数归零）以会话内推送后核验为准，不在本件预填。
