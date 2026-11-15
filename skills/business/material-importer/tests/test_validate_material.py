@@ -155,5 +155,109 @@ class IdUniquenessTest(unittest.TestCase):
             self.assertEqual(r["errors"], [])
 
 
+class FrontmatterDelimiterTest(unittest.TestCase):
+    """delimiter 回归组（fix-material-frontmatter-delimiters）。
+
+    契约：`---` 仅在独立成行时作为 frontmatter 边界；值内 `---` 不影响解析；
+    错误类别四类保持。断言值见 change design.md 实测表。
+    """
+
+    def _parse(self, tmp: Path, name: str, content: str) -> tuple:
+        p = tmp / name
+        p.write_text(content, encoding="utf-8", newline="")
+        return validate_material.parse_frontmatter(str(p))
+
+    def test_unquoted_scalar_with_dashes_preserved(self) -> None:
+        """未加引号标量值内含 ---：解析成功且值保全原文（现状静默截断为 成本）。"""
+        with TemporaryDirectory() as tmp:
+            data, err = self._parse(
+                Path(tmp),
+                "unquoted.md",
+                "---\n"
+                'id: "customer-20260101-001"\n'
+                "source: 成本---成本管理典型问题库.xlsx\n"
+                "---\n"
+                "\n正文。\n",
+            )
+        self.assertIsNone(err)
+        self.assertEqual(data["source"], "成本---成本管理典型问题库.xlsx")
+
+    def test_quoted_scalar_with_dashes_preserved(self) -> None:
+        """加引号标量值内含 ---：解析成功且值保全原文（现状 YAML 解析错误）。"""
+        with TemporaryDirectory() as tmp:
+            data, err = self._parse(
+                Path(tmp),
+                "quoted.md",
+                "---\n"
+                'id: "customer-20260101-001"\n'
+                'source: "成本---成本管理典型问题库.xlsx"\n'
+                "---\n"
+                "\n正文。\n",
+            )
+        self.assertIsNone(err)
+        self.assertEqual(data["source"], "成本---成本管理典型问题库.xlsx")
+
+    def test_normal_lf_frontmatter(self) -> None:
+        with TemporaryDirectory() as tmp:
+            data, err = self._parse(
+                Path(tmp), "lf.md", "---\nid: x\ncreated: 2026-01-01\n---\n正文\n"
+            )
+        self.assertIsNone(err)
+        self.assertEqual(data["id"], "x")
+
+    def test_crlf_frontmatter(self) -> None:
+        with TemporaryDirectory() as tmp:
+            data, err = self._parse(
+                Path(tmp),
+                "crlf.md",
+                "---\r\nid: x\r\ncreated: 2026-01-01\r\n---\r\n\r\n正文\r\n",
+            )
+        self.assertIsNone(err)
+        self.assertEqual(data["id"], "x")
+
+    def test_closing_delimiter_trailing_whitespace(self) -> None:
+        with TemporaryDirectory() as tmp:
+            data, err = self._parse(
+                Path(tmp), "trail.md", "---\nid: x\n--- \n正文\n"
+            )
+        self.assertIsNone(err)
+        self.assertEqual(data["id"], "x")
+
+    def test_missing_open_delimiter(self) -> None:
+        with TemporaryDirectory() as tmp:
+            data, err = self._parse(Path(tmp), "noopen.md", "id: x\n---\n正文\n")
+        self.assertIsNone(data)
+        self.assertEqual(err, "缺少 YAML frontmatter（不以 --- 开头）")
+
+    def test_unclosed_block(self) -> None:
+        with TemporaryDirectory() as tmp:
+            data, err = self._parse(Path(tmp), "unclosed.md", "---\nid: x\n正文\n")
+        self.assertIsNone(data)
+        self.assertEqual(err, "YAML frontmatter 未闭合")
+
+    def test_invalid_yaml(self) -> None:
+        with TemporaryDirectory() as tmp:
+            data, err = self._parse(
+                Path(tmp), "badyaml.md", "---\nid: [unclosed\n---\n正文\n"
+            )
+        self.assertIsNone(data)
+        self.assertTrue(err.startswith("YAML 解析错误"), err)
+
+    def test_non_mapping(self) -> None:
+        with TemporaryDirectory() as tmp:
+            data, err = self._parse(Path(tmp), "list.md", "---\n- a\n- b\n---\n正文\n")
+        self.assertIsNone(data)
+        self.assertEqual(err, "frontmatter 不是合法的键值对")
+
+    def test_four_dashes_opening_is_missing_frontmatter(self) -> None:
+        """---- 开头：归类为缺少 YAML frontmatter（现状为 YAML 解析错误，既定例外 2）。"""
+        with TemporaryDirectory() as tmp:
+            data, err = self._parse(
+                Path(tmp), "four.md", "----\nid: x\n----\n正文\n"
+            )
+        self.assertIsNone(data)
+        self.assertEqual(err, "缺少 YAML frontmatter（不以 --- 开头）")
+
+
 if __name__ == "__main__":
     unittest.main()

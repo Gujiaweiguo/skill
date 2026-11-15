@@ -46,6 +46,14 @@ TYPE_SPECIFIC_FIELDS = {
 DATE_FIELDS = {"created", "updated", "issued", "expires", "contract_period"}
 
 
+_DELIMITER_LINE_RE = re.compile(r"^---[ \t]*\r?$")
+
+
+def _is_delimiter_line(line: str) -> bool:
+    """独立成行的 --- 才是 frontmatter 边界（允许行尾空白与 CRLF；不含 ---- 等更长横线）。"""
+    return bool(_DELIMITER_LINE_RE.match(line))
+
+
 def parse_frontmatter(file_path: str) -> tuple[dict[str, Any] | None, str | None]:
     """解析 frontmatter，返回 (data, error)。"""
     try:
@@ -54,15 +62,24 @@ def parse_frontmatter(file_path: str) -> tuple[dict[str, Any] | None, str | None
     except Exception as e:
         return None, f"无法读取文件: {e}"
 
-    if not content.startswith("---"):
+    lines = content.split("\n")
+    # 开 delimiter：文件首行必须是独立成行的 ---（前置不得有空白行/BOM/更长横线）
+    if not _is_delimiter_line(lines[0] if lines else ""):
         return None, "缺少 YAML frontmatter（不以 --- 开头）"
 
-    parts = content.split("---", 2)
-    if len(parts) < 3:
+    # 闭 delimiter：其后第一个独立成行的 ---
+    close_idx = None
+    for i in range(1, len(lines)):
+        if _is_delimiter_line(lines[i]):
+            close_idx = i
+            break
+    if close_idx is None:
         return None, "YAML frontmatter 未闭合"
 
+    yaml_block = "\n".join(lines[1:close_idx])
+
     try:
-        data = yaml.safe_load(parts[1])
+        data = yaml.safe_load(yaml_block)
     except yaml.YAMLError as e:
         return None, f"YAML 解析错误: {e}"
 
