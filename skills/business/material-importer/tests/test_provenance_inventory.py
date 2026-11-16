@@ -2308,3 +2308,85 @@ class AuthoredDeclarationTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RawDeclaredNoneTest(unittest.TestCase):
+    """raw 分支 declared source:"none" 与 materials 分支同语义：非缺口。
+
+    对齐修复：raw-md 注释形态 `<!-- source: none -->` 声明 none 时，
+    退出 missing_original/missing_source gaps 与 repair 候选；
+    accessibility/hash_check 维持 raw 分支现状映射（missing/not-applicable）。
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.base = make_base(self.root)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _gaps_for(self, report: dict, rel: str) -> dict:
+        return {k: [g for g in v if g["path"] == rel]
+                for k, v in report["gaps"].items()}
+
+    # 1. raw-md 注释形态 none（含 frontmatter 同值，与实证
+    #    raw/prd-lnkcard/00-owner-decisions.md 同构）退出 missing_original
+    def test_raw_inline_none_exits_missing_original(self):
+        head = ('---\nsource: none\n---\n'
+                '<!-- source: none -->\n')
+        write_raw_md_head(self.base, "owner.md", head)
+        before = snapshot(self.base)
+        report = pi.run_inventory(self.base, repair_candidates=True)
+        item = report["items"]["raw/owner.md"]
+        self.assertEqual(item["source_nature"], "none")
+        self.assertEqual(item["link_state"], "unknown-unavailable")
+        self.assertEqual(item["declared_source"], "none")
+        self.assertEqual(item["note"], 'source: "none" 为 authored 标记，非缺口')
+        # accessibility/hash_check 维持 raw 分支现状映射
+        self.assertEqual(item["accessibility"], "missing")
+        self.assertEqual(item["hash_check"], "not-applicable")
+        g = self._gaps_for(report, "raw/owner.md")
+        self.assertEqual(g["missing_original"], [])
+        self.assertEqual(g["missing_source"], [])
+        # 退出 repair 候选
+        self.assertNotIn("raw/owner.md",
+                         [r["path"] for r in report["repair_candidates"]])
+        self.assertEqual(snapshot(self.base), before)  # 零写入
+
+    # 2. raw-md frontmatter-only 形态：raw 解析口径只认注释载体，不读
+    #    frontmatter——现状如实断言（不新增解析），none 声明仍计 missing_source
+    def test_raw_frontmatter_only_none_not_parsed_current_behavior(self):
+        write_raw_md_head(self.base, "fm.md", '---\nsource: none\n---\n')
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/fm.md"]
+        # 既有口径：frontmatter 不被 raw 分支解析 → 无声明来源
+        self.assertNotIn("declared_source", item)
+        self.assertEqual(item["source_nature"], "none")
+        g = self._gaps_for(report, "raw/fm.md")
+        self.assertEqual(len(g["missing_source"]), 1)  # 现状保持，不新增解析
+        self.assertEqual(g["missing_original"], [])
+
+    # 3. materials 分支 none 行为回归不变（同语义对照）
+    def test_materials_none_regression_unchanged(self):
+        (self.base / "materials" / "m.md").write_text(
+            '---\nsource: "none"\n---\n正文\n', encoding="utf-8")
+        report = pi.run_inventory(self.base, repair_candidates=True)
+        item = report["items"]["materials/m.md"]
+        self.assertEqual(item["source_nature"], "none")
+        self.assertEqual(item["hash_check"], "no-declared-hash")
+        self.assertEqual(item["note"], 'source: "none" 为 authored 标记，非缺口')
+        g = self._gaps_for(report, "materials/m.md")
+        self.assertEqual(g["missing_source"], [])
+        self.assertEqual(g["missing_original"], [])
+        self.assertNotIn("materials/m.md",
+                         [r["path"] for r in report["repair_candidates"]])
+
+    # 4. rc 影响：raw 注释形态 none 单独存在时不再触发 rc=3（修复前计
+    #    missing_original → rc=3；修复后干净基座 rc=0）
+    def test_raw_none_rc_zero(self):
+        write_raw_md_head(self.base, "solo.md", "<!-- source: none -->\n")
+        before = snapshot(self.base)
+        r = run_cli(self.base)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(snapshot(self.base), before)  # 零写入

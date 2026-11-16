@@ -237,6 +237,9 @@ uv run {baseDir}/scripts/provenance_inventory.py [--base $COMPANY_BASE] [--repor
 - **退出码**：0=完成无缺口 / 1=工具失败 / 2=用法错误 / 3=完成且有发现（缺口清单含缺来源、
   缺哈希、缺原件、歧义匹配、manifest 损坏/记录冲突/产物缺失、边界问题、**未核验外部
   网页声明、声明冲突/错误、存档发现、materials 片段锚点未核验**）。
+- **declared `source: none` 非缺口**：raw 投影声明 `none` 与 materials 同语义——
+  `source_nature=none`、authored 标记非缺口，退出 missing_original/missing_source 与
+  repair 候选（raw 分支 accessibility/hash_check 维持本分支既有映射）。
   **「有发现」不是工具故障**——rc=3 时报告仍是完整可用的证据；URL-only 文章"未核验"
   即 rc=3，**不承诺体检归零**。
 - `--repair-candidates`：对缺溯源产物产候选（唯一 basename 匹配 → candidate-association

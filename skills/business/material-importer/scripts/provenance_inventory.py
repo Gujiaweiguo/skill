@@ -971,11 +971,20 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                 # （既有「先出现者优先」语义不变；URL 命中一律走外部通道，
                 #  绝不进入 resolve_declared_source）
                 local_src = local_hits[0]["value"]
+                # declared none 与 materials 分支同语义：authored 标记非缺口。
+                # 仅退出 missing_original/missing_source gaps 与 repair 候选；
+                # accessibility/hash_check 维持 raw 分支现状映射（观察照做，
+                # 不引入 not-applicable 新枚举语义），none 之外零变化
+                declared_none = (local_src.strip().strip('"')
+                                 .strip("'") == "none")
                 item["source_kind"] = "mixed" if external_present else "local"
-                item["source_nature"] = "declared"
-                item["link_state"] = "declared"
+                item["source_nature"] = "none" if declared_none else "declared"
+                item["link_state"] = ("unknown-unavailable"
+                                      if declared_none else "declared")
                 item["declared_source"] = local_src
                 item["declared_via"] = local_hits[0]["via"]
+                if declared_none:
+                    item["note"] = 'source: "none" 为 authored 标记，非缺口'
                 resolved, status = resolve_declared_source(local_src, base)
                 if status == "unresolvable":
                     item["hash_check"] = "not-applicable"
@@ -1010,8 +1019,11 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                     elif not exists_ok:
                         item["accessibility"] = "missing"
                         item["hash_check"] = "not-applicable"
-                        note_gap("missing_original", rel,
-                                 {"declared_source": local_src})
+                        if not declared_none:
+                            # declared none 不算缺口（authored 标记，
+                            # 与 materials 分支同语义）
+                            note_gap("missing_original", rel,
+                                     {"declared_source": local_src})
                     else:
                         item["source_accessibility"] = "accessible"
                         if prov.get("source_sha256"):
