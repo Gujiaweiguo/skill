@@ -88,6 +88,11 @@ HEX64_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 # materials frontmatter
 FM_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|\Z)", re.S)
 FM_SOURCE_RE = re.compile(r"(?m)^\s*source\s*:\s*(.*?)\s*$")
+# raw 声明哈希 frontmatter 回退（仅注释载体缺位时生效）：只认
+# source_sha256_at_backfill（B3 执行轮为 raw 投影写入的口径），引号剥离同
+# source 回退（YAML 引号值）
+FM_SHA_RE = re.compile(
+    r"(?m)^\s*source_sha256_at_backfill\s*:\s*(.*?)\s*$")
 
 # materials frontmatter source 值以 'authored:' 前缀开头（strip 后整串前缀，
 # 大小写敏感小写 authored）→ authored 声明（原创内容，无本地原件）。
@@ -299,7 +304,8 @@ def parse_raw_md_provenance(text_head: str) -> dict:
     """
     out: dict = {"source": None, "declared_via": None,
                  "source_pos": None,
-                 "source_sha256": None, "extracted_by": None,
+                 "source_sha256": None, "hash_via": None,
+                 "extracted_by": None,
                  "signature_via": None}
     source_hits: list[tuple[int, str, str]] = []  # (位置, 值, 字段名)
 
@@ -332,6 +338,20 @@ def parse_raw_md_provenance(text_head: str) -> dict:
         if fm and out["extracted_by"] is None:
             out["extracted_by"] = fm.group(1).strip()
             out["signature_via"] = "block"
+
+    # 声明哈希 frontmatter 回退：注释载体（行内/块）无任何
+    # source_sha256/source_sha256_at_backfill 命中时，回退读 frontmatter
+    # 的 source_sha256_at_backfill → 作为 declared hash 进入既有哈希比对链
+    # （hash_via='frontmatter'）。注释载体有命中时零变化（注释优先）。
+    if out["source_sha256"] is None:
+        fh_m = FM_RE.match(text_head)
+        if fh_m:
+            fsha = FM_SHA_RE.search(fh_m.group(1))
+            if fsha:
+                value = fsha.group(1).strip().strip('"').strip("'")
+                if value:
+                    out["source_sha256"] = value.lower()
+                    out["hash_via"] = "frontmatter"
 
     # B3 回填回退（missing_source 轮）：注释载体（行内/块）无任何
     # source/source_path 命中时，回退读 frontmatter source 字段
@@ -873,6 +893,8 @@ def run_inventory(base: Path, *, full_hash: bool = False,
             # （第三批：非文首区 URL 命中不是有效来源，不再从 prov 顶层带入）
             if prov.get("signature_via"):
                 item["signature_via"] = prov["signature_via"]
+            if prov.get("hash_via"):
+                item["hash_via"] = prov["hash_via"]
 
             # --- D1/D2：受控网页声明采集（加法输出，不改本地字段优先规则）---
             # 第三批（复核遗漏补充）修复：

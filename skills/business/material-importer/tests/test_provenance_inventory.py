@@ -2524,3 +2524,120 @@ class RawFrontmatterFallbackTest(unittest.TestCase):
         self.assertEqual(
             [g for g in report["gaps"]["missing_source"]
              if g["path"] == "raw/url.md"], [])
+
+
+class RawFrontmatterHashFallbackTest(unittest.TestCase):
+    """raw 投影声明哈希 frontmatter 回退（missing_hash 轮 B3 工具闭环）。
+
+    语义：注释载体（行内/块 sha）命中优先、零变化；仅当注释载体无任何
+    source_sha256/source_sha256_at_backfill 命中时，回退读 frontmatter 的
+    source_sha256_at_backfill → 作为 declared hash 进入既有哈希比对链
+    （hash_via='frontmatter'，引号剥离同 source 回退）。
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.base = make_base(self.root)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _write_raw(self, rel: str, frontmatter: str, head_comments: str = "",
+                   body: str = "正文\n") -> Path:
+        p = self.base / "raw" / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(f"---\n{frontmatter}---\n" + head_comments + "\n" + body,
+                     encoding="utf-8")
+        return p
+
+    # ① frontmatter-only 哈希被采用，hash_check 与当前文件比对
+    def test_frontmatter_only_hash_adopted_and_compared(self):
+        orig = self.base / "incoming" / "h.docx"
+        orig.write_bytes(b"H")
+        self._write_raw(
+            "fh.md",
+            f"source: incoming/h.docx\n"
+            f"source_sha256_at_backfill: {sha(b'H')}\n")
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/fh.md"]
+        self.assertEqual(item["hash_via"], "frontmatter")
+        self.assertEqual(item["hash_check"], "match")
+        self.assertEqual(item["source_sha256_actual"], sha(b"H"))
+        self.assertEqual(
+            [g for g in report["gaps"]["missing_hash"]
+             if g["path"] == "raw/fh.md"], [])
+        # 引号剥离口径（YAML 引号值）同样命中
+        self._write_raw(
+            "fhq.md",
+            f"source: incoming/h.docx\n"
+            f"source_sha256_at_backfill: \"{sha(b'H')}\"\n")
+        report2 = pi.run_inventory(self.base)
+        self.assertEqual(report2["items"]["raw/fhq.md"]["hash_check"], "match")
+        # 哈希不匹配 → 既有 mismatch 链路
+        self._write_raw(
+            "fhm.md",
+            "source: incoming/h.docx\nsource_sha256_at_backfill: "
+            + "0" * 64 + "\n")
+        report3 = pi.run_inventory(self.base)
+        self.assertEqual(report3["items"]["raw/fhm.md"]["hash_check"],
+                         "mismatch")
+
+    # ② 注释哈希 + frontmatter 哈希并存 → 注释优先，现状零变化
+    def test_comment_hash_takes_priority_over_frontmatter(self):
+        orig = self.base / "incoming" / "c2.docx"
+        orig.write_bytes(b"C2")
+        self._write_raw(
+            "both-h.md", f"source: incoming/c2.docx\n"
+                         f"source_sha256_at_backfill: {'0' * 64}\n",
+            head_comments=f"<!-- source_sha256: {sha(b'C2')} -->\n")
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/both-h.md"]
+        self.assertNotIn("hash_via", item)  # frontmatter 哈希未被采用
+        self.assertEqual(item["hash_check"], "match")  # 注释哈希胜出
+        self.assertEqual(
+            [g for g in report["gaps"]["missing_hash"]
+             if g["path"] == "raw/both-h.md"], [])
+
+    # ③ frontmatter source + frontmatter 哈希 → 同时退出 missing_source
+    #    与 missing_hash（B3 raw 投影双回填形态）
+    def test_frontmatter_source_and_hash_exit_both_gaps(self):
+        orig = self.base / "incoming" / "b3.docx"
+        orig.write_bytes(b"B3")
+        self._write_raw(
+            "b3.md",
+            f"source: incoming/b3.docx\n"
+            f"source_sha256_at_backfill: {sha(b'B3')}\n")
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/b3.md"]
+        self.assertEqual(item["declared_via"], "frontmatter")
+        self.assertEqual(item["hash_via"], "frontmatter")
+        self.assertEqual(item["hash_check"], "match")
+        self.assertEqual(
+            [g for g in report["gaps"]["missing_source"]
+             if g["path"] == "raw/b3.md"], [])
+        self.assertEqual(
+            [g for g in report["gaps"]["missing_hash"]
+             if g["path"] == "raw/b3.md"], [])
+
+    # ④ 注释哈希形态回归零变化：仅注释哈希（无 frontmatter）行为一致，
+    #    frontmatter 哈希缺位时不制造新语义
+    def test_comment_hash_only_regression_unchanged(self):
+        orig = self.base / "incoming" / "r2.docx"
+        orig.write_bytes(b"R2")
+        write_raw_md(self.base, "reg2.md", "incoming/r2.docx", sha(b"R2"))
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/reg2.md"]
+        self.assertNotIn("hash_via", item)
+        self.assertEqual(item["hash_check"], "match")
+        # 无任何哈希载体 → 既有 no-declared-hash / missing_hash 不变
+        write_raw_md(self.base, "nohash.md", "incoming/r2.docx", None)
+        report2 = pi.run_inventory(self.base)
+        item2 = report2["items"]["raw/nohash.md"]
+        self.assertNotIn("hash_via", item2)
+        self.assertEqual(item2["hash_check"], "no-declared-hash")
+        self.assertEqual(
+            [g for g in report2["gaps"]["missing_hash"]
+             if g["path"] == "raw/nohash.md"],
+            [{"path": "raw/nohash.md",
+              "declared_source": "incoming/r2.docx"}])
