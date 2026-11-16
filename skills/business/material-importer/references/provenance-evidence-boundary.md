@@ -114,3 +114,22 @@ raw 投影、_media 图片、原件二进制的存放归属（git 文本 / 百�
 - **competitor-product-analyzer**：SKILL.md 边界规则段落引用本文件（保留其回看操作细节）。
 
 新消费方接入 = 引用本文件路径 + 在上述两处登记，不复制规则文本。
+
+## 10. 来源形态先例注册表（2026-11-16 溯源战役新增）
+
+以下来源形态经 Owner 批准成为合法回填形态；语义在此唯一权威定义，操作 SOP 见 docs 仓 `00-governance/material-provenance/provenance-campaign-sop.md`（引用不复制）：
+
+| 形态 | 语义与边界 | 首例证据包（docs 仓） |
+|---|---|---|
+| `authored: ` 前缀声明 | frontmatter `source` 整串前缀（半角冒号，小写，仅认 frontmatter 不认注释/正文）＝原创内容声明：`source_nature=declared / link_state=not-applicable / accessibility=not-applicable / hash_check=not-applicable`，不入任何 gaps；原声明须逐字保留于 `provenance_note` | `expression16-execution-20261116` 等 |
+| incoming 目录 manifest | 多源聚合材料 source 指向 Owner 授权写入的 `_manifest.json`（逐件 sha256 清单）；材料侧关联仍受 §3/§4 锚点约束（manifest 是来源固化，不替代锚点） | qimao / `yunwu-execution-20261116` / 明源 567 件 |
+| 生成件字节副本 | 公司生成物（out/ 生成区）字节副本固化 `incoming/蓝联生成/` 后 source 指副本；副本与原件哈希双登记；generated-from 定性入 note | `quotes-backfill-20261116` |
+| 压缩包成员解包 | 原生打包于压缩包内时，Owner 批准解包成员固化 incoming；载体与成员**双哈希**入 note，coverage 注明解包口径 | 附件06 xlsm（`notlocated280-execution-B4-20261116`） |
+| authoring 源 md 补充 | 外部 md 草稿（PRD/workflow 类）可作原生入 incoming；材料为逐字拷贝时按 §3 锚定 | 学伟 26 件（`notlocated280-execution-MISC-20261116`） |
+| 陈旧 token 重映射 | 声明路径 token 已失效（目录重组）时，同 stem 仅为检索线索；真实原生靠**内容级锚定**（特征句↔原生文本层）确立，原声明逐字保留 | strategy 族 167 / OCR 族 85 |
+
+补充边界（战役实证）：
+
+- **泳道性质分类不构成定案**：authored 定性（"自撰蒸馏"类判断）必须经内容级验证（候选逐字比对）复核后才可呈批——实证中 26 份被判自撰的材料实为盘上草稿逐字拷贝（L3 误判由 L5 推翻，双记录保留）。
+- **竞争候选措辞**：登记"同字节"须逐一比对字节；未比对一律写"竞争候选（未比对）"或区分同/非同字节计数。
+- 归一化容差只用于**验证**（全半角/表格竖线/`…`缩略/加粗差异），写入材料的 note 仍用逐字引文。
