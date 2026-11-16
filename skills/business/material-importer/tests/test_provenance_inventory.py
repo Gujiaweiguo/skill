@@ -2356,15 +2356,17 @@ class RawDeclaredNoneTest(unittest.TestCase):
 
     # 2. raw-md frontmatter-only 形态：raw 解析口径只认注释载体，不读
     #    frontmatter——现状如实断言（不新增解析），none 声明仍计 missing_source
-    def test_raw_frontmatter_only_none_not_parsed_current_behavior(self):
+    def test_raw_frontmatter_only_none_parsed_via_fallback(self):
+        # B3 工具闭环后：注释载体无命中时回退解析 frontmatter source，
+        # none 沿用既有 none 语义（不再是 missing_source）
         write_raw_md_head(self.base, "fm.md", '---\nsource: none\n---\n')
         report = pi.run_inventory(self.base)
         item = report["items"]["raw/fm.md"]
-        # 既有口径：frontmatter 不被 raw 分支解析 → 无声明来源
-        self.assertNotIn("declared_source", item)
+        self.assertEqual(item["declared_source"], "none")
+        self.assertEqual(item["declared_via"], "frontmatter")
         self.assertEqual(item["source_nature"], "none")
         g = self._gaps_for(report, "raw/fm.md")
-        self.assertEqual(len(g["missing_source"]), 1)  # 现状保持，不新增解析
+        self.assertEqual(g["missing_source"], [])
         self.assertEqual(g["missing_original"], [])
 
     # 3. materials 分支 none 行为回归不变（同语义对照）
@@ -2390,3 +2392,135 @@ class RawDeclaredNoneTest(unittest.TestCase):
         r = run_cli(self.base)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertEqual(snapshot(self.base), before)  # 零写入
+
+
+class RawFrontmatterFallbackTest(unittest.TestCase):
+    """raw 投影声明解析 frontmatter 回退（missing_source 轮 B3 工具闭环）。
+
+    语义：注释载体（行内/块 source/source_path）命中优先、零变化；
+    仅当注释载体无任何命中时回退读 frontmatter source 字段，
+    值进入与注释值完全相同的处理链（declared_via='frontmatter'）。
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.base = make_base(self.root)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _write_raw(self, rel: str, frontmatter_source: str | None,
+                   head_comments: str = "", body: str = "正文\n") -> Path:
+        p = self.base / "raw" / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        fm = f"---\nsource: {frontmatter_source}\n---\n" \
+            if frontmatter_source is not None else ""
+        p.write_text(fm + head_comments + "\n" + body, encoding="utf-8")
+        return p
+
+    # ① raw 无注释、有 frontmatter source → declared_source 正确、
+    #    declared_via=frontmatter、退出 missing_source
+    def test_frontmatter_source_exits_missing_source(self):
+        orig = self.base / "incoming" / "原始 文件.docx"
+        orig.write_bytes(b"ORIGINAL-BYTES")
+        self._write_raw("fm.md", "incoming/原始 文件.docx")
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/fm.md"]
+        self.assertEqual(item["declared_source"], "incoming/原始 文件.docx")
+        self.assertEqual(item["declared_via"], "frontmatter")
+        self.assertEqual(item["source_nature"], "declared")
+        self.assertEqual(item["source"], "incoming/原始 文件.docx")
+        self.assertEqual(item["hash_check"], "no-declared-hash")
+        self.assertEqual(
+            [g for g in report["gaps"]["missing_source"]
+             if g["path"] == "raw/fm.md"], [])
+        # 哈希链同样适用：frontmatter + 注释 sha 命中 → match
+        orig2 = self.base / "incoming" / "y.docx"
+        orig2.write_bytes(b"Y")
+        p = self.base / "raw" / "fm2.md"
+        p.write_text(f"---\nsource: incoming/y.docx\n---\n"
+                     f"<!-- source_sha256: {sha(b'Y')} -->\n正文\n",
+                     encoding="utf-8")
+        report2 = pi.run_inventory(self.base)
+        self.assertEqual(report2["items"]["raw/fm2.md"]["hash_check"],
+                         "match")
+
+    # ② 注释 + frontmatter 并存 → 注释优先，现状零变化
+    def test_comment_takes_priority_over_frontmatter(self):
+        orig = self.base / "incoming" / "c.docx"
+        orig.write_bytes(b"C")
+        self._write_raw(
+            "both.md", "incoming/不存在的.docx",
+            head_comments="<!-- source: incoming/c.docx -->\n")
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/both.md"]
+        self.assertEqual(item["declared_source"], "incoming/c.docx")
+        self.assertEqual(item["declared_via"], "source")
+        self.assertEqual(item["source"], "incoming/c.docx")
+        # frontmatter 值不被解析（否则会 missing_original）
+        self.assertEqual(
+            [g for g in report["gaps"]["missing_original"]
+             if g["path"] == "raw/both.md"], [])
+
+    # ③ frontmatter source: none → 沿用既有 none 语义退出
+    def test_frontmatter_none_uses_existing_none_semantics(self):
+        self._write_raw("none.md", "none")
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/none.md"]
+        self.assertEqual(item["source_nature"], "none")
+        self.assertEqual(item["declared_source"], "none")
+        self.assertEqual(item["declared_via"], "frontmatter")
+        self.assertEqual(item["note"], 'source: "none" 为 authored 标记，非缺口')
+        self.assertEqual(
+            [g for g in report["gaps"]["missing_source"]
+             if g["path"] == "raw/none.md"], [])
+        self.assertEqual(
+            [g for g in report["gaps"]["missing_original"]
+             if g["path"] == "raw/none.md"], [])
+
+    # ④ frontmatter authored: 前缀 → raw 分支无 authored 专用语义，
+    #    如实断言现状：按本地声明值走解析链（解析失败/不存在 →
+    #    missing_original），authored_declarations 不计数（仅 materials
+    #    分支计入）。不强行改，与 materials 差异在此标注。
+    def test_frontmatter_authored_prefix_raw_current_behavior(self):
+        self._write_raw("authored.md", "authored: 手写原创内容")
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/authored.md"]
+        self.assertEqual(item["declared_via"], "frontmatter")
+        self.assertEqual(item["source_nature"], "declared")
+        # 现状：值被当本地路径解析，目标不存在 → missing_original
+        self.assertEqual(
+            [g for g in report["gaps"]["missing_original"]
+             if g["path"] == "raw/authored.md"],
+            [{"path": "raw/authored.md",
+              "declared_source": "authored: 手写原创内容"}])
+        self.assertEqual(
+            [a for a in report["authored_declarations"]
+             if a["path"] == "raw/authored.md"], [])
+
+    # ⑤ 注释声明回归零变化：仅注释（无 frontmatter）行为与历史一致
+    def test_comment_only_regression_unchanged(self):
+        orig = self.base / "incoming" / "r.docx"
+        orig.write_bytes(b"R")
+        write_raw_md(self.base, "reg.md", "incoming/r.docx", None)
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/reg.md"]
+        self.assertEqual(item["declared_via"], "source")
+        self.assertEqual(item["declared_source"], "incoming/r.docx")
+        self.assertEqual(
+            [g for g in report["gaps"]["missing_source"]
+             if g["path"] == "raw/reg.md"], [])
+
+    # ⑥（补充）frontmatter source 为 URL → 走外部声明通道，
+    #    不进本地解析、不算 missing_source
+    def test_frontmatter_url_goes_external_channel(self):
+        self._write_raw("url.md", "https://example.com/page")
+        report = pi.run_inventory(self.base)
+        item = report["items"]["raw/url.md"]
+        self.assertEqual(item["source_kind"], "external-url")
+        self.assertEqual(item["declared_via"], "frontmatter")
+        self.assertEqual(item["external_urls"], ["https://example.com/page"])
+        self.assertEqual(
+            [g for g in report["gaps"]["missing_source"]
+             if g["path"] == "raw/url.md"], [])

@@ -333,6 +333,21 @@ def parse_raw_md_provenance(text_head: str) -> dict:
             out["extracted_by"] = fm.group(1).strip()
             out["signature_via"] = "block"
 
+    # B3 回填回退（missing_source 轮）：注释载体（行内/块）无任何
+    # source/source_path 命中时，回退读 frontmatter source 字段
+    # （materials 风格，B3 执行轮已为 raw 投影写入）。frontmatter 值进入
+    # 与注释值完全相同的下游处理链（URL/none/authored/本地解析全语义），
+    # declared_via='frontmatter'；注释载体有命中时零变化（注释优先）。
+    if not source_hits:
+        fmm = FM_RE.match(text_head)
+        if fmm:
+            fsm = FM_SOURCE_RE.search(fmm.group(1))
+            if fsm:
+                # 引号剥离口径与 materials 分支读取一致（YAML 引号值）
+                source_hits.append((fmm.start(1) + fsm.start(1),
+                                    fsm.group(1).strip()
+                                    .strip('"').strip("'"), "frontmatter"))
+
     if source_hits:
         # 去重（行内与块可能双命中同一值）后取先出现者
         seen: set[tuple[str, str]] = set()
@@ -873,7 +888,11 @@ def run_inventory(base: Path, *, full_hash: bool = False,
             local_hits: list[dict] = []
             for h in prov.get("source_hits") or []:
                 if URL_SCHEME_SHAPED_RE.match(h["value"]):
-                    if h["pos"] < region_end:
+                    # frontmatter 回退命中天然处于文首声明区（frontmatter
+                    # 本身即声明载体），视为有效网页来源位置；注释载体
+                    # 命中仍按既有 region_end 口径不变
+                    if (h["pos"] < region_end
+                            or h.get("via") == "frontmatter"):
                         head_url_hits.append(h)
                     # 非文首区 URL 形态命中：不是有效网页来源——不进外部
                     # 清单、不进本地解析、也不当缺失文件（spec 场景3）

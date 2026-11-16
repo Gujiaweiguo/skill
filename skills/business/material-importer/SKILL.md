@@ -240,6 +240,9 @@ uv run {baseDir}/scripts/provenance_inventory.py [--base $COMPANY_BASE] [--repor
 - **declared `source: none` 非缺口**：raw 投影声明 `none` 与 materials 同语义——
   `source_nature=none`、authored 标记非缺口，退出 missing_original/missing_source 与
   repair 候选（raw 分支 accessibility/hash_check 维持本分支既有映射）。
+- **raw 声明解析 frontmatter 回退**：注释载体（行内/块 `source:`/`source_path:`）命中
+  优先、零变化；仅当注释载体无任何 source 命中时，回退读 frontmatter `source` 字段
+  （`declared_via=frontmatter`），值进入与注释值相同的处理链（URL/none/本地解析全语义）。
   **「有发现」不是工具故障**——rc=3 时报告仍是完整可用的证据；URL-only 文章"未核验"
   即 rc=3，**不承诺体检归零**。
 - `--repair-candidates`：对缺溯源产物产候选（唯一 basename 匹配 → candidate-association
