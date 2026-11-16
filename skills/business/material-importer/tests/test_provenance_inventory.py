@@ -2213,5 +2213,98 @@ class MaterialFragmentGuardedResolveFixTest(unittest.TestCase):
         self.assertEqual(snapshot_all(self.root), before)  # 零写入
 
 
+class AuthoredDeclarationTest(unittest.TestCase):
+    """materials source: authored: 前缀声明（原创内容，not-applicable 语义）。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.base = make_base(self.root)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _write_material(self, rel: str, source_line: str,
+                        body: str = "正文\n") -> Path:
+        p = self.base / "materials" / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(f"---\nsource: {source_line}\n---\n{body}",
+                     encoding="utf-8")
+        return p
+
+    # 1. authored 前缀：分维映射 + 退出 gaps
+    def test_authored_prefix_not_in_gaps(self):
+        self._write_material("a.md", "authored: 手写原创内容")
+        report = pi.run_inventory(self.base)
+        item = report["items"]["materials/a.md"]
+        self.assertEqual(item["source_nature"], "declared")
+        self.assertEqual(item["link_state"], "not-applicable")
+        self.assertEqual(item["accessibility"], "not-applicable")
+        self.assertEqual(item["hash_check"], "not-applicable")
+        for gap in report["gaps"].values():
+            self.assertEqual([g for g in gap if g["path"] == "materials/a.md"],
+                             [])
+        self.assertEqual(report["authored_declarations"], [{
+            "path": "materials/a.md",
+            "source_verbatim": "authored: 手写原创内容",
+            "line": 2,
+        }])
+
+    # 2. authored 声明目标不存在也不计 missing（无本地原件概念）
+    def test_authored_not_counted_missing(self):
+        self._write_material("b.md", "authored:whatever")
+        report = pi.run_inventory(self.base)
+        self.assertEqual(report["gaps"]["missing_original"], [])
+        self.assertEqual(report["gaps"]["missing_source"], [])
+
+    # 3. 清单纳入 rc=3：仅 authored 声明即「有发现」
+    def test_authored_rc3_and_listing(self):
+        self._write_material("c.md", "authored: 原创")
+        r = run_cli(self.base)
+        self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
+        payload = json.loads(r.stdout)
+        self.assertEqual(len(payload["authored_declarations"]), 1)
+        self.assertTrue(pi.has_findings(payload))
+
+    # 4. 无前缀相似文本不误判
+    def test_similar_text_not_authored(self):
+        # 4a. 大写/非精确前缀（Authoring:）→ 按普通声明处理（missing_original）
+        self._write_material("d1.md", '"Authoring: not authored"')
+        # 4b. 正文出现 authored: 文本、frontmatter source 正常 → 不认
+        self._write_material("d2.md", "authored-in-body-check",
+                             body="source: authored: 正文里出现的\n")
+        report = pi.run_inventory(self.base)
+        self.assertEqual(report["authored_declarations"], [])
+        self.assertEqual(
+            [g["path"] for g in report["gaps"]["missing_original"]],
+            ["materials/d1.md", "materials/d2.md"])
+        self.assertEqual(
+            report["items"]["materials/d1.md"]["source_nature"], "declared")
+        self.assertEqual(
+            report["items"]["materials/d2.md"]["source_nature"], "declared")
+
+    # 5. authored 与 source:none 并存（none 行为不变，均不进 gaps）
+    def test_authored_coexists_with_source_none(self):
+        self._write_material("e1.md", "authored: x")
+        (self.base / "materials" / "e2.md").write_text(
+            '---\nsource: "none"\n---\n正文\n', encoding="utf-8")
+        report = pi.run_inventory(self.base)
+        none_item = report["items"]["materials/e2.md"]
+        self.assertEqual(none_item["source_nature"], "none")
+        self.assertEqual(none_item["hash_check"], "no-declared-hash")
+        self.assertEqual(len(report["authored_declarations"]), 1)
+        for gap in report["gaps"].values():
+            self.assertEqual(gap, [])
+
+    # 6. --repair-candidates：authored 不产生候选/嫌疑
+    def test_authored_no_repair_candidates(self):
+        self._write_material("f.md", "authored: x")
+        report = pi.run_inventory(self.base, repair_candidates=True)
+        self.assertEqual(report.get("repair_candidates"), [])
+        self.assertEqual(report.get("wrong_source_suspects"), [])
+        self.assertEqual(report["authored_declarations"][0]["path"],
+                         "materials/f.md")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -223,6 +223,14 @@ uv run {baseDir}/scripts/provenance_inventory.py [--base $COMPANY_BASE] [--repor
   /`nul_scope`（sample|full，全文件计数仅在完整读取时报）；UTF-8 严格解码失败报
   `encoding-invalid`；短文档/空白文档不判垃圾；文件名中部含 `~$` 的投影只进
   `garbage-candidate` 候选清单（不拦截、不删除、不单独定罪）。
+- **authored 前缀声明**：materials frontmatter `source` 值以半角 `authored:` 前缀
+  开头（strip 后整串前缀、大小写敏感小写；仅认 frontmatter source 字段，raw 注释区/
+  正文不认）→ authored 声明：`source_nature=declared`、`link_state=not-applicable`、
+  `accessibility=not-applicable`（与 not-scanned 区分）、`hash_check=not-applicable`；
+  不计入 missing_original/missing_source 及任何 gaps、不产生 repair_candidates。
+  顶层清单 `authored_declarations[]`（path/source_verbatim/line）纳入 rc=3 发现
+  （存在 authored 声明即「有发现」，同 external 先例）；authored 不参与本地扫描
+  范围。`source: none` 行为不变。
 - **多公司隔离**：复用 `_company_base.resolve_company_base()`（无静默默认公司）；
   匹配索引/指纹/manifest 只在当前基座内构建，同名原件/相同相对路径不跨公司匹配复用；
   声明来源解析（含 symlink）越出基座 → `boundary-violation` 单列且不读取目标内容。

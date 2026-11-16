@@ -89,6 +89,11 @@ HEX64_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 FM_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|\Z)", re.S)
 FM_SOURCE_RE = re.compile(r"(?m)^\s*source\s*:\s*(.*?)\s*$")
 
+# materials frontmatter source 值以 'authored:' 前缀开头（strip 后整串前缀，
+# 大小写敏感小写 authored）→ authored 声明（原创内容，无本地原件）。
+# 仅认 frontmatter source 字段；raw 注释区/正文不认。source:none 行为不变。
+AUTHORED_PREFIX = "authored:"
+
 MID_TILDE_DOLLAR_RE = re.compile(r"^.+~\$.+")  # basename 中部含 ~$（非前缀）
 
 # --- recognize-web-capture-provenance（D1：受控网页声明采集） ---
@@ -543,7 +548,9 @@ def run_inventory(base: Path, *, full_hash: bool = False,
             "scope": ["originals(whole-base excl. raw/materials/out/.git)",
                       "raw/**/*.md|*.csv|*.notes.md（仅文本投影）",
                       "raw/**/_manifest.json",
-                      "materials/**/*.md"],
+                      "materials/**/*.md",
+                      "materials authored: 前缀声明为原创内容，"
+                      "无本地原件，不参与本地来源扫描（not-applicable）"],
             "inaccessible": [],
             "not_scanned": [],
             "discovery_errors": [],
@@ -569,6 +576,8 @@ def run_inventory(base: Path, *, full_hash: bool = False,
         "local_archive_findings": [],
         # --- inspect-material-source-fragments（D2：materials 片段发现，始终存在）---
         "material_source_fragment_findings": [],
+        # --- authored 声明（materials source: authored: 前缀，原创内容）---
+        "authored_declarations": [],
     }
 
     sha_cache: dict[Path, tuple[str | None, OSError | None]] = {}
@@ -1520,6 +1529,22 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                 item["link_state"] = "unknown-unavailable"
                 item["hash_check"] = "no-declared-hash"
                 item["note"] = 'source: "none" 为 authored 标记，非缺口'
+            elif source_val.startswith(AUTHORED_PREFIX):
+                # authored: 前缀声明（原创内容）：无本地原件，来源观察不适用。
+                # 不计入 missing_original/missing_source 及任何 gaps，
+                # 不产生 repair_candidates / wrong_source_suspects；
+                # 存在 authored 声明即「有发现」（同 external 先例，rc=3）。
+                item["source_nature"] = "declared"
+                item["link_state"] = "not-applicable"
+                item["accessibility"] = "not-applicable"
+                item["hash_check"] = "not-applicable"
+                item["note"] = ("source 以 authored: 前缀声明为原创内容；"
+                                "无本地原件，不参与本地来源扫描")
+                report["authored_declarations"].append({
+                    "path": rel,
+                    "source_verbatim": source_val,
+                    "line": text.count("\n", 0, m.start(1) + sm.start(1)) + 1,
+                })
             else:
                 item["source_nature"] = "declared"
                 item["link_state"] = "declared"
@@ -1775,6 +1800,9 @@ def run_inventory(base: Path, *, full_hash: bool = False,
         key=lambda e: (e["path"], e.get("kind", ""),
                        e.get("source_container", ""),
                        e.get("source_fragment", "")))
+    report["authored_declarations"] = sorted(
+        report["authored_declarations"],
+        key=lambda e: (e["path"], e.get("line", 0)))
     for key in report["gaps"]:
         report["gaps"][key] = sorted(report["gaps"][key],
                                      key=lambda e: e["path"])
@@ -1804,6 +1832,7 @@ def has_findings(report: dict) -> bool:
         or report["source_declaration_errors"]
         or report["local_archive_findings"]
         or report["material_source_fragment_findings"]
+        or report["authored_declarations"]
         or report["scan"]["inaccessible"]
         or report["scan"]["discovery_errors"]
     )
