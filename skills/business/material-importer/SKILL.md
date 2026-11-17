@@ -10,10 +10,13 @@ description: |-
   validate_material.py 校验 + scan_raw_index.py 索引重建；三级目录 incoming→raw→materials，
   含 raw/_index.json 关系索引、P1.5 空章节清理、P2 多文件混合拆分、P3 质量评估、P4 交互式确认。
   触发场景："整理素材"、"导入公司资料"、"把 incoming/ 里的文件入库"、"入库新案例"、
-  "检查证照有效期"、"检查素材质量"、"案例匹配"、"做方案素材够不够"。
+  "检查证照有效期"、"检查素材质量"、"案例匹配"、"做方案素材够不够"、"归档授权 demo 快照"。
   被 product-prd-generator / competitor-product-analyzer / strategy-brief-generator /
   project-proposal-generator / requirement-evaluator 复用作为文档转换与素材库基础设施。
-  不修改业务系统代码、不生成对外方案/PRD/投标文件，只产出结构化素材供下游 skill 消费。
+  授权 demo 登录、只读探测与运行时快照归档属于本 skill（分类契约见
+  references/material-classification.md，唯一权威源）；不修改业务系统代码、不生成对外
+  方案/PRD/投标文件，不判断竞品能力、不做目标产品差距结论，只产出结构化素材与快照证据
+  供下游 skill 消费。
 compatibility: >
   Requires Python 3.10+ and uv.
 
@@ -40,6 +43,18 @@ compatibility: >
     PEP 723 inline deps in the script header document requirements but are not the primary run path.
   Cert expiry: pytesseract (optional, CPU-only, lightweight).
 change: >
+  v8.4 — 2026-11-17（unified-competitor-context-classification）
+  • 新增 references/material-classification.md（唯一权威源）：统一竞品关系上下文字段
+  （workspace_company / target_company / target_product / competitor_company /
+  competitor_product / source_version / product_version / account_role /
+  permission_scope / captured_at / usage_scope，三 skill 共用）、资料分类字段
+  （material_kind / source_format / topic…）、分类判断边界（不判竞品能力、不做目标产品
+  existing/partial/missing、不判是否进 PRD）、授权 demo 快照归档契约（标准流程 + manifest
+  上下文字段 + 逐产物哈希 + 脱敏门禁）与分类层失败状态（workspace/target/competitor-
+  context-missing、version-mismatch、cross-company-context、projection-unverified）
+  • 授权 demo 登录、只读探测与运行时快照保存归档职责划入本 skill 采集入库层；
+  competitor-product-analyzer 转为快照消费方（不重复登录）。旧材料缺上下文字段保持
+  unknown，不批量猜测、不自动回填
   v8.3 — 2026-11-14（inspect-material-source-fragments）
   • provenance_inventory materials 片段来源观察：frontmatter source 完整字面路径
   优先（含 #/括号/空格/分号），仅明确不存在（ENOENT）且符合受限 .jsonl 片段
@@ -195,6 +210,26 @@ $COMPANY_BASE/                     ← 🏢 当前公司根（config/company.yam
   v7 起：回填写入随产物持久化分级（`provenance_class: candidate-association` +
   `source_sha256_at_backfill` + `backfilled_at`，不再用裸 `source_sha256` 字段名）；
   已有 source 的文件不改写，但声明来源不可解析时会进报告 `wrong_source_suspects`（仅建议）。
+
+## 资料分类契约（P0.1 — 统一竞品关系上下文）
+
+分类字段、判断边界与 demo 快照归档契约的**唯一权威源**：`references/material-classification.md`。
+要点（定义以该文件为准）：
+
+- 每批资料至少区分 `workspace_company / target_company / target_product / competitor_company /
+  competitor_product / material_kind / source_format / topic / source_version / usage_scope`；
+  旧材料缺字段保持 `unknown`，不批量猜测、不自动回填。
+- **公司不是产品**：lanlnk / gdcreia / lianyou 是公司；lnkcre / lnkcrm / lnkcard / lnkreport
+  等是产品。竞品公司与竞品产品不得合并（历史 `vendor` 字段只表示竞品公司）。
+- 本 skill 只分类**资料**（是什么、来自哪、属于哪个产品语境、放哪层、要不要 OCR/回看）；
+  **不判断**竞品是否具备完整能力、竞品与目标产品谁更强、目标产品 existing/partial/missing、
+  是否进 PRD——这些归 competitor-product-analyzer / product-prd-generator。
+- **授权 demo 登录、只读探测与运行时快照归档属于本 skill**（标准流程、manifest 字段、快照
+  包结构见 material-classification.md §6）；competitor-product-analyzer 消费已归档快照，
+  不重复登录。
+- 分类层失败状态：`workspace-context-missing` / `target-context-missing` /
+  `competitor-context-missing` / `version-mismatch` / `cross-company-context` /
+  `projection-unverified`（语义与处理见 material-classification.md §5）。
 
 ## 溯源生命周期（只读体检 / 转换指纹 / 增量重跑，v7）
 

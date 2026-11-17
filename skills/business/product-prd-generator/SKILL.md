@@ -11,7 +11,7 @@ description: |-
   "商管/会员/CRM/供应链产品规划"、"基于现有产品做版本规划"。
   仅面向内部产品规划与决策，不生成报价/方案/投标文件（那些交给 company-intro-generator / pricing-generator / bid-doc-master），
   不直接修改业务系统代码（业务系统自己基于本 skill 输出的交接文档拆 OpenSpec change）。
-compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to-md conversion and image extraction. Reads code from an explicit --code-root (LnkCRE retains its historical default; lnkcrm's code root is configured in company.yaml since O5-lnkcrm-code, so --code-root explicit confirmation has converged to configured — registered per O5-Q5, 2026-10-04; other products must provide an explicit code root). Default candidate artifacts go to $COMPANY_BASE/out/prd/<canonical_product_id>/output/; use --canonical-target with --output-kind for explicit canonical PRD output. $LANLNK_BASE remains a compatibility alias.
+compatibility: Requires Python 3.10+ and uv. Reuses material-importer for doc-to-md conversion and image extraction. Unified competitor-relationship context (target_company/target_product vs competitor_company/competitor_product, multi-to-many; field authority in material-importer references/material-classification.md) gates competitor-evidence consumption per target product. Reads code from an explicit --code-root (LnkCRE retains its historical default; lnkcrm's code root is configured in company.yaml since O5-lnkcrm-code, so --code-root explicit confirmation has converged to configured — registered per O5-Q5, 2026-10-04; other products must provide an explicit code root). Default candidate artifacts go to $COMPANY_BASE/out/prd/<canonical_product_id>/output/; use --canonical-target with --output-kind for explicit canonical PRD output. $LANLNK_BASE remains a compatibility alias.
 ---
 
 # Product PRD Generator
@@ -103,6 +103,37 @@ Ontology 负责产品领域概念、关系與规则；PRD 负责产品目标、�
 ### 3. 转换后的中间资料
 
 - `$LANLNK_BASE/raw/prd-商管系统/`
+
+## 竞品关系上下文与竞品证据消费规则
+
+**不要把竞品分析 skill 的能力清单直接当作 PRD。** 本 skill 按以下顺序分类和消费输入：
+
+```
+客户需求
+→ 目标产品 ontology / term aliases
+→ 当前代码基线
+→ 竞品分析能力（competitor-product-analyzer 的 capability-map / 交接 source-reference）
+→ 证据与来源锚点（source_ref / sha256 / slide-page 锚点 / manifest+page-id）
+→ 目标产品 existing / partial / missing / unknown
+→ 差距分析
+→ 版本规划
+→ PRD
+```
+
+**统一上下文字段**（workspace_company / target_company / target_product / competitor_company / competitor_product / source_version / product_version / account_role / permission_scope / captured_at / usage_scope）定义唯一权威源：`skills/business/material-importer/references/material-classification.md`。消费竞品证据必须按 `target_company / target_product / competitor_company / competitor_product / source_version` 过滤，规则：
+
+1. `lnkcre` 只消费 `target_product=lnkcre` 的竞品映射。
+2. `lnkcrm` 只消费 `target_product=lnkcrm` 的竞品映射。
+3. `lnkcard`（预付费卡）使用自己的产品基线和术语，不套用商管模块。
+4. `lnkreport` 使用自己的报表/数据产品基线，不套用商管或会员模块。
+5. `gdcreia`、`lianyou` 等公司只能通过各自 `config/company.yaml` 的 products 解析目标产品（公司 slug 不是产品 id）。
+6. 不得因目标产品缺少 ontology、代码根或 PRD 基线而回退到 lanlnk、lnkcre 或商管 ontology（`_paths` 的跨产品回退已由 `_guard_unregistered_fallback` 闸门拦截：跨公司直接报错，同公司未注册产品 stderr 警告后仅限 onboarding 兼容）。
+7. 目标公司或目标产品缺失/无法解析时，状态记 `target-context-missing`；目标产品基线（ontology/功能清单/代码根）缺失时记 `baseline-unavailable`——两种状态都不得生成确定性的产品差距或 PRD 需求。
+8. 竞品分析结果不自动构成产品需求授权（`competitor_observation` 只是 source；采纳与否由 owner decision 决定，见 product-governance 契约）。
+9. 图片、截图和 runtime snapshot 只能作为辅助证据；关键字段和流程需要 OPC 视觉回看并带 manifest/page-id/artifact hash 锚点（快照消费约定见 competitor-product-analyzer `references/runtime-snapshot-protocol.md`）。
+10. 不得假设自动 doc_map 会读取图片内容（图片证据一律走锚点引用 + 人工回看）。
+
+**多对多边界**：同一竞品产品在 `target_product=lnkcre` 与 `target_product=lnkcrm` 下是两份独立映射（competitor-product-analyzer 分别产出），本 skill 只消费与当前目标产品匹配的那份；`competitor_product=unknown` 的公司级线索不进入差距分析。同名竞品公司/产品不自动合并（`entity-conflict`）；同名术语跨产品语境不自动视为同义（`term-context-conflict`）；多版本竞品证据不拼成同一部署状态（`version-mismatch`）；投影失真不当原件事实（`projection-unverified`，按 material-importer provenance-evidence-boundary 处理）。
 
 ## 目录规范
 
@@ -335,6 +366,7 @@ CLI `--project` 接受 **MI、MI-CRE、LnkCRE、lnkcre、商管系统**，统一
 - 代码与文档冲突
 - 竞品资料无法确认
 - 图片只能辅助判断，不能单独定论
+- 上下文与基线状态：`target-context-missing`（目标公司/产品缺失——不生成确定性差距/需求）、`baseline-unavailable`（目标产品 ontology/功能清单/代码根缺失）、`entity-conflict`（同名产品不自动合并）、`term-context-conflict`（同名术语跨产品语境存疑）、`version-mismatch`（多版本竞品证据未确认一致）、`projection-unverified`（投影未经原件核验，不当原件事实）
 
 ## 输出目录
 
@@ -655,7 +687,7 @@ uv run pytest tests/ -v
 - **Ontology sub_functions 必须与 field-specs 全局同步**：ontology 的 `sub_functions` 有旧名称而 field-specs 没有对应实体时，渲染器会产生**空 `####` 标题**（有标题无内容）。这不是报错而是静默问题。每次大改后应做全局同步检查：`ont_subs == spec_keys` for all modules。
 
 > 商管域专属已知限制（资产管理空壳/集团驾驶舱图表库缺失/销售五源模型）见 LnkCRE 域知识入口（`domain_knowledge_path_for_project`；命中 canonical `30-products/lnkcre/ontology/domain-knowledge.md`）。
-- **多产品支持（2026-07-19 起，2026-08-01 三产品真实收官验证）**：CLI 已支持 langchat / LnkChatBI / 未来的 CRM 等非商管产品自动生成 PRD。每个产品通过项目级配置三件套（ontology.yaml + term-aliases.yaml + code-map-rules-<project>.yaml）实现覆盖，缺失时回退到商管默认。配置路径解析为三级 fallback（document-control-plane 迁移后）：`$LANLNK_BASE/30-products/<canonical-dir>/` → `$LANLNK_BASE/out/prd/<project>/output/`（legacy 生成区）→ 商管默认。新产品的 onboarding 流程见下方「添加新产品的步骤」章节。**已验证样板**：商管 LnkCRE（canonical `30-products/lnkcre/`）/ langchat（`30-products/lnkchat/`，2026-08-01 真实运行通过：8 模块全覆盖 / 0 商管污染 / 107 capabilities 归类）/ LnkChatBI（canonical `30-products/lnkchatbi/`，2026-09-26 方案 B 家族迁移后 ontology 双件在 `30-products/lnkchatbi/ontology/`；2026-09-27 ontology v2 重建为 canonical：9 模块 44 capability 对齐代码 62 spec）。
+- **多产品支持（2026-07-19 起，2026-08-01 三产品真实收官验证）**：CLI 已支持 langchat / LnkChatBI / 未来的 CRM 等非商管产品自动生成 PRD。每个产品通过项目级配置三件套（ontology.yaml + term-aliases.yaml + code-map-rules-<project>.yaml）实现覆盖。配置路径解析为三级 fallback（document-control-plane 迁移后）：`$LANLNK_BASE/30-products/<canonical-dir>/` → `$LANLNK_BASE/out/prd/<project>/output/`（legacy 生成区）→ 商管默认（**仅限未注册 + lanlnk 公司的 onboarding 前兼容，带 stderr 警告；受 `_guard_unregistered_fallback` 闸门约束——跨公司（gdcreia/lianyou 等）直接 `MissingProductDataError`，不得静默回退商管 ontology；命中兜底时状态记 `baseline-unavailable`，不生成确定性差距/需求**）。新产品的 onboarding 流程见下方「添加新产品的步骤」章节。**已验证样板**：商管 LnkCRE（canonical `30-products/lnkcre/`）/ langchat（`30-products/lnkchat/`，2026-08-01 真实运行通过：8 模块全覆盖 / 0 商管污染 / 107 capabilities 归类）/ LnkChatBI（canonical `30-products/lnkchatbi/`，2026-09-26 方案 B 家族迁移后 ontology 双件在 `30-products/lnkchatbi/ontology/`；2026-09-27 ontology v2 重建为 canonical：9 模块 44 capability 对齐代码 62 spec）。
 - **平台型产品素材分层原则（2026-08-01 实证）**：langchat 等「平台型」产品的 PRD 素材必须按**平台层 vs 业务层**分层。平台 PRD 只用平台层素材（产品架构图 / 术语口径 / v2-strategy 目标架构 / 代码 specs）；业务层素材（如商管岗位 AI Skill 解决方案——招商/营运/客服等）是「平台之上的行业应用」，归商管域，**不进平台 PRD 的 docs-root**。混层会导致 doc_map 把业务岗位需求错误归到平台模块，产出语义错乱的 PRD。详见 `/opt/code/docs/opencode/90-复利工程/更新日志.md` 2026-08-01 条目。
 - **canonical 迁移解析缺口已修复（2026-09-26 同日）**：`_paths._PRODUCT_CANONICAL_DIR` 已补 lnkreport / lnkchatbi / lnkvision 三个条目，`ontology_path_for_project()` / `term_aliases_path_for_project()` 命中 `30-products/<产品>/ontology/` canonical 双件（回归闸 `tests/test_paths.py`）。两个残留口径：① **lnkvision 无 ontology.yaml/term-aliases.yaml**——canonical 本体为 `30-products/lnkvision/ontology/域知识.md`（registry 登记；`domain_knowledge_path_for_project` 命中该目录 README 入口），lnkvision 的 PRD 生成以 registry/域知识.md 为准，`ontology_path_for_project('lnkvision')` 的 tier-4 返回不应被消费；② **未注册产品 tier-4 兜底带跨域污染闸门**（`_guard_unregistered_fallback`）：未注册产品 + 非 lanlnk 公司（如 lianyou 的「溯源APP」）直接 `MissingProductDataError` 报错引导注册（先例 acbae37 lnkcrm）；未注册 + lanlnk 公司 stderr 警告后保留兜底（兼容 onboarding 前运行）；已注册产品（含 商管系统→lnkcre）tier-4 是 registry 登记入口，不触发闸门。
 
@@ -877,5 +909,6 @@ PRD 是中文业务单据与流程，代码 OpenSpec/能力名是英文工程 ID
 5. **修改 business-ontology.yaml 时**，它是共享文件（`$LANLNK_BASE/config/ontology/`），其他 skill 也依赖
 6. **新增实体时**，必须同时更新 field-specs 和 ontology 的 `sub_functions`。每次大批量修改后做全局同步检查
 7. **新增域知识文件时**（如会员系统），在项目目录下创建 `域知识.md`，并在本文件「适用场景」下添加引用
+8. **统一竞品关系上下文字段或消费规则变更**时，以 `skills/business/material-importer/references/material-classification.md` 为唯一权威源修改，本文件「竞品关系上下文与竞品证据消费规则」只同步简例；并检查 competitor-product-analyzer 侧字段（capability-schema / evidence-ledger）仍成立
 
 **判断标准**：如果一个行为或坑"下次的我"读到代码不一定能立刻理解为什么这么做，就应该记录。

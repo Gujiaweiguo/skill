@@ -409,6 +409,7 @@ subprocess.run(
 |---|---|
 | `material-importer/references/domain-tags.md` | material-importer (owner), product-prd-generator, compound-learning |
 | `material-importer/references/provenance-evidence-boundary.md` | material-importer (owner), competitor-product-analyzer |
+| `material-importer/references/material-classification.md` | material-importer (owner), competitor-product-analyzer, product-prd-generator |
 | `product-prd-generator/references/term-aliases.yaml` | product-prd-generator (owner), competitor-product-analyzer |
 | `product-prd-generator/references/product-governance/source-reference.schema.json` | product-prd-generator (owner), material-importer, competitor-product-analyzer |
 | `product-prd-generator/references/product-governance/layer-reference.schema.json` | product-prd-generator (owner), openspec-practice |

@@ -65,6 +65,7 @@ print_result() {
 SHARED_FILES=(
   "skills/business/material-importer/references/domain-tags.md|material-importer,product-prd-generator,compound-learning"
   "skills/business/material-importer/references/provenance-evidence-boundary.md|material-importer,competitor-product-analyzer"
+  "skills/business/material-importer/references/material-classification.md|material-importer,competitor-product-analyzer,product-prd-generator"
   "skills/business/product-prd-generator/references/term-aliases.yaml|product-prd-generator,competitor-product-analyzer"
   "skills/business/product-prd-generator/references/product-governance/source-reference.schema.json|product-prd-generator,material-importer,competitor-product-analyzer"
   "skills/business/product-prd-generator/references/product-governance/layer-reference.schema.json|product-prd-generator,openspec-practice"
