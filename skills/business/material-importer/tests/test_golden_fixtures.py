@@ -1,8 +1,9 @@
-"""Golden fixture tests: pin the two real-world files that drove the 2026-10 fixes.
+"""Golden fixture tests: pin real-world files that drove the 2026-10/11 fixes.
 
 - 福州香格里拉 xlsx → column-aware date coerce + header-scan width basis
   (257-column sheet, preface region, percent rendering, notes sidecars)
 - 明源 产品拆分 pptx → pptx_table_guard merged-cells detection
+- lanlnk v7 manifest → provenance_inventory outputs 对象数组零假阳性
 
 Fixtures live in the external docs repo and are referenced by absolute path +
 sha256 (tests/fixtures_registry.json); binaries are never copied into this repo.
@@ -25,6 +26,7 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 
 import convert_excel  # noqa: E402
 import pptx_table_guard  # noqa: E402
+import provenance_inventory as pi  # noqa: E402
 
 
 def _sha256(path: Path) -> str:
@@ -136,6 +138,56 @@ class GoldenPptxMingyuanTest(GoldenFixtureTestBase):
         for f in result["findings"]:
             if f["slide"] in fx["expectations"]["suspect_slides"]:
                 self.assertIn(fx["expectations"]["reasons_include"], f["reasons"])
+
+
+class GoldenManifestV7OutputsTest(GoldenFixtureTestBase):
+    """lanlnk v7 manifest（outputs 对象数组）：provenance_inventory 零假阳性回归。
+
+    真实 manifest（sha 钉线，只读）物化到临时合成基座：列出的 artifacts/
+    outputs 文件以占位内容创建 → run_inventory 不得对 outputs 列出的文件
+    报 outputs_missing，且全部计入 manifest 覆盖（不复制外部仓任何字节进本仓，
+    也不写外部仓任何文件）。
+    """
+
+    def test_outputs_object_array_paths_resolvable(self) -> None:
+        fx = self.get_fixture("lanlnk-v7-outputs-manifest")
+        path = self.resolve(fx)
+        if path is None:
+            self.skipTest("golden fixture not present on this box")
+        records = json.loads(path.read_text(encoding="utf-8"))
+        exp = fx["expectations"]
+        # 真实形态锁：fingerprint_format 1 + outputs 全部为含 path 的对象
+        for r in records:
+            self.assertEqual(r["fingerprint_format"],
+                             exp["fingerprint_format"])
+            for o in r["outputs"]:
+                self.assertIsInstance(o, dict)
+                self.assertIn("path", o)
+        listed: set[str] = set()
+        for r in records:
+            listed.update(r.get("artifacts") or [])
+            listed.update(o["path"] for o in r["outputs"])
+        with tempfile.TemporaryDirectory(prefix="golden_manifest_") as td:
+            base = Path(td) / "co"
+            (base / "config").mkdir(parents=True)
+            (base / "config" / "company.yaml").write_text(
+                "name: co\n", encoding="utf-8")
+            sub = base / "raw" / "golden"
+            sub.mkdir(parents=True)
+            # manifest 原字节入临时基座（合成内容占位，不读外部仓投影正文）
+            (sub / "_manifest.json").write_bytes(path.read_bytes())
+            for rel in sorted(listed):
+                target = sub / rel
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("golden-placeholder\n", encoding="utf-8")
+            report = pi.run_inventory(base)
+            self.assertEqual(report["gaps"]["outputs_missing"], [])
+            for rel in sorted(listed):
+                # 该 manifest 列出的均为 csv / notes 边车 → manifest 覆盖必须命中
+                self.assertEqual(
+                    report["items"][f"raw/golden/{rel}"].get("manifest_coverage"),
+                    ["raw/golden/_manifest.json"],
+                    f"outputs/artifacts 列出文件未被覆盖: {rel}")
 
 
 if __name__ == "__main__":

@@ -2641,3 +2641,109 @@ class RawFrontmatterHashFallbackTest(unittest.TestCase):
              if g["path"] == "raw/nohash.md"],
             [{"path": "raw/nohash.md",
               "declared_source": "incoming/r2.docx"}])
+
+
+# --- convert_excel v7 manifest：outputs 对象数组（docs 2026-11-17 入库批次实证）---
+# v7（fingerprint_format: 1）manifest 的 outputs 为对象数组
+# [{path, sha256, bytes, ...}]，artifacts 保持纯字符串数组。旧实现两处对
+# artifacts/outputs 的 list 元素直接 str(v)：str(dict) 把整个对象当文件名 →
+# stat 必失败 → outputs_missing 假阳性（真实基座 62 条 / 5 个 manifest），
+# 且 covered_files 侧对象条目全部丢失。真实锚点只读登记于
+# tests/fixtures_registry.json（lanlnk-v7-outputs-manifest），manifest 正文
+# 不复制进本仓；核心测试全部合成基座。
+
+
+def write_v7_manifest(base: Path, records: list[dict],
+                      rel_dir: str = "sub") -> Path:
+    sub = base / "raw" / rel_dir
+    sub.mkdir(parents=True, exist_ok=True)
+    mp = sub / "_manifest.json"
+    mp.write_text(json.dumps(records, ensure_ascii=False, indent=2),
+                  encoding="utf-8")
+    return mp
+
+
+class ManifestOutputsObjectArrayTest(unittest.TestCase):
+    """v7 outputs 对象数组：取 v["path"]、缺 path 记 manifest_invalid、dict 形态兼容。"""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.base = make_base(self.root)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _v7_record(self, **over) -> dict:
+        rec = {
+            "source_path": "incoming/表.xlsx",
+            "source_sha256": sha(b"XLSX"),
+            "source_size": 4,
+            "extractor": "convert_excel.py v7",
+            "extractor_version": 7,
+            "fingerprint_format": 1,
+            "artifacts": ["csv/a.csv"],
+            "outputs": [
+                {"path": "csv/b.csv", "sha256": sha(b"B"), "bytes": 1},
+                {"path": "csv/c.csv.notes.md", "sha256": sha(b"C"), "bytes": 1},
+            ],
+        }
+        rec.update(over)
+        return rec
+
+    def _materialize(self, rel_paths: list[str]) -> None:
+        """把 manifest 列出的文件以占位内容物化到 raw/sub/ 下。"""
+        for rel in rel_paths:
+            p = self.base / "raw" / "sub" / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text("placeholder\n", encoding="utf-8")
+
+    # 1. outputs 对象数组 → 取 v["path"]，不再把 str(dict) 整体当文件名
+    def test_v7_outputs_object_array_no_false_missing(self):
+        (self.base / "incoming" / "表.xlsx").write_bytes(b"XLSX")
+        write_v7_manifest(self.base, [self._v7_record()])
+        self._materialize(["csv/a.csv", "csv/b.csv", "csv/c.csv.notes.md"])
+        report = pi.run_inventory(self.base)
+        # 全部列出的文件真实存在 → outputs_missing 必须为空（旧实现假阳性）
+        self.assertEqual(report["gaps"]["outputs_missing"], [])
+        # artifacts（字符串）与 outputs（对象）列出的文件都计入 manifest 覆盖
+        for rel in ("csv/a.csv", "csv/b.csv", "csv/c.csv.notes.md"):
+            item = report["items"][f"raw/sub/{rel}"]
+            self.assertEqual(item.get("manifest_coverage"),
+                             ["raw/sub/_manifest.json"])
+            self.assertNotIn(f"raw/sub/{rel}", [g["path"] for g in
+                           report["gaps"]["no_manifest_coverage"]])
+
+    # 2. outputs 对象缺 path 键 → 记入 manifest_invalid（不静默丢弃），
+    #    同 record 其余合法条目不受牵连
+    def test_v7_outputs_dict_missing_path_key_noted_not_dropped(self):
+        rec = self._v7_record(outputs=[
+            {"sha256": sha(b"X"), "bytes": 9},           # 缺 path 键
+            {"path": "csv/b.csv", "sha256": sha(b"B"), "bytes": 1},
+        ])
+        write_v7_manifest(self.base, [rec])
+        self._materialize(["csv/a.csv", "csv/b.csv"])
+        report = pi.run_inventory(self.base)
+        inv = report["gaps"]["manifest_invalid"]
+        self.assertEqual(len(inv), 1)
+        self.assertEqual(inv[0]["path"], "raw/sub/_manifest.json")
+        self.assertEqual(inv[0]["key"], "outputs")
+        self.assertIn("path", inv[0]["reason"])
+        # 坏条目本身无路径可查（不当文件名 stat），合法条目照常覆盖
+        self.assertEqual(report["gaps"]["outputs_missing"], [])
+        self.assertEqual(
+            report["items"]["raw/sub/csv/b.csv"].get("manifest_coverage"),
+            ["raw/sub/_manifest.json"])
+
+    # 3. 旧 dict 形态 outputs（键=路径）取键，行为不变
+    def test_manifest_outputs_dict_shape_keys_still_covered(self):
+        rec = self._v7_record(
+            artifacts=[],
+            outputs={"csv/legacy.csv": {"bytes": 1}})
+        write_v7_manifest(self.base, [rec])
+        self._materialize(["csv/legacy.csv"])
+        report = pi.run_inventory(self.base)
+        self.assertEqual(report["gaps"]["outputs_missing"], [])
+        self.assertEqual(
+            report["items"]["raw/sub/csv/legacy.csv"].get("manifest_coverage"),
+            ["raw/sub/_manifest.json"])

@@ -45,6 +45,20 @@
       }
     },
     {
+      "name": "lanlnk-v7-outputs-manifest",
+      "kind": "manifest-v7-outputs",
+      "comment": "provenance_inventory v7 outputs 对象数组假阳性回归的真实观察锚点（只读登记，manifest 正文不复制进本仓）。convert_excel v7（fingerprint_format: 1）manifest 的 outputs 为 [{path, sha256, bytes}] 对象数组、artifacts 为纯字符串数组；旧实现 str(dict) 整体当文件名 → outputs_missing 假阳性 62 条（2026-11-17 docs 入库批次，5 个 manifest 之一）。核心测试合成，不依赖本锚点。",
+      "base": "/opt/code/docs/lanlnk",
+      "registered_at": "2026-11-17",
+      "path": "/opt/code/docs/lanlnk/raw/01云资管产品资料/03租售打通及疫情免租方案/03租售打通方案/租售打通参考资料/资产管理相关/_manifest.json",
+      "sha256": "402643bb961802a2e554cfd666425524b2b715c5362bb0cc24a7f4c21d56c464",
+      "expectations": {
+        "fingerprint_format": 1,
+        "outputs_entries_are_path_objects": true,
+        "outputs_listed_files_resolvable": true
+      }
+    },
+    {
       "name": "gdcreia-association-web-capture",
       "kind": "md-head-provenance",
       "comment": "recognize-web-capture-provenance 真实观察锚点（只读登记，正文/HTML 不复制进本仓）。九篇公众号文章 md 统一中文首部 <!-- 来源 URL / 抓取时间 2026-11-07 -->；html/ 为同名网页存档但 MD 未声明 local_archive，工具不得自动建立关系。",

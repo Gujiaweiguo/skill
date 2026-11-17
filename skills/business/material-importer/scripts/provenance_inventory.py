@@ -567,6 +567,35 @@ def walk_with_errors(root: Path, root_filter=None, dir_filter=None):
     return visited, failures
 
 
+def manifest_listed_paths(record: dict) -> tuple[list[str], list[dict]]:
+    """manifest record 的 artifacts/outputs 列出的文件路径 + 不可用对象条目。
+
+    convert_excel v7（fingerprint_format: 1）manifest 的 outputs 为对象数组
+    [{path, sha256, bytes, ...}]：dict 元素取 v["path"]；字符串元素 str(v)
+    行为不变（artifacts 为纯字符串数组）；dict 形态（键=路径）取键。
+    缺可用 path（键缺失或值非非空字符串）的对象条目返回到 invalid_entries，
+    由调用方记入 manifest_invalid 缺口（不静默丢弃；也不把 str(dict) 整体
+    当文件名 stat → outputs_missing 假阳性，2026-11-17 docs 入库批次实证）。
+    """
+    listed: list[str] = []
+    invalid: list[dict] = []
+    for key in ("artifacts", "outputs"):
+        vals = record.get(key) or []
+        if isinstance(vals, list):
+            for v in vals:
+                if isinstance(v, dict):
+                    path_val = v.get("path")
+                    if isinstance(path_val, str) and path_val:
+                        listed.append(path_val)
+                    else:
+                        invalid.append({"key": key, "entry": v})
+                else:
+                    listed.append(str(v))
+        elif isinstance(vals, dict):
+            listed.extend(str(k) for k in vals.keys())
+    return listed, invalid
+
+
 # ---------------------------------------------------------------------------
 # 主体检逻辑（纯函数，可被测试直接调用）
 # ---------------------------------------------------------------------------
@@ -799,14 +828,17 @@ def run_inventory(base: Path, *, full_hash: bool = False,
                 item["status"] = "manifest-conflict"
                 note_gap("manifest_conflict", rel, {"source_path": src})
         # outputs/artifacts 中列出的文件不存在 → outputs-missing
+        # v7 outputs 对象数组经 manifest_listed_paths 取 v["path"]；
+        # 缺可用 path 的对象条目记入 manifest_invalid（不静默丢弃）。
         listed: list[str] = []
         for r in records:
-            for key in ("artifacts", "outputs"):
-                vals = r.get(key) or []
-                if isinstance(vals, list):
-                    listed.extend(str(v) for v in vals)
-                elif isinstance(vals, dict):
-                    listed.extend(str(v) for v in vals.keys())
+            rec_listed, rec_invalid = manifest_listed_paths(r)
+            listed.extend(rec_listed)
+            for bad in rec_invalid:
+                note_gap("manifest_invalid", rel, {
+                    "reason": f"{bad['key']} 对象条目缺可用 path"
+                              "（键缺失或值非非空字符串），不静默丢弃",
+                    "key": bad["key"], "entry": bad["entry"]})
         for listed_rel in sorted(set(listed)):
             target = mp.parent / listed_rel
             ok, err = safe_exists(target)
@@ -825,14 +857,10 @@ def run_inventory(base: Path, *, full_hash: bool = False,
     covered_files: dict[Path, list[str]] = {}   # file -> [manifest rel]
     for mp_parent, info in manifest_cover.items():
         for r in info["records"]:
-            vals: list[str] = []
-            for key in ("artifacts", "outputs"):
-                v = r.get(key) or []
-                if isinstance(v, list):
-                    vals.extend(str(x) for x in v)
-                elif isinstance(v, dict):
-                    vals.extend(str(x) for x in v.keys())
-            for v in vals:
+            # 缺可用 path 的对象条目已在 manifest 预读阶段记入
+            # manifest_invalid，此处不重复记，仅收集可覆盖路径
+            rec_listed, _invalid = manifest_listed_paths(r)
+            for v in rec_listed:
                 target = mp_parent / v
                 covered_files.setdefault(target, []).append(
                     info["rel_dir"] + "/_manifest.json")
