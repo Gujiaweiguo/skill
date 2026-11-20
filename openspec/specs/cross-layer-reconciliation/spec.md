@@ -6,11 +6,12 @@ Defines the three pairwise reconciliation views (ontology-PRD, PRD-code, ontolog
 ## Requirements
 
 ### Requirement: The three product layers SHALL be reconciled pairwise
-For each in-scope product, governance SHALL be able to record separate reconciliation results for ontology-to-PRD, PRD-to-code, and ontology-to-code. Each result SHALL identify the compared artifact versions/revisions, timestamp, coverage and known scan limitations, evidence references, outcome, owner/reviewer, and required follow-up. A single aggregate status SHALL NOT replace the three pairwise results. A record produced for an incremental delivery SHALL declare its reconciliation scope explicitly (increment-scoped by default, or product-wide when a full scan was actually performed) and SHALL NOT present increment-scoped evidence as a product-level complete reconciliation; each record SHALL retain its pair, scope, compared revisions, coverage, and limitations regardless of scope kind. When a promotion or absorption touches only some layers, the three pairwise relations SHALL each be stated as affected, not-affected, not-checked, or not-applicable — a not-affected or not-applicable statement SHALL carry its basis — so that a small incremental correction does not mechanically require three full reports.
+For each in-scope product, governance SHALL be able to record separate reconciliation results for ontology-to-PRD, PRD-to-code, and ontology-to-code. Each result SHALL identify the compared artifact versions/revisions, timestamp, coverage and known scan limitations, evidence references, outcome, owner/reviewer, and required follow-up.
 
 #### Scenario: Full product reconciliation is requested
 - **WHEN** an owner requests a three-layer reconciliation for a product
 - **THEN** the report SHALL provide distinct ontology-to-PRD, PRD-to-code, and ontology-to-code results or explicitly mark an unavailable comparison
+- **AND** A single aggregate status SHALL NOT replace the three pairwise results.
 
 #### Scenario: Only one pair can be inspected
 - **WHEN** a run has evidence for only one pair of layers
@@ -19,10 +20,12 @@ For each in-scope product, governance SHALL be able to record separate reconcili
 #### Scenario: Increment delivery closes with reconciliation
 - **WHEN** an incremental PRD is promoted or its returns are absorbed
 - **THEN** the reconciliation records SHALL declare increment-scoped coverage by default and SHALL NOT be reported as product-level complete alignment
+- **AND** A record produced for an incremental delivery SHALL declare its reconciliation scope explicitly (increment-scoped by default, or product-wide when a full scan was actually performed) and SHALL NOT present increment-scoped evidence as a product-level complete reconciliation; each record SHALL retain its pair, scope, compared revisions, coverage, and limitations regardless of scope kind.
 
 #### Scenario: Untouched pairs in an increment
 - **WHEN** an increment provably affects only one layer pair
 - **THEN** the other two pairs MAY be recorded as not-affected or not-applicable with their basis, instead of full per-pair reports
+- **AND** When a promotion or absorption touches only some layers, the three pairwise relations SHALL each be stated as affected, not-affected, not-checked, or not-applicable — a not-affected or not-applicable statement SHALL carry its basis — so that a small incremental correction does not mechanically require three full reports.
 
 #### Scenario: Impact check with no ontology change
 - **WHEN** an increment does not change product semantics and a reasoned no-change impact check is recorded
