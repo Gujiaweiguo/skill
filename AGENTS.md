@@ -5,7 +5,7 @@
 OpenCode skills repository for 蓝联科技 (Lanlnk). **Skill definitions** (markdown) + **rendering engines** (Python/Node.js). No runtime web app.
 
 Two skill types:
-- **OpenSpec skills** (12) in `.opencode/skills/openspec-*/` — REAL directories (not symlinks). Bundled upstream, **read-only**.（2026-11-01 补 track openspec-propose / openspec-update-change：`.opencode/` gitignore 后新增的 upstream skill 曾长期只在磁盘上，fresh clone 会丢，属 6c5c5b3 同类引用悬空）
+- **OpenSpec skills** (12) in `.agents/skills/openspec-*/` — REAL directories (not symlinks). Bundled upstream, **read-only**.（2026-11-20 OpenSpec 2.1.0 sync：`openspec update --force` 把 upstream 实体目录从 `.opencode/skills/openspec-*/` 换位到 `.agents/skills/`，tracked 位置等价平移——2026-11-01 曾补 track 防丢，本次同批 `git add -u` 入链删除侧）
 - **Custom skills** (32) in `skills/<category>/<name>/` — symlinks from `.opencode/skills/<name>`.
 
 ## Critical Paths
@@ -14,13 +14,13 @@ Two skill types:
 |------|-------|
 | Edit skills here | `skills/<category>/<name>/` |
 | OpenCode symlinks | `.opencode/skills/<name>` → `../../skills/...` (relative) or `/opt/code/skill/skills/...` (absolute) |
-| OpenSpec skills | `.opencode/skills/openspec-*/`（upstream artifacts，read-only；1.14.1 sync 后无独立 command 文件） |
+| OpenSpec skills | `.agents/skills/openspec-*/`（upstream artifacts，read-only；2.1.0 sync，含 `.openspec-target` 标记文件） |
 | External data (business skills) | `$LANLNK_BASE` = `/opt/code/docs/lanlnk` (not in this repo) |
 | External data (user guides) | `$USERGUIDE_BASE` = `<COMPANY_BASE>/materials/03-products/user-guides` (derived from company base, see COMPANIES.md §3) |
 | Config | `config/lanlnk.yaml` |
 | Cross-skill document quality | `references/docspec/` |
 
-**Never edit** `.opencode/skills/openspec-*/` — these are upstream artifacts.
+**Never edit** `.agents/skills/openspec-*/` — these are upstream artifacts.
 
 ## Environment Setup
 
@@ -424,9 +424,9 @@ subprocess.run(
 
 ## OpenSpec Workflow
 
-CLI v1.14.1 on PATH. Each change = `openspec/changes/<name>/`.
+CLI v2.1.0 on PATH. Each change = `openspec/changes/<name>/`.
 
-Workflow entry points are the `openspec-*` skills in `.opencode/skills/`（`openspec-propose` / `openspec-new-change` / `openspec-ff-change` / `openspec-apply-change` / `openspec-verify-change` / `openspec-archive-change` 等，全量 12 个见下表）。旧 `.opencode/command/opsx-*.md` slash 命令已随 1.14.1 upstream sync 移除；skill 触发短语仍兼容 `opsx apply` / `openspec apply` 等说法。
+Workflow entry points are the `openspec-*` skills in `.agents/skills/`（`openspec-propose` / `openspec-new-change` / `openspec-ff-change` / `openspec-apply-change` / `openspec-verify-change` / `openspec-archive-change` 等，全量 12 个见下表）。旧 `.opencode/command/opsx-*.md` slash 命令已随 1.14.1 upstream sync 移除；2.1.0 sync 起实体目录驻 `.agents/skills/`。skill 触发短语仍兼容 `opsx apply` / `openspec apply` 等说法。
 
 | Skill | Action |
 |-------|--------|

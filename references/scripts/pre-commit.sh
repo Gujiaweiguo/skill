@@ -22,7 +22,8 @@ CHECK_SCRIPT="$REPO_ROOT/references/scripts/check_skill_ecosystem.sh"
 [ ! -x "$CHECK_SCRIPT" ] && exit 0
 
 # Triggers exclude references/scripts/ on purpose: the check scripts don't need to re-run themselves.
-if ! git diff --cached --name-only | grep -qE '(^skills/.*SKILL\.md$|^\.opencode/skills/|^AGENTS\.md$|^\.gitignore$)'; then
+# 2026-11-20: added ^\.agents/ — upstream openspec-* skills moved there (OpenSpec 2.1.0 sync).
+if ! git diff --cached --name-only | grep -qE '(^skills/.*SKILL\.md$|^\.opencode/skills/|^\.agents/|^AGENTS\.md$|^\.gitignore$)'; then
   exit 0
 fi
 
