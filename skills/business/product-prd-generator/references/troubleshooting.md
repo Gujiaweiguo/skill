@@ -735,3 +735,17 @@ print('ontology OK')
 **预防触发器**：产品每次归档 change（或首次产生提交）后，同步检查该产品在 `tests/` 的 fixture 族；活状态断言只锚定「结构性不变量」（scope 集合、authority 状态机、语义门禁），不锚定易变值（SHA、条数快照）。
 
 **关联设计决策**：reconcile 的基线三态语义（empty → present-unconfirmed 播种；populated → 不播种走 spec 驱动；populated + 产品级 `ontology_roadmap_seeding` 开关 → 本体目标能力以 missing roadmap 项播种）见 `code-map-rules-lnkcard.yaml` 与 reconcile `_add_ontology_declared_capabilities`。
+
+## 生成区：裁决追写后 PRD 即过时 / 重生成覆盖手写 manifest
+
+**症状一**：PRD 内容缺最新 Owner 裁决（能力数/场景数与 ontology 实际不符，或某条补充裁决整块缺失）。
+
+**根因**：生成区产物在裁决追写入 ontology 之后即过时——生成（git 提交 A）早于最后一笔裁决入库（提交 B），时序差几分钟即产生缺口（实证：lnkretail 2026-11-22，v0.1 生成 21:23 早于 D-015 补充裁决入库 21:36 共 13 分钟，缺 22 角色全集与审批矩阵；另：principle 层有而 scenario 层无的裁决不会渲染进 PRD——渲染只吃 scenario）。
+
+**处置**：收口会话在**最后一笔台账/ontology 提交之后立即重跑生成**；审阅生成区时先比对 manifest 的 capability/scenario 计数与 ontology 实际计数，再抽关键词；裁决文本落 ontology 时**必须建 scenario**（仅写 principle/statement 不会进 PRD）。
+
+**症状二**：重生成后手写在 `generation-manifest.md` 里的晋升清单/重生成记录丢失。
+
+**根因**：manifest 是渲染模板产物，每次重生成整体覆盖（实证：同会话两次覆盖）。
+
+**处置**：持久记录（晋升清单、重生成记录、审阅报告）放产品 `30-products/<产品>/reconciliation/` 与 `prd/README.md`，manifest 只作当次导出视图；重生成后按 reconciliation 记录重建 manifest 增补段。
