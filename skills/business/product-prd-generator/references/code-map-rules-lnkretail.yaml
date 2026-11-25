@@ -1,0 +1,54 @@
+project: lnkretail
+description: >-
+  LnkRetail 产品代码基线。技术骨架已建立（/opt/code/lnkretail，2026-11-23 归档
+  add-technical-foundation，三个技术 OpenSpec scope），业务模块与业务表尚无：不得凭
+  技术骨架声明任何业务代码能力，禁止以静态关键词扫描或历史 EV 证据替代实现基线；
+  业务能力的 implementation status 仍为 unknown。canonical 能力地图已批准
+  （target-capability-map.md，31 能力族），机器本体 onboarding（10 模块、38 子域、
+  48 能力）。业务实现扫描待业务 change 归档后另行启用。
+specs:
+  path: openspec/specs
+  # 技术骨架的 scope 不是业务能力，不参与业务能力对账（2026-11-23，Owner 裁定 PRD 状态
+  # 口径：业务能力保持“目标能力、业务实现未扫描”，不记为 missing）。三个 scope 全部被
+  # 排除时业务基线为空，本体能力按 present-unconfirmed 播种，措辞走 technical-only 分支。
+  # 适用边界：本机制只在“没有任何业务 scope”时成立。业务 change 归档产生业务 scope 后，
+  # 业务基线不再为空，未实现的能力不会自动播种——届时须另行裁定状态口径并调整本配置。
+  exclude:
+    - client-app-shell
+    - database-isolation
+    - service-health
+matrix:
+  enabled: false
+future_scanners:
+  direct_runtime_sources:
+    enabled: false
+    note: 无业务代码（业务基线未建立），禁止使用静态关键词扫描替代实现基线。
+  tests:
+    enabled: false
+    note: 业务测试待业务 change 归档后另行配置扫描。
+direct_code:
+  enabled: false
+  note: 无业务代码（业务基线未建立），不启用直接代码扫描。
+direct_tests:
+  enabled: false
+  note: 无业务代码（业务基线未建立），不启用测试扫描。
+exclude_paths:
+  - "**/.git/**"
+  - "**/.opencode/**"
+  - "**/node_modules/**"
+  - "**/.venv/**"
+  - "**/__pycache__/**"
+  - "artifacts/**"
+  - "tmp/**"
+  - "openspec/**"
+  - "migrations/**"
+# 规划能力由 canonical ontology/PRD 管理，不自动注入 missing。
+ontology_roadmap_seeding: false
+
+# 归档证据驱动口径（D-020 第 14 项，2026-11-25；lnkretail 专用，其他产品的规则文件不写此键）：
+# 业务 scope 归档后 specs 基线不再为空，上面“空基线播种”的适用边界已不成立。启用后能力清单
+# 重建为本体能力清单，状态只由显式能力映射 + 归档目录 + SHA 绑定门禁证据驱动；scope ID 不进
+# 清单，不启用代码扫描。映射是产品数据，放 docs 仓产品本体目录，条目在回写裁定后由 docs 侧维护。
+archive_evidence_driven:
+  enabled: true
+  capability_map: $COMPANY_BASE/30-products/lnkretail/ontology/archive-capability-map.yaml

@@ -16,6 +16,7 @@ from ._paths import (
     ontology_path_for_project,
     overrides_path_for_project,
 )
+from . import archive_status
 from .archive_evidence import apply_archive_evidence, load_archive_evidence
 from .models import EvidenceKind, EvidenceRef, ReconcileResult, ReconciledCapability, RequirementRecord
 
@@ -259,6 +260,10 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
                     gaps=capability.gaps + (review_gap,),
                     evidence=capability.evidence,
                 )
+
+    if archive_status.is_enabled(project):
+        # 归档证据驱动口径（按产品 opt-in，见 archive_status）：未启用的产品不进入此分支
+        archive_status.apply_archive_driven_inventory(by_id, project, code_map)
 
     requirements = _build_requirement_records(doc_map, by_id)
 

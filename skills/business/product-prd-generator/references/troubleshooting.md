@@ -749,3 +749,15 @@ print('ontology OK')
 **根因**：manifest 是渲染模板产物，每次重生成整体覆盖（实证：同会话两次覆盖）。
 
 **处置**：持久记录（晋升清单、重生成记录、审阅报告）放产品 `30-products/<产品>/reconciliation/` 与 `prd/README.md`，manifest 只作当次导出视图；重生成后按 reconciliation 记录重建 manifest 增补段。
+
+## 能力状态：业务 scope 归档后能力清单塌缩为 scope ID（archive-evidence-driven 口径）
+
+**症状**：产品代码仓首批业务 change 归档后重跑生成，本体目标能力全部消失，能力清单只剩 OpenSpec scope ID 且全记 `existing`（2026-11-25 lnkretail 实证：48 项 present-unconfirmed → 11 项 scope `existing`，蓝图每条目标能力盖“✅ existing”）。
+
+**根因**：空基线播种（`_add_ontology_declared_capabilities`）只在 specs 扫描零产物时触发；业务 scope 出现后基线不再为空，播种停摆，而 scope ID 经 specs 扫描直接进入 `by_id`。归档提案的能力声明是表格或缺省，也不是 `archive_evidence` 能识别的 `### New Capabilities` 列表。
+
+**处置**：新增 `product_prd_generator/archive_status.py`（按产品 opt-in）。规则文件写 `archive_evidence_driven.enabled: true` 后，`reconcile()` 末尾把 `by_id` 重建为本体能力清单：未被归档覆盖的记 `present-unconfirmed`（已是目标能力种子的条目原样保留，空基线场景输出不变）；只有“显式能力映射 + 归档目录（proposal/tasks/verification-report 齐全、tasks 全勾）+ 映射里的 40 位 `verification_sha` 出现在 verification-report 且是 HEAD 祖先”全部成立才记 `existing`（`coverage: partial` 记 `partial`），任一不成立即不晋升并打印原因。映射是产品数据，放 `$COMPANY_BASE/30-products/<pid>/ontology/archive-capability-map.yaml`，`changes` 为空时不晋升任何能力。未写该键的产品不进入此分支。
+
+**验证**：`uv run --extra dev pytest tests/test_archive_status.py -v`；隔离重跑启用产品，确认本体能力数、scope ID 条目为 0。
+
+**注意**：写入映射时 `verification_sha` 必须选归档 verification-report 里实际引用的提交（lnkretail Wave 2 的报告未引用其 feature 提交）。渲染文案“present-unconfirmed（目标能力，代码基线未建立）”是共用字符串，未改；`review.py` / `review_format.py` 中按“lnkretail 全部 present-unconfirmed”触发的分支在有晋升后不再触发，首次回写晋升时需一并处理。
