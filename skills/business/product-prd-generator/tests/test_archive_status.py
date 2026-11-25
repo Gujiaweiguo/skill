@@ -1,6 +1,6 @@
 """Tests for the opt-in archive-evidence-driven capability status.
 
-Each test builds a synthetic code repo with one archived change under tmp_path.
+Each test builds a synthetic code repo with one or two archived changes under tmp_path.
 Run with `uv run pytest tests/test_archive_status.py -v`.
 """
 from __future__ import annotations
@@ -14,6 +14,7 @@ from product_prd_generator import archive_status, reconcile
 from product_prd_generator.models import EvidenceKind, ReconciledCapability
 
 ARCHIVE_REL = "openspec/changes/archive/2026-11-24-s1-demo"
+SECOND_REL = "openspec/changes/archive/2026-11-25-s1-second"
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -27,7 +28,23 @@ def _git(repo: Path, *args: str) -> str:
     return completed.stdout.strip()
 
 
-def _repo(tmp_path: Path, *, tasks: str = "- [x] 1.1 done\n", cite: str | None = None, git: bool = True) -> tuple[Path, str]:
+def _archive_files(archive: Path, tasks: str, citation: str) -> None:
+    archive.mkdir(parents=True)
+    (archive / "proposal.md").write_text("# demo\n", encoding="utf-8")
+    (archive / "tasks.md").write_text(tasks, encoding="utf-8")
+    (archive / "verification-report.md").write_text(
+        f"## Formal evidence\n\nEvidence bound to `{citation}`.\n", encoding="utf-8"
+    )
+
+
+def _repo(
+    tmp_path: Path,
+    *,
+    tasks: str = "- [x] 1.1 done\n",
+    cite: str | None = None,
+    cite_len: int = 40,
+    git: bool = True,
+) -> tuple[Path, str]:
     root = tmp_path / "code"
     root.mkdir(parents=True)
     head = "0" * 40
@@ -37,17 +54,17 @@ def _repo(tmp_path: Path, *, tasks: str = "- [x] 1.1 done\n", cite: str | None =
         _git(root, "add", "README.md")
         _git(root, "commit", "-q", "-m", "init")
         head = _git(root, "rev-parse", "HEAD")
-    archive = root / ARCHIVE_REL
-    archive.mkdir(parents=True)
-    (archive / "proposal.md").write_text("# demo\n", encoding="utf-8")
-    (archive / "tasks.md").write_text(tasks, encoding="utf-8")
-    (archive / "verification-report.md").write_text(
-        f"## Formal evidence\n\nEvidence bound to `{cite or head}`.\n", encoding="utf-8"
-    )
+    _archive_files(root / ARCHIVE_REL, tasks, (cite or head)[:cite_len])
     if git:
         _git(root, "add", "-A")
         _git(root, "commit", "-q", "-m", "archive")
     return root, head
+
+
+def _second_archive(root: Path, sha: str) -> None:
+    _archive_files(root / SECOND_REL, "- [x] 2.1 done\n", sha)
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "second archive")
 
 
 def _entry(sha: str, capabilities: list[dict[str, str]] | None = None, **overrides: object) -> dict[str, object]:
@@ -68,6 +85,10 @@ def _cap(cap_id: str, status: str = "existing") -> ReconciledCapability:
     )
 
 
+def _cover(coverage: str = "full", scope: str = "", change_id: str = "s1-demo") -> archive_status.Cover:
+    return archive_status.Cover(change_id, "2026-11-24", "a" * 40, coverage, scope)
+
+
 # --- gate verification -----------------------------------------------------
 
 
@@ -78,15 +99,25 @@ def test_gate_passes_for_archived_change_with_cited_ancestor_sha(tmp_path: Path)
     assert (result.archive_date, result.verification_sha) == ("2026-11-24", head)
 
 
+@pytest.mark.parametrize("cite_len", [7, 8, 12])
+def test_gate_accepts_an_abbreviation_cited_in_the_report(tmp_path: Path, cite_len: int) -> None:
+    root, head = _repo(tmp_path, cite_len=cite_len)
+    result = archive_status.evaluate_gate(_entry(head), root)
+    assert result.ok, result.reason
+
+
 def test_gate_fails_closed(tmp_path: Path) -> None:
     root, head = _repo(tmp_path)
-    unchecked, unchecked_head = _repo(tmp_path / "unchecked", tasks="- [x] 1.1\n- [ ] 1.2\n")
-    assert "tasks" in archive_status.evaluate_gate(_entry(unchecked_head), unchecked).reason
     assert "verification-report" in archive_status.evaluate_gate(_entry("c" * 40), root).reason
-    not_ancestor, _ = _repo(tmp_path / "not-ancestor", cite="c" * 40)
-    assert "祖先" in archive_status.evaluate_gate(_entry("c" * 40), not_ancestor).reason
+    assert "verification-report" in archive_status.evaluate_gate(_entry(head[:6] + "0" * 34), root).reason
     assert "40 位" in archive_status.evaluate_gate(_entry("abc123"), root).reason
     assert "目录名" in archive_status.evaluate_gate(_entry(head, change_id="other-id"), root).reason
+
+    unchecked, unchecked_head = _repo(tmp_path / "unchecked", tasks="- [x] 1.1\n- [ ] 1.2\n")
+    assert "tasks" in archive_status.evaluate_gate(_entry(unchecked_head), unchecked).reason
+
+    not_ancestor, _ = _repo(tmp_path / "not-ancestor", cite="c" * 40)
+    assert "祖先" in archive_status.evaluate_gate(_entry("c" * 40), not_ancestor).reason
 
     missing, missing_head = _repo(tmp_path / "missing")
     subprocess.run(["rm", "-rf", str(missing / ARCHIVE_REL)], check=True)
@@ -115,22 +146,41 @@ def test_evaluate_promotions_keeps_only_verified_known_capabilities(tmp_path: Pa
     }
     promotions, notes = archive_status.evaluate_promotions(capability_map, root, {"cap-a", "cap-b", "cap-c", "cap-d"})
     assert set(promotions) == {"cap-a", "cap-b"}
-    assert (promotions["cap-a"].coverage, promotions["cap-a"].verification_sha) == ("full", head)
-    assert promotions["cap-b"].scope == "settlement-price scene only"
+    assert (promotions["cap-a"].coverage, promotions["cap-a"].covers[0].verification_sha) == ("full", head)
+    assert (promotions["cap-b"].coverage, promotions["cap-b"].scope) == ("partial", "settlement-price scene only")
     joined = "; ".join(notes)
     for needle in ("not-in-ontology", "cap-c 的 coverage", "不是映射", "s1-demo：门禁核验未通过"):
         assert needle in joined
 
 
-def test_duplicate_capability_is_reported_not_overwritten(tmp_path: Path) -> None:
+def test_repeated_capability_within_one_change_is_reported_not_merged(tmp_path: Path) -> None:
     root, head = _repo(tmp_path)
     capability_map = {"changes": [
-        _entry(head, [{"id": "cap-a", "coverage": "full"}]),
+        _entry(head, [{"id": "cap-a", "coverage": "full"}, {"id": "cap-a", "coverage": "partial"}]),
         _entry(head, [{"id": "cap-a", "coverage": "partial"}]),
     ]}
     promotions, notes = archive_status.evaluate_promotions(capability_map, root, {"cap-a"})
-    assert promotions["cap-a"].coverage == "full"
-    assert any("重复条目" in note for note in notes)
+    assert [cover.coverage for cover in promotions["cap-a"].covers] == ["full"]
+    assert sum("重复" in note for note in notes) == 2
+
+
+def test_capability_covered_by_several_changes_keeps_every_piece_of_evidence(tmp_path: Path) -> None:
+    root, head = _repo(tmp_path)
+    _second_archive(root, head)
+    capability_map = {"changes": [
+        _entry(head, [{"id": "cap-a", "coverage": "full"}]),
+        _entry(head, [{"id": "cap-a", "coverage": "partial", "scope": "in-transit only"}],
+                change_id="s1-second", archive_dir=SECOND_REL),
+    ]}
+    promotions, notes = archive_status.evaluate_promotions(capability_map, root, {"cap-a"})
+    assert notes == []
+    promotion = promotions["cap-a"]
+    assert [(cover.change_id, cover.coverage) for cover in promotion.covers] == [("s1-demo", "full"), ("s1-second", "partial")]
+    assert (promotion.coverage, promotion.scope) == ("partial", "in-transit only")
+    built = archive_status.build_inventory({}, (("cap-a", "A"),), promotions, "ontology:o.yaml")
+    archive_refs = [e.ref for e in built["cap-a"].evidence if e.kind == EvidenceKind.OPENSPEC_ARCHIVE]
+    assert archive_refs == ["s1-demo@2026-11-24", "s1-second@2026-11-25"]
+    assert built["cap-a"].gaps == (f"{archive_status._PARTIAL_GAP}：in-transit only",)
 
 
 # --- inventory rebuild -----------------------------------------------------
@@ -138,8 +188,8 @@ def test_duplicate_capability_is_reported_not_overwritten(tmp_path: Path) -> Non
 
 def test_build_inventory_promotes_seeds_and_keeps_override() -> None:
     promotions = {
-        "cap-a": archive_status.Promotion("s1-demo", "2026-11-24", "a" * 40, "full", ""),
-        "cap-b": archive_status.Promotion("s1-demo", "2026-11-24", "a" * 40, "partial", "scene x only"),
+        "cap-a": archive_status.Promotion((_cover("full"),)),
+        "cap-b": archive_status.Promotion((_cover("partial", "scene x only"),)),
     }
     by_id = {"identity": _cap("identity"), "cap-c": _cap("cap-c", "explicitly-not-do")}
     inventory = archive_status.build_inventory(

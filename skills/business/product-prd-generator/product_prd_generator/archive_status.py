@@ -5,8 +5,11 @@
 scope ID 会直接成为能力条目。启用本口径的产品，能力清单重建为“产品本体能力清单”，
 状态只由 **显式能力映射 + 归档目录 + SHA 绑定的门禁证据** 驱动：
 
-- 被映射的归档 change 通过门禁核验 → 其覆盖的能力记 ``existing``；映射注明只覆盖
-  部分场景（``coverage: partial``）的记 ``partial``；
+- 被映射的归档 change 通过门禁核验 → 其覆盖的能力记 ``existing``；任一映射注明只覆盖
+  部分场景（``coverage: partial``）的记 ``partial``。同一能力可由多个 change 覆盖，
+  逐个保留证据；
+- 门禁核验：归档目录齐全且 tasks 全部勾选；映射里的 40 位 ``verification_sha`` 是代码仓
+  HEAD 的祖先，且归档的 verification-report 引用了它全文或不短于 7 位的缩写；
 - 其余本体能力仍为 ``present-unconfirmed``（目标能力，业务实现未扫描）；
 - scope ID（技术或业务）不直接进入能力清单；
 - 不启用任何代码扫描。
@@ -42,6 +45,7 @@ SEED_STATUS = "present-unconfirmed"
 _SKILL_ROOT = Path(__file__).resolve().parents[1]
 _COVERAGES = ("full", "partial")
 _SHA40 = re.compile(r"[0-9a-f]{40}")
+_HEX_TOKEN = re.compile(r"(?<![0-9a-f])([0-9a-f]{7,40})(?![0-9a-f])")
 _ARCHIVE_DIR = re.compile(r"(?P<date>\d{4}-\d{2}-\d{2})-(?P<change_id>[A-Za-z0-9][A-Za-z0-9-]*)")
 _REQUIRED_FILES = ("proposal.md", "tasks.md", "verification-report.md")
 _BASE_TOKENS = ("${COMPANY_BASE}", "$COMPANY_BASE", "${LANLNK_BASE}", "$LANLNK_BASE")
@@ -62,12 +66,27 @@ class GateResult:
 
 
 @dataclass(frozen=True, slots=True)
-class Promotion:
+class Cover:
     change_id: str
     archive_date: str
     verification_sha: str
     coverage: str
     scope: str
+
+
+@dataclass(frozen=True, slots=True)
+class Promotion:
+    """One capability as covered by one or more verified archived changes."""
+
+    covers: tuple[Cover, ...]
+
+    @property
+    def coverage(self) -> str:
+        return "full" if all(cover.coverage == "full" for cover in self.covers) else "partial"
+
+    @property
+    def scope(self) -> str:
+        return "；".join(dict.fromkeys(cover.scope for cover in self.covers if cover.scope))
 
 
 def _rules(project: str) -> Mapping[str, Any]:
@@ -146,8 +165,9 @@ def evaluate_gate(entry: Mapping[str, Any], code_root: Path) -> GateResult:
     sha = str(gate.get("verification_sha", "")).strip() if isinstance(gate, Mapping) else ""
     if not _SHA40.fullmatch(sha):
         return GateResult(False, "gate_evidence.verification_sha 须为 40 位提交 SHA")
-    if sha not in (archive_dir / "verification-report.md").read_text(encoding="utf-8"):
-        return GateResult(False, "verification_sha 未出现在归档的 verification-report.md")
+    report = (archive_dir / "verification-report.md").read_text(encoding="utf-8")
+    if not any(sha.startswith(token) for token in _HEX_TOKEN.findall(report)):
+        return GateResult(False, "verification_sha 未出现在归档的 verification-report.md（全文或不短于 7 位的缩写）")
     if not _is_ancestor(sha, code_root):
         return GateResult(False, "verification_sha 不是代码仓 HEAD 的祖先，或 git 不可用")
     return GateResult(True, "ok", match.group("date"), sha)
@@ -159,13 +179,14 @@ def evaluate_promotions(
     known_ids: set[str] | frozenset[str],
 ) -> tuple[dict[str, Promotion], list[str]]:
     """Turn verified map entries into ``{capability_id: Promotion}``; everything else is a note."""
-    promotions: dict[str, Promotion] = {}
+    covers: dict[str, list[Cover]] = {}
     notes: list[str] = []
     for entry in capability_map.get("changes", []):
         if not isinstance(entry, Mapping):
             notes.append("changes 条目不是映射，已忽略")
             continue
-        label = str(entry.get("change_id", "")).strip() or "<unnamed>"
+        change_id = str(entry.get("change_id", "")).strip()
+        label = change_id or "<unnamed>"
         gate = evaluate_gate(entry, code_root)
         if not gate.ok:
             notes.append(f"{label}：门禁核验未通过（{gate.reason}），其能力不晋升")
@@ -180,17 +201,19 @@ def evaluate_promotions(
                 notes.append(f"{label}：{cap_id or '<empty>'} 不在本体能力清单中，已忽略")
             elif coverage not in _COVERAGES:
                 notes.append(f"{label}：{cap_id} 的 coverage 须为 full 或 partial，已忽略")
-            elif cap_id in promotions:
-                notes.append(f"{cap_id} 已由 {promotions[cap_id].change_id} 晋升，忽略 {label} 的重复条目")
+            elif any(cover.change_id == change_id for cover in covers.get(cap_id, [])):
+                notes.append(f"{label}：{cap_id} 在同一 change 内重复列出，忽略后一条")
             else:
-                promotions[cap_id] = Promotion(
-                    change_id=str(entry["change_id"]),
-                    archive_date=gate.archive_date,
-                    verification_sha=gate.verification_sha,
-                    coverage=coverage,
-                    scope=str(item.get("scope", "")).strip(),
+                covers.setdefault(cap_id, []).append(
+                    Cover(
+                        change_id=change_id,
+                        archive_date=gate.archive_date,
+                        verification_sha=gate.verification_sha,
+                        coverage=coverage,
+                        scope=str(item.get("scope", "")).strip(),
+                    )
                 )
-    return promotions, notes
+    return {cap_id: Promotion(tuple(items)) for cap_id, items in covers.items()}, notes
 
 
 def build_inventory(
@@ -234,16 +257,14 @@ def build_inventory(
             reconciled_status=status.value,
             confidence=Confidence.MEDIUM.value,
             gaps=gaps,
-            evidence=(
-                EvidenceRef(kind="doc", ref=ontology_ref),
+            evidence=(EvidenceRef(kind="doc", ref=ontology_ref),)
+            + tuple(
                 EvidenceRef(
                     kind=EvidenceKind.OPENSPEC_ARCHIVE,
-                    ref=f"{promotion.change_id}@{promotion.archive_date}",
-                    note=(
-                        f"archive-verified; gate sha {promotion.verification_sha[:12]}; "
-                        f"coverage={promotion.coverage}"
-                    ),
-                ),
+                    ref=f"{cover.change_id}@{cover.archive_date}",
+                    note=f"archive-verified; gate sha {cover.verification_sha[:12]}; coverage={cover.coverage}",
+                )
+                for cover in promotion.covers
             ),
         )
     return inventory
@@ -280,7 +301,8 @@ def apply_archive_driven_inventory(
     by_id.update(inventory)
     print(
         f"  archive-evidence-driven inventory: {len(inventory)} ontology capabilities; "
-        f"promoted {len(promotions)} (existing/partial); "
+        f"promoted {len(promotions)} (existing {sum(1 for p in promotions.values() if p.coverage == 'full')}, "
+        f"partial {sum(1 for p in promotions.values() if p.coverage != 'full')}); "
         f"not-archived {len(inventory) - len(promotions)} present-unconfirmed"
     )
     for note in notes:
