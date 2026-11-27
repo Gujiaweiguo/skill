@@ -27,6 +27,16 @@ class ReviewBriefInput:
     # 且 docs 输入无已授权需求。2026-11-27 前这里按 project == "lnkretail" 自行判定，
     # 其他规划型产品（lnkmember 首版）因此拿不到规划型说明。
     planning: bool = False
+    # docs 输入是否为空（render._docs_input_empty）：规划型说明据此区分“输入为空”与
+    # “输入为历史系统参考资料”。lnkmember 首版 docs 输入为空，却被告知输入为历史参考资料。
+    docs_input_empty: bool = False
+
+
+def _planning_input_lead(docs_input_empty: bool) -> str:
+    """规划型 0.2 的输入说明；docs 输入非空时与既有文案逐字相同。"""
+    if docs_input_empty:
+        return "当前 docs 输入为空（无客户需求、无参考资料）"
+    return "当前输入为历史系统参考资料，不构成已授权客户需求"
 
 
 def _mi_strategy_lines() -> list[str]:
@@ -69,7 +79,7 @@ def render_review_brief(data: ReviewBriefInput) -> str:
         strategy = [
             "### 0.2 输入来源",
             "",
-            f"当前输入为历史系统参考资料，不构成已授权客户需求；{total_capabilities} 项能力是目标蓝图（Owner 裁决经 ontology 场景进入模块设计），代码基线 baseline-unavailable。",
+            f"{_planning_input_lead(data.docs_input_empty)}；{total_capabilities} 项能力是目标蓝图（Owner 裁决经 ontology 场景进入模块设计），代码基线 baseline-unavailable。",
             "需求覆盖结论须待 W0 领域/契约基线和 Owner/客户授权输入后再形成。",
             "",
         ]

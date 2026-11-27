@@ -73,7 +73,7 @@ def _has_authorized_requirements(doc_map: dict[str, Any] | None) -> bool:  # noq
 def _is_planning_mode(capabilities: list[dict[str, Any]], doc_map: dict[str, Any] | None = None) -> bool:  # noqa: ANY_OK
     """规划型 PRD 判定：代码基线 baseline-unavailable（全部能力 present-unconfirmed，
     无任何 existing/partial/missing 确认状态）且 docs 输入无已授权客户需求/owner 决策
-    （仅为历史参考资料）。此时不得输出确定性需求/差距/覆盖结论。"""
+    （为空或仅为历史参考资料）。此时不得输出确定性需求/差距/覆盖结论。"""
     stats = _status_stats(capabilities)
     if stats.get("present-unconfirmed", 0) <= 0:
         return False
@@ -299,13 +299,43 @@ def _render_approval_flow_evidence(requirements: list[dict[str, Any]], docs_root
     return "\n".join(lines)
 
 
-_PLANNING_NO_COVERAGE_NOTE = (
-    "当前 docs 输入均为历史参考资料、无已授权客户需求；Owner 蓝图裁决经 ontology 场景进入模块设计，"
-    "不能据此得出需求覆盖结论。"
-)
+_PLANNING_NO_COVERAGE_TAIL = "Owner 蓝图裁决经 ontology 场景进入模块设计，不能据此得出需求覆盖结论。"
 
 
-def _render_customer_summary(doc_map: dict[str, Any] | None, planning: bool = False) -> str:  # noqa: ANY_OK
+def _docs_input_empty(doc_map: dict[str, Any] | None, docs_root: str = "") -> bool:  # noqa: ANY_OK
+    """规划型产品的 docs 输入是否为空：doc_map 没有任何 feature，且 docs-root 下没有 md。
+
+    2026-11-27 lnkmember 首版实证：docs-root 只有 parsed/、features 为空，规划型模板却写
+    “输入为历史系统参考资料”。措辞必须区分“输入为空”与“仅有历史参考资料”；拿不准
+    （docs-root 未给出或无法读取）时按非空处理，沿用既有文案。
+    """
+    if isinstance(doc_map, dict):
+        features = doc_map.get("features", [])
+        if isinstance(features, list) and features:
+            return False
+    if not docs_root:
+        return False
+    try:
+        return not any(Path(docs_root).rglob("*.md"))
+    except OSError:
+        return False
+
+
+def _planning_no_coverage_note(docs_input_empty: bool) -> str:
+    """规划型“无需求覆盖结论”备注；非空输入时与 2026-11-21 起的既有文案逐字相同。"""
+    head = (
+        "当前 docs 输入为空（无客户需求、无参考资料）"
+        if docs_input_empty
+        else "当前 docs 输入均为历史参考资料、无已授权客户需求"
+    )
+    return f"{head}；{_PLANNING_NO_COVERAGE_TAIL}"
+
+
+def _render_customer_summary(
+    doc_map: dict[str, Any] | None,  # noqa: ANY_OK
+    planning: bool = False,
+    docs_input_empty: bool = False,
+) -> str:
     if not doc_map:
         return "## 2A. 需求与决策汇总\n\n（待 doc-map 提供 source_type=customer-requirements / owner-decisions 的 features 后填充）\n"
     grouped: dict[str, dict[str, list[str]]] = defaultdict(lambda: {"files": [], "items": []})
@@ -328,7 +358,10 @@ def _render_customer_summary(doc_map: dict[str, Any] | None, planning: bool = Fa
                 continue
             if term not in grouped[current_module]["items"]:
                 grouped[current_module]["items"].append(term)
-    section = "## 2A. 历史资料与已授权决策" if planning else "## 2A. 需求与决策汇总（客户需求 + owner 决策）"
+    if planning:
+        section = "## 2A. 需求与决策输入" if docs_input_empty else "## 2A. 历史资料与已授权决策"
+    else:
+        section = "## 2A. 需求与决策汇总（客户需求 + owner 决策）"
     lines = [section, "", f"共 {len(grouped)} 个模块。", ""]
     for module, payload in grouped.items():
         files = ", ".join(dict.fromkeys(payload["files"]))
@@ -344,8 +377,11 @@ def _render_customer_summary(doc_map: dict[str, Any] | None, planning: bool = Fa
         lines.append("")
     if len(grouped) == 0:
         if planning:
-            lines.append(f"- （暂无已授权客户需求模块。{_PLANNING_NO_COVERAGE_NOTE}）")
-            lines.append("- 历史系统资料抽取结果不作为客户需求，见 [需求清单.md](需求清单.md)（历史参考索引）与 3.2 结构类型概览（历史参考证据）。")
+            lines.append(f"- （暂无已授权客户需求模块。{_planning_no_coverage_note(docs_input_empty)}）")
+            if docs_input_empty:
+                lines.append("- 需求清单与结构类型概览待 docs 输入后补充；目标能力蓝图见第 3 节。")
+            else:
+                lines.append("- 历史系统资料抽取结果不作为客户需求，见 [需求清单.md](需求清单.md)（历史参考索引）与 3.2 结构类型概览（历史参考证据）。")
         else:
             lines.append("- （暂无）")
     return "\n".join(lines) + "\n"
@@ -782,14 +818,16 @@ def _write_handoff_outputs(inputs: RenderInputs, output_dir: Path, code_root: st
     )
 
 
-def _render_unmatched_requirements(capabilities: list[dict[str, Any]], planning: bool = False) -> str:  # noqa: ANY_OK
+def _render_unmatched_requirements(  # noqa: ANY_OK
+    capabilities: list[dict[str, Any]], planning: bool = False, docs_input_empty: bool = False
+) -> str:
     missing = [cap for cap in capabilities if cap.get("reconciled_status") == "missing"]
     if not missing:
         if planning:
             pu = sum(1 for cap in capabilities if cap.get("reconciled_status") == "present-unconfirmed")
             return (
                 "## 5. 需求覆盖结论\n\n"
-                f"{_PLANNING_NO_COVERAGE_NOTE}\n\n"
+                f"{_planning_no_coverage_note(docs_input_empty)}\n\n"
                 f"- 现有 {pu} 项均为目标能力清单（present-unconfirmed），不是已确认 gap 数量；"
                 "代码基线不可用（baseline-unavailable），没有可确认的 existing/partial/missing gap。\n"
                 "- 需求覆盖结论待 W0 领域/契约基线建立且客户需求获得授权后才能形成。\n"
@@ -1004,6 +1042,7 @@ def _render_priority_review(
     requirements: list[dict[str, Any]],  # noqa: ANY_OK
     planning: bool = False,
     pending_pointer: str = "",
+    docs_input_empty: bool = False,
 ) -> str:
     """高优先级需求 review 清单 — standalone file for human review。
 
@@ -1026,7 +1065,11 @@ def _render_priority_review(
             lines = [
                 "# 高优先级需求 review 清单",
                 "",
-                "当前无已授权高优先级客户需求（docs 输入均为历史参考资料，未经客户/owner 授权）。",
+                (
+                    "当前无已授权高优先级客户需求（docs 输入为空，无任何客户需求或参考资料）。"
+                    if docs_input_empty
+                    else "当前无已授权高优先级客户需求（docs 输入均为历史参考资料，未经客户/owner 授权）。"
+                ),
                 "",
                 sentence + "。需求授权后本清单再行更新。",
             ]
@@ -1513,6 +1556,7 @@ def render_prd(inputs: RenderInputs, code_root: str = "") -> str:
     requirements = inputs.reconcile.get("requirements", [])
     stats = _status_stats(capabilities)
     planning = _is_planning_mode(capabilities, inputs.doc_map)
+    docs_input_empty = planning and _docs_input_empty(inputs.doc_map, inputs.docs_root)
     ontology = _load_ontology(str(project))
     all_tables = parse_data_dict_files(inputs.docs_root)
     tables_by_mod = group_by_module(all_tables)
@@ -1524,13 +1568,14 @@ def render_prd(inputs: RenderInputs, code_root: str = "") -> str:
         tables_by_module=tables_by_mod,
         unmatched_table_count=len(unmatched_tables),
         planning=planning,
+        docs_input_empty=docs_input_empty,
     ))
     sources_desc, dirty_note = _baseline_notes(inputs.doc_map, code_root, inputs.reconcile.get("scan_coverage"))
     parts = [
         f"# {project} 产品 PRD\n",
         review_brief,
         _render_project_context(str(project), stats, code_root, sources_desc, dirty_note),
-        _render_customer_summary(inputs.doc_map, planning),
+        _render_customer_summary(inputs.doc_map, planning, docs_input_empty),
         _render_structure_summary(requirements),
         _render_blueprint_modules(requirements, capabilities, ontology, tables_by_mod, project=str(project)) if ontology else _render_requirement_list(requirements),
         _render_data_model_index(tables_by_mod, unmatched_tables),
@@ -1541,7 +1586,7 @@ def render_prd(inputs: RenderInputs, code_root: str = "") -> str:
         f"共 {len(capabilities)} 项能力，详见 [功能清单.md](功能清单.md)。",
         "",
         _render_engineering_notes(capabilities, ontology),
-        _render_unmatched_requirements(capabilities, planning),
+        _render_unmatched_requirements(capabilities, planning, docs_input_empty),
         _render_version_plan(capabilities),
         _render_image_refs(capabilities),
         _render_risks(capabilities),
@@ -1590,11 +1635,12 @@ def main() -> int:
     (output_dir / "差距分析.md").write_text(_render_gap_analysis(capabilities, planning), encoding="utf-8")
     (output_dir / "需求证据表.md").write_text(_render_evidence_table(capabilities), encoding="utf-8")
     (output_dir / "需求清单.md").write_text(_render_requirement_list_file(requirements, planning), encoding="utf-8")
+    docs_input_empty = planning and _docs_input_empty(inputs.doc_map, inputs.docs_root)
     pending_pointer = (
         reconciliation_pointer_for_project(str(inputs.reconcile.get("project", args.project))) if planning else ""
     )
     (output_dir / "高优先级需求review清单.md").write_text(
-        _render_priority_review(requirements, planning, pending_pointer), encoding="utf-8"
+        _render_priority_review(requirements, planning, pending_pointer, docs_input_empty), encoding="utf-8"
     )
     _write_handoff_outputs(inputs, output_dir, code_root=args.code_root)
 

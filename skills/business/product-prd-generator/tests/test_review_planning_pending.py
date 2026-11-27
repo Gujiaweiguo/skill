@@ -130,3 +130,70 @@ def test_priority_review_planning_fallback_is_product_neutral() -> None:
     assert render._render_priority_review([], planning=False) == (
         "# 高优先级需求 review 清单\n\n当前无高优先级需求。\n"
     )
+
+
+def test_docs_input_empty_detection(tmp_path: Path) -> None:
+    """docs 输入为空 = doc_map 没有 feature 且 docs-root 下没有 md；拿不准按非空处理。"""
+    assert render._docs_input_empty({"features": [{"source_type": "historical-system"}]}, str(tmp_path)) is False
+    assert render._docs_input_empty({"features": []}, str(tmp_path)) is True
+    (tmp_path / "a.md").write_text("# x\n", encoding="utf-8")
+    assert render._docs_input_empty({"features": []}, str(tmp_path)) is False
+    assert render._docs_input_empty({"features": []}, "") is False
+    assert render._docs_input_empty(None, str(tmp_path / "missing")) is True
+
+
+_LEGACY_NO_COVERAGE_NOTE = (
+    "当前 docs 输入均为历史参考资料、无已授权客户需求；"
+    "Owner 蓝图裁决经 ontology 场景进入模块设计，不能据此得出需求覆盖结论。"
+)
+_EMPTY_INPUT_NOTE = "当前 docs 输入为空（无客户需求、无参考资料）"
+
+
+def test_planning_wording_keeps_legacy_text_when_docs_input_is_not_empty() -> None:
+    """非空输入（lnkretail 一类）的规划型文案逐字不变。"""
+    assert render._planning_no_coverage_note(False) == _LEGACY_NO_COVERAGE_NOTE
+    assert _LEGACY_NO_COVERAGE_NOTE in render._render_unmatched_requirements([], planning=True)
+    summary = render._render_customer_summary({"features": []}, planning=True)
+    assert "## 2A. 历史资料与已授权决策" in summary
+    assert "历史系统资料抽取结果不作为客户需求" in summary
+    assert _LEGACY_NO_COVERAGE_NOTE in summary
+    review_list = render._render_priority_review([], planning=True)
+    assert "（docs 输入均为历史参考资料，未经客户/owner 授权）" in review_list
+    brief = render_review_brief(ReviewBriefInput(
+        project="lnkretail",
+        status_stats={"present-unconfirmed": 48},
+        requirement_count=0,
+        tables_by_module={},
+        unmatched_table_count=0,
+        planning=True,
+    ))
+    assert "当前输入为历史系统参考资料，不构成已授权客户需求；48 项能力是目标蓝图" in brief
+
+
+def test_planning_wording_says_input_is_empty_when_it_is(tmp_path: Path) -> None:
+    """docs 输入为空（lnkmember 首版）时不得声称“输入为历史系统参考资料”。"""
+    (tmp_path / "parsed").mkdir()
+    assert render._docs_input_empty({"features": []}, str(tmp_path)) is True
+    tail = _LEGACY_NO_COVERAGE_NOTE.split("；", 1)[1]
+    assert render._planning_no_coverage_note(True) == _EMPTY_INPUT_NOTE + "；" + tail
+    section5 = render._render_unmatched_requirements([], planning=True, docs_input_empty=True)
+    assert _EMPTY_INPUT_NOTE in section5
+    assert "历史参考资料" not in section5
+    summary = render._render_customer_summary({"features": []}, planning=True, docs_input_empty=True)
+    assert "## 2A. 需求与决策输入" in summary
+    assert _EMPTY_INPUT_NOTE in summary
+    assert "历史系统资料抽取结果" not in summary
+    review_list = render._render_priority_review([], planning=True, docs_input_empty=True)
+    assert "（docs 输入为空，无任何客户需求或参考资料）" in review_list
+    assert "历史参考资料" not in review_list
+    brief = render_review_brief(ReviewBriefInput(
+        project="lnkmember",
+        status_stats={"present-unconfirmed": 55},
+        requirement_count=0,
+        tables_by_module={},
+        unmatched_table_count=0,
+        planning=True,
+        docs_input_empty=True,
+    ))
+    assert _EMPTY_INPUT_NOTE + "；55 项能力是目标蓝图" in brief
+    assert "历史系统参考资料" not in brief

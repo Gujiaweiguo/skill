@@ -18,7 +18,7 @@ from .data_model import (
     parse_data_dict_files,
     pick_key_fields,
 )
-from .render import _is_planning_mode
+from .render import _docs_input_empty, _is_planning_mode
 from .review_format import ReviewBriefInput, render_review_brief
 
 _CONTROL_CHARS = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
@@ -658,6 +658,7 @@ def build_content_package(reconcile_path: str | Path, doc_map_path: str | Path |
         tables_by_module=tables_by_mod,
         unmatched_table_count=len(get_unmatched(all_tables)),
         planning=planning,
+        docs_input_empty=planning and _docs_input_empty(doc_map, docs_root),
     ))
 
     output_dir = Path(output_dir)
