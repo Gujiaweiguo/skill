@@ -47,15 +47,15 @@ PRODUCTS = (
     "lnkcard",
 )
 
-# onboarding 登记格的 verified_at（区别于 O2 首版矩阵的 2026-10-04 冻结日期）：
-# lnkcard 六格 2026-10-26；lnkretail 2026-11-21、lnkmember 2026-11-27 均仅
-# product-prd-generator 一格。
+# 首版矩阵之后登记或修订的格的 verified_at（区别于 O2 首版矩阵的 2026-10-04 冻结日期）：
+# lnkcard 六格 2026-10-26；lnkretail 2026-11-27（onboarding→partial 修订）、
+# lnkmember 2026-11-27 均仅 product-prd-generator 一格。
 LNKCARD_ONBOARDING_DATE = "2026-10-26"
-LNKRETAIL_ONBOARDING_DATE = "2026-11-21"
+LNKRETAIL_REVISION_DATE = "2026-11-27"
 LNKMEMBER_ONBOARDING_DATE = "2026-11-27"
 ONBOARDING_DATES: dict[tuple[str, str], str] = {
     **{(consumer, "lnkcard"): LNKCARD_ONBOARDING_DATE for consumer in CONSUMERS},
-    ("product-prd-generator", "lnkretail"): LNKRETAIL_ONBOARDING_DATE,
+    ("product-prd-generator", "lnkretail"): LNKRETAIL_REVISION_DATE,
     ("product-prd-generator", "lnkmember"): LNKMEMBER_ONBOARDING_DATE,
 }
 
@@ -145,6 +145,11 @@ AUDIT_DATE = "2026-10-04"
 # 2026-11-27 补登记；代码仓为空，首版生成区候选已产出但未经 owner 评审晋升，不标
 # implemented/partial；verified_at = 2026-11-27；其余五消费者暂不登记，
 # 该消费者单元数 10→11，EXPECTED_DISTRIBUTION onboarding 12→13）。
+# 修订（LNKRETAIL-PARTIAL，2026-11-27）：product-prd-generator×lnkretail onboarding→partial
+# （owner decision references/adapter-capability-owner-decision-lnkretail-partial-2026-11-27.md：
+# 生成器已为该产品真实运行并产出多版 PRD，代码基线与归档证据驱动口径在位；37/48 能力
+# 尚未被归档证据覆盖，故不记 implemented；evidence/verified_at 同批更新；
+# EXPECTED_DISTRIBUTION partial 13→14 / onboarding 13→12。同次裁决 lnkmember 维持 onboarding）。
 EXPECTED_MATRIX: dict[str, dict[str, str]] = {
     "product-prd-generator": {
         "lnkcre": "implemented",
@@ -156,7 +161,7 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
         "lnkgateway": "not-applicable",
         "lnkwebsite": "not-applicable",
         "lnkcard": "onboarding",
-        "lnkretail": "onboarding",
+        "lnkretail": "partial",
         "lnkmember": "onboarding",
     },
     "requirement-evaluator": {
@@ -218,8 +223,8 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
 
 EXPECTED_DISTRIBUTION = {
     "implemented": 16,
-    "partial": 13,
-    "onboarding": 13,
+    "partial": 14,
+    "onboarding": 12,
     "unsupported": 1,
     "not-applicable": 12,
     "blocked": 1,
