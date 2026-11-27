@@ -1487,7 +1487,7 @@ prs.save(target_path)
 
 ```yaml
 mode: intro
-base_ppt: "/opt/code/docs/lanlnk/incoming/会员客户需求/正祥选型方案/蓝联科技CRM商圈会员数智营销方案_202604.pptx"
+base_ppt: "$LANLNK_BASE/incoming/<需求目录>/<作为版式基底的公司方案PPT>.pptx"
 output: "$PROPOSALS_DIR/{项目名称}/蓝联科技公司介绍_{客户简称}_{YYYYMMDD}.pptx"
 
 cover:

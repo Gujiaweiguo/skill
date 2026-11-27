@@ -1,10 +1,10 @@
 ---
 title: "蓝联科技公司介绍"
 project: "蓝联科技公司介绍"
-client: "福州正祥商业管理有限公司"
+client: "<客户全称>"
 type: "intro"
 template: "report"
-date: "2026-06-19"
+date: "<YYYY-MM-DD>"
 author: "蓝联科技"
 doc_id: "LNK-INTRO-V1.0"
 

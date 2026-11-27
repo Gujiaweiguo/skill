@@ -4,6 +4,8 @@
  * 使用方法:
  *   1. 复制此目录到项目工作目录
  *   2. 修改下方 CONFIG 和各 slide 函数中的文本内容
+ *      （slide 函数里的文字是会员系统类立项的示例内容，必须逐页替换；
+ *        不得保留任何真实客户名、预算数字或结论）
  *   3. 运行: node compile.js
  *
  * 依赖: ../../lib/pptx-render-fix.js + ../../lib/pptx-layouts.js
@@ -20,6 +22,7 @@ var CONFIG = {
   projectName: "XX会员系统立项方案",
   subtitle: "以会员资产沉淀为核心，重建停车、营销与商户协同能力",
   clientName: "XX商业管理有限公司",
+  projectLabel: "XX会员系统",
   reportDept: "立项汇报",
   date: "2026年6月",
   outputPath: "./output/proposal.pptx",
@@ -271,7 +274,7 @@ function slide13Decision() {
   s.addText("建议管理层本次拍板事项", { x: 0.86, y: 0.96, w: 6.2, h: 0.48, fontFace: "Microsoft YaHei", fontSize: 25, bold: true, color: C.white, margin: 0 });
   s.addText("本次立项的核心，不是上一个小程序，而是为未来经营补齐会员底座", { x: 0.88, y: 1.64, w: 7.2, h: 0.28, fontFace: "Microsoft YaHei", fontSize: 13, color: "D8E5EC", margin: 0 });
   var items = [
-    "同意启动福州正祥会员系统项目",
+    "同意启动" + CONFIG.projectLabel + "项目",
     "同意按1个项目试点+2个项目复制方式推进",
     "同意一期纳入会员、停车、券、活动、美团抖音API对接核心能力",
     "同意首年预算30万元，次年维护费3万元/年",

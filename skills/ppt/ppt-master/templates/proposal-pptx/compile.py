@@ -231,34 +231,46 @@ def gen_requirement_understanding(slide, data: dict, theme: Theme):
 
 
 def gen_coverage_analysis(slide, data: dict, theme: Theme):
-    """功能覆盖度: 三大指标卡居中"""
+    """功能覆盖度: 三大指标卡居中
+
+    数字与结论只来自内容包：``stats.satisfied`` / ``stats.custom_dev`` / ``stats.exceed``
+    各含 ``pct`` / ``value`` / ``label``，``statement`` 为可选的结论句。缺数据时显示占位符
+    “—”，不编造默认数字；未给 ``statement`` 且各项数值齐全时，由数值拼出事实陈述。
+    此处不得写死任何客户名、项目结论或数字（2026-11-27 修复：此前对任何客户都固定输出
+    同一客户名与“总体覆盖率 99%”，指标卡缺数据时还会显示一组编造的默认值）。
+    """
     _add_header(slide, data.get("title", "功能覆盖度分析"), theme, "02")
 
-    stats = data.get("stats", {})
-    sat = stats.get("satisfied", {})
-    cust = stats.get("custom_dev", {})
-    exc = stats.get("exceed", {})
+    stats = data.get("stats", {}) or {}
+    sat = stats.get("satisfied", {}) or {}
+    cust = stats.get("custom_dev", {}) or {}
+    exc = stats.get("exceed", {}) or {}
+
+    def _num(value, suffix: str = "") -> str:
+        if isinstance(value, bool) or not isinstance(value, (int, float, str)) or str(value) == "":
+            return "—"
+        return f"{value}{suffix}"
 
     metrics = [
         {
-            "big": f"{sat.get('pct', 85)}%",
+            "big": _num(sat.get("pct"), "%"),
             "label": sat.get("label", "直接满足"),
-            "sub": f"{sat.get('value', 131)}项",
-            "desc": "系统现有功能完全覆盖客户需求",
+            "sub": _num(sat.get("value"), "项"),
+            "desc": "系统现有功能直接覆盖的需求",
             "color": theme.success,
         },
         {
-            "big": f"{cust.get('pct', 14)}%",
+            "big": _num(cust.get("pct"), "%"),
             "label": cust.get("label", "定制开发"),
-            "sub": f"{cust.get('value', 22)}项",
-            "desc": "少量定制开发即可满足",
+            "sub": _num(cust.get("value"), "项"),
+            "desc": "需要定制开发才能满足的需求",
             "color": theme.warning,
         },
         {
-            "big": f"{exc.get('value', 141)}项",
+            "big": _num(exc.get("value"), "项"),
             "label": exc.get("label", "超出期望"),
             "sub": "客户未要求",
-            "desc": "蓝联功能超出客户需求范围",
+            "desc": "客户未要求、系统已有的功能",
             "color": theme.accent,
         },
     ]
@@ -291,10 +303,22 @@ def gen_coverage_analysis(slide, data: dict, theme: Theme):
                   m["desc"], size=12, color=theme.text_gray,
                   align=PP_ALIGN.CENTER, font_name=theme.font)
 
-    # bottom statement
+    # bottom statement —— 只来自内容包：显式 statement，或由齐全的数值拼出
+    statement = data.get("statement")
+    if not isinstance(statement, str) or not statement.strip():
+        complete = all(
+            _num(v) != "—"
+            for v in (sat.get("pct"), sat.get("value"), cust.get("value"), exc.get("value"))
+        )
+        if complete:
+            statement = (
+                f"直接满足 {sat.get('pct')}%（{sat.get('value')} 项），"
+                f"定制开发 {cust.get('value')} 项，超出客户需求 {exc.get('value')} 项"
+            )
+        else:
+            statement = "（结论待填：在内容包 coverage-analysis 的 statement 中写明本次覆盖度结论）"
     _add_text(slide, MARGIN, Inches(6.0), SLIDE_W - 2 * MARGIN, Inches(0.5),
-              "✓ 总体覆盖率 99%，系统成熟度高，可快速满足正祥商业会员系统建设需求",
-              size=15, color=theme.secondary, bold=True,
+              statement, size=15, color=theme.secondary, bold=True,
               align=PP_ALIGN.CENTER, font_name=theme.font)
 
 

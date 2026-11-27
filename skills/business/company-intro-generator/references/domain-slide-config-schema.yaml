@@ -12,17 +12,17 @@
 
 # ── Meta：项目元信息 ──
 meta:
-  customer_name: "佛山若有光商业"          # 客户全称（用于封面/文件名）
-  customer_short: "佛山若有光"             # 客户简称（用于文件名）
-  project_name: "佛山若有光商业"            # 项目目录名
+  customer_name: "<客户全称>"                # 客户全称（用于封面/文件名）
+  customer_short: "<客户简称>"                # 客户简称（用于文件名）
+  project_name: "<项目名称>"                  # 项目目录名
   version: "V5"                           # 版本号
-  date: "2026年7月"                       # 方案日期
+  date: "<YYYY年M月>"                       # 方案日期
   subtitle: "商管系统 + 会员CRM + AI岗位数字人"  # 封面副标题
 
 # ── Paths：输入输出路径 ──
 paths:
-  base_ppt: "/opt/code/docs/lanlnk/incoming/会员客户需求/正祥选型方案/蓝联科技CRM商圈会员数智营销方案_202604.pptx"
-  output: "$PROPOSALS_DIR/佛山若有光商业/蓝联科技商业地产数智化解决方案_佛山若有光商业_V5_20260728.pptx"
+  base_ppt: "$LANLNK_BASE/incoming/<需求目录>/<作为版式基底的公司方案PPT>.pptx"
+  output: "$PROPOSALS_DIR/{项目名称}/蓝联科技商业地产数智化解决方案_{客户简称}_V5_{YYYYMMDD}.pptx"
   # 环境变量 $PROPOSALS_DIR / $LANLNK_BASE 会被自动展开
 
 # ── Palette（可选）：覆盖默认调色板 ──
@@ -48,7 +48,7 @@ cover:
   match_text: "商圈会员数字营销解决方案"       # base PPT 中的原始标题文字
   new_title: "商业地产数智化解决方案"          # 替换为的新标题
   title_size: 40                             # pt
-  subtitle: "佛山若有光商业 · 商管系统 + 会员CRM + AI岗位数字人"
+  subtitle: "<客户简称> · 商管系统 + 会员CRM + AI岗位数字人"
   subtitle_y: 5.2        # inches，副标题 Y 位置
   date_y: 5.9            # inches，日期 Y 位置
 

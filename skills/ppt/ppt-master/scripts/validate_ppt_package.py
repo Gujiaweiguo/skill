@@ -288,6 +288,22 @@ class PPTPackageValidator:
                     f"{context} type='{slide_type}' 建议包含 {field_name}"
                 ))
 
+        if slide_type == "coverage-analysis":
+            # 数字与结论只取自内容包；缺数据时页面显示占位符，这里给警告而不是放行编造
+            # （2026-11-27：此前编译器对任何客户都输出同一客户名与固定百分比）
+            statement = str(cfg.get("statement", "") or "").strip()
+            stats = cfg.get("stats") if isinstance(cfg.get("stats"), dict) else {}
+            has_numbers = any(
+                isinstance(stats.get(key), dict) and any(k in stats[key] for k in ("pct", "value"))
+                for key in ("satisfied", "custom_dev", "exceed")
+            )
+            if not statement and not has_numbers:
+                result.issues.append(ValidationIssue(
+                    "warning", "COVERAGE_DATA_MISSING",
+                    f"{context} type='coverage-analysis' 未提供 stats 数值或 statement，"
+                    "页面将显示占位符（不自动填数）"
+                ))
+
         if slide_type == "feature-cards":
             items = cfg.get("items", [])
             if isinstance(items, list):

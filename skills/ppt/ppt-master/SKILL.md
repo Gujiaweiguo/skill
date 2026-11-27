@@ -319,6 +319,8 @@ L.addBottomStatement(slide, "金句", "coral");
 4. `pricing-comparison` — 报价对比（双方案卡片）
 5. `implementation-plan` — 实施计划（阶段时间线）
 
+`coverage-analysis` 的数字与结论只取自内容包：`stats.satisfied` / `stats.custom_dev` / `stats.exceed` 各含 `pct`、`value`、`label`，可选 `statement` 为结论句。缺数据时页面显示占位符“—”，校验器给出 `COVERAGE_DATA_MISSING` 警告；不要把某个客户的结论或数字写进模板或配置示例。
+
 **intro 模式**定制页型：
 1. `text-bullets` — 标题+正文+要点列表
 2. `feature-cards` — 标题+卡片网格（columns: 2/3/4）

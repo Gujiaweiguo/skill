@@ -346,7 +346,7 @@ uv run python -m src.main generate tender_info.json \
 
 ```yaml
 mode: tender
-base_ppt: "/opt/code/docs/lanlnk/incoming/会员客户需求/正祥选型方案/蓝联科技CRM商圈会员数智营销方案_202604.pptx"
+base_ppt: "$LANLNK_BASE/incoming/<需求目录>/<作为版式基底的公司方案PPT>.pptx"
 output: "$BIDDING_DIR/{项目名称}/{项目简称}_述标PPT.pptx"
 cover:
   title: "{项目名称}述标答辩"
