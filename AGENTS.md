@@ -50,7 +50,7 @@ cd skills/ppt/ppt-master && npm install   # one-time
 ├── raw/          # 中间产物：markitdown 转换件 + _media/ 图片（gitignore，百度盘）
 ├── materials/    # 结构化素材 8 大类+（01-company-overview … 16-customers，带 frontmatter）
 ├── out/          # 交付物分型层：strategy/ prd/ proposals/ bidding/ …（平铺只放最终文件）
-├── 30-products/  # 产品三层基线入口（lnkcre/lnkchat/lnkreport/lnkchatbi/lnkvision/lnkgateway/lnkcrm/lnkwebsite，各产品目录含 INDEX.md）
+├── 30-products/  # 产品三层基线入口（lnkcre/lnkchat/lnkreport/lnkchatbi/lnkvision/lnkgateway/lnkcrm/lnkwebsite/lnkcard/lnkretail/lnkmember，各产品目录含 INDEX.md）
 └── 00-90 编号树   # 00-governance / 10-strategy / 40-delivery / 90-legacy（历史快照，只读）。
                   # 20-architecture / 25-product-assets / 35-domain-packages 已于 2026-09
                   # 三层整理移除：产品本体/PRD 归位 30-products/<产品>/{ontology,prd}/，

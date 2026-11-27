@@ -476,6 +476,12 @@ uv run product-prd-generator --project 商管系统 \
   --output-dir $LANLNK_BASE/out/prd/lnkcre/output
 ```
 
+可选参数：
+- `--exclude-dir <目录前缀|裸目录名>`：把历史客户/竞品资料目录排除出 doc 扫描，可重复。裸目录名 = 任意层命中同名目录段即排除其子树；按路径段精确比对，不做子串匹配
+- `--exclude-source <glob>`：按相对 docs-root 的 glob 排除平铺文件（目录排除命中不了的），可重复
+
+两项默认不传则不排除任何内容；实际生效值写入 `generation-manifest.md` 的 `exclude_dir` / `exclude_source`。
+
 #### coverage-validate 模式
 
 新材料（客户需求/竞品资料）入库后，对照现有 PRD + 代码做覆盖度校验，输出矩阵和增量 gap，不重跑全量 PRD。适用于 PRD v1.x 持续完善。
@@ -631,10 +637,16 @@ touch $LANLNK_BASE/incoming/prd-<project>/.gitkeep
 - `future_scanners`：产品专属 scanner 预留配置；通用 direct code/test scanner 另由 `direct_code` / `direct_tests` 显式 opt-in，不能仅因存在预留项而扫描
 - `exclude_paths`：全局排除规则（node_modules / .venv / __pycache__ 等）
 
+可选字段：
+
+- `specs.exclude`：不属于业务能力的技术骨架 scope（如 service-health / database-isolation / client-app-shell）。被排除的 scope 不进业务基线；全部 scope 都被排除时业务基线为空，本体能力按 present-unconfirmed 播种，差距文案写“技术骨架”。只在没有任何业务 scope 时适用，业务 change 归档后改用下一条。排查见 troubleshooting「基线：技术骨架仓…」条。
+- `archive_evidence_driven.enabled`：业务 change 归档后由归档证据驱动能力状态（按产品 opt-in），映射放 `$COMPANY_BASE/30-products/<pid>/ontology/archive-capability-map.yaml`。见 troubleshooting「能力状态：业务 scope 归档后能力清单塌缩为 scope ID」。
+
 **样板参考**：
 - 商管：`<skill>/references/code-map-rules-商管系统.yaml`
 - langchat：`<skill>/references/code-map-rules-langchat.yaml`（含上游 fork 排除规则）
 - LnkChatBI：`<skill>/references/code-map-rules-LnkChatBI.yaml`（含 g2-ssr / demo SQL 排除规则）
+- lnkretail：`<skill>/references/code-map-rules-lnkretail.yaml`（含 `specs.exclude` 与 `archive_evidence_driven`）
 
 ### Step 6：跑 generate 验证
 
@@ -672,6 +684,7 @@ uv run pytest tests/ -v
 
 ## 已知限制
 
+- **规划型兜底仍带 lnkretail 专属内容（2026-11-27 记录，未修）**：`render._render_priority_review` 的规划型兜底文案把 lnkretail 的待决策项与契约当示例写死（R-03/R-04/R-08/R-11、POS↔lnkcard / POS↔lnkretail、便利店/卖菜/财务），任何规划型产品都会原样带出；`review.py` 的规划待确认项兜底与 `review_format.py` review 简报的 planning 判定按 `project == "lnkretail"` 硬编码。实证：lnkmember 首版生成（2026-11-27）的 review 清单出现了上述 LnkRetail 条目，其 review 简报也没有规划型说明（“0.2 输入来源”走通用文案、指标行仍标“需求条目”）。给 lnkretail 之外的规划型产品出 PRD 时，这三处须人工核对；排查见 troubleshooting「规划型产品：代码基线不可用时的措辞，与三处 lnkretail 硬编码」。
 - **PDF 转换需要 poppler-utils**：`apt install poppler-utils`。无 sudo 权限时，PDF 无法用 markitdown 转换，需要 LibreOffice 预转换或手动转 md。当前项目有 6 个竞品 PDF 受此影响（政策文件，影响小）。
 - **匹配率 ~19%**：瓶颈是**术语覆盖率**（ontology 572+ 术语），不是匹配策略。两阶段匹配提升精确度但不提升召回率。继续扩 ontology 术语是唯一提升路径。
 - **business-ontology.yaml 运行时依赖**：doc_map 从 `$LANLNK_BASE/config/ontology/business-ontology.yaml` 加载。文件缺失时退化为纯 term-aliases 匹配（匹配率回到 ~12%）。

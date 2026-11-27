@@ -761,3 +761,51 @@ print('ontology OK')
 **验证**：`uv run --extra dev pytest tests/test_archive_status.py -v`；隔离重跑启用产品，确认本体能力数、scope ID 条目为 0。
 
 **注意**：写入映射时 `verification_sha` 必须填 40 位全值，且是归档 verification-report 实际引用的提交（报告可以只写缩写；lnkretail Wave 2、3 的报告写的是缩写，Wave 2 引用的也不是它的 feature 提交）。渲染文案“present-unconfirmed（目标能力，代码基线未建立）”是共用字符串，未改；`review.py` / `review_format.py` 中按“lnkretail 全部 present-unconfirmed”触发的分支在有晋升后不再触发，首次回写晋升时需一并处理。
+
+## 基线：技术骨架仓的业务基线被当成“已有实现”，本体能力整体掉出对账矩阵
+
+**症状**（2026-11-23 lnkretail 实证）：产品代码仓只有技术骨架（有提交、有技术 OpenSpec scope），业务模块未实现。此时 specs 扫描的 `artifact_count` 不再是 0，空基线播种停摆，48 项本体目标能力整体掉出对账矩阵（播种开关打开的产品则被播种成 missing）。
+
+**根因**：生成器此前只有两条播种路径——specs 扫描零产物 → present-unconfirmed 播种；基线已有内容 → 走 spec 驱动（开关打开时播种 missing）。技术 scope 让基线“非空”，但它们不是业务能力。
+
+**处置**：在产品规则文件写 `specs.exclude`，把不属于业务能力的技术 scope 列进去（lnkretail：`client-app-shell` / `database-isolation` / `service-health`）。效果：
+
+1. 被排除的 scope 不进业务基线，`scan_coverage.scanners.specs.limitations` 留下 technical-only 说明；
+2. 全部 scope 都被排除 → 业务基线为空（`artifact_count=0` + empty-baseline 语义 + technical-only 标记），本体能力按 present-unconfirmed 播种，差距文案写“技术骨架”而不是“无提交/无测试”；
+3. 归档证据路径同样跳过被排除的 scope，它们不会以 missing 回到对账结果；
+4. 未配置 `specs.exclude` 的产品行为不变。
+
+**适用边界**：本机制只在“没有任何业务 scope”时成立。业务 change 归档后业务基线不再为空，未实现的能力不会自动播种——届时改用 `archive_evidence_driven`（见「能力状态：业务 scope 归档后能力清单塌缩为 scope ID」）。
+
+**验证**：`uv run --extra dev pytest tests/test_technical_only_baseline.py tests/test_empty_baseline_reconcile.py -v`。
+
+## 规划型产品：代码基线不可用时的措辞，与三处 lnkretail 硬编码
+
+**症状**（2026-11-21 lnkretail 首版、2026-11-27 lnkmember 首版）：代码基线不可用（空仓或技术骨架），docs 输入又只有历史参考资料时，能力全部是 present-unconfirmed。按常规路径渲染会把“未确认”写成确定性的差距/需求结论；lnkretail 还出现过 review/pending-items.md 各优先级均无项、而高优先级清单的兜底文案却指向它的不一致。
+
+**判定**：`render._is_planning_mode`——能力全部 present-unconfirmed（没有任何 existing / partial / missing），且 doc_map 里没有 `source_type` 为 `customer-requirements` 或 `owner-decisions` 的条目。`generation-manifest.md` 的 `baseline_status` 写 `baseline-unavailable`。
+
+**处置**：规划型下差距分析、需求清单、客户摘要、交接包改用规划型措辞；建议 change 的状态为 `baseline-unavailable`，原因分两类——零提交骨架仓与 technical-only（后者措辞见上条）。`changes` 为空不等于无需实施。
+
+**注意（未修的已知缺口）**：有三处仍按 lnkretail 写死，给其他规划型产品出 PRD 时须人工核对：
+
+1. `render._render_priority_review` 的兜底文案把 lnkretail 的待决策项与契约当示例（R-03/R-04/R-08/R-11、POS↔lnkcard / POS↔lnkretail、便利店/卖菜/财务）。lnkmember 首版的「高优先级需求 review 清单」原样带出了这些 LnkRetail 条目。
+2. `review.py` 的规划待确认项兜底只在 `project == "lnkretail"` 时追加。
+3. `review_format.py` review 简报的 planning 判定同样只认 lnkretail。其他规划型产品的简报拿不到规划型说明：“0.2 输入来源”走通用文案，指标行仍标“需求条目”（lnkmember 首版实证，写作“需求条目 | 0”）。
+
+**验证**：`uv run --extra dev pytest tests/test_review_lnkretail_planning_pending.py tests/test_technical_only_baseline.py -v`。
+
+## 文档扫描：历史客户资料混入需求来源（--exclude-dir / --exclude-source）
+
+**症状**（2026-11 lnkretail 实证）：docs-root 下混有历史客户/竞品资料（`congou/SCM`、`myshop/BMS060616`，以及平铺的 `document-batch-*/<客户名>*.md`），需求清单 / 需求证据表把别家客户的需求当成本产品的需求来源。
+
+**根因**：`_iter_markdown_files` 默认遍历 docs-root 下全部 md。产品别名目录段过滤只对多产品共享根生效；当 docs-root 本身是产品专属根（目录名为 `prd-<别名>` 或 `<别名>`）时跳过段过滤——该根下所有文件被默认视为属于本产品，历史资料一并进入 doc_map。
+
+**处置**：generate 时显式传排除参数，均可重复：
+
+- `--exclude-dir <目录前缀|裸目录名>`：单段 = 任意层命中同名目录段即排除其子树；多段 = 匹配相对 docs_root 的目录前缀。按 `Path.parts` 逐段精确比对，不做子串匹配。
+- `--exclude-source <glob>`：按相对 docs_root 的 glob 排除平铺文件（目录排除命中不了的 docs-root 直下文件）。
+
+两项默认不传则不排除任何内容。实际生效值写入 `generation-manifest.md` 的 `exclude_dir` / `exclude_source`，审阅生成区时先核对这两行。
+
+**验证**：`uv run --extra dev pytest tests/test_doc_map_product_filter.py -v`。
