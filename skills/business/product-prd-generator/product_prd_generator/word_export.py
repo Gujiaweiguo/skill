@@ -18,6 +18,7 @@ from .data_model import (
     parse_data_dict_files,
     pick_key_fields,
 )
+from .render import _is_planning_mode
 from .review_format import ReviewBriefInput, render_review_brief
 
 _CONTROL_CHARS = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
@@ -648,12 +649,15 @@ def build_content_package(reconcile_path: str | Path, doc_map_path: str | Path |
     project = str(reconcile.get("project", "商管系统"))
     all_tables = parse_data_dict_files(docs_root)
     tables_by_mod = group_by_module(all_tables)
+    # 规划型标志与 render 同源，避免暂停中的 docx 导出回退成非规划型简报。
+    planning = _is_planning_mode(capabilities, doc_map)
     review_brief = render_review_brief(ReviewBriefInput(
         project=project,
         status_stats=Counter(stats),
         requirement_count=len(requirements),
         tables_by_module=tables_by_mod,
         unmatched_table_count=len(get_unmatched(all_tables)),
+        planning=planning,
     ))
 
     output_dir = Path(output_dir)

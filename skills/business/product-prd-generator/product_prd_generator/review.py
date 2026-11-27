@@ -6,6 +6,8 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Mapping
 
+from . import _paths
+
 
 @dataclass(frozen=True, slots=True)
 class ReviewItem:
@@ -53,40 +55,29 @@ def _priority_for(capability: Mapping[str, object]) -> str:
     return "低优先级"
 
 
-_LNKRETAIL_PLANNING_PENDING_ITEMS: tuple[ReviewItem, ...] = (
-    ReviewItem(
+def _planning_pending_pointer_item(project: str) -> ReviewItem:
+    """规划型基线（能力全为 present-unconfirmed）的产品级待确认项指针。
+
+    产品待决策项、跨产品契约等由产品侧 ``30-products/<pid>/reconciliation/`` 台账维护；
+    skill 只指过去，不按产品硬编码（2026-11-27 泛化）。台账目录解析不到时不写路径。
+    """
+    pointer = _paths.reconciliation_pointer_for_project(project)
+    where = (
+        f"以 `{pointer}` 下的 open 项台账与 owner 决策记录为准"
+        if pointer
+        else "由产品侧 reconciliation 台账维护"
+    )
+    return ReviewItem(
         priority="高优先级",
-        title="产品待决策项 R-03/R-04/R-08/R-11",
-        problem="lnkretail 规划阶段产品待决策项（R-03/R-04/R-08/R-11）尚未经 owner 逐项确认",
-        reason="status=present-unconfirmed（目标能力，代码基线未建立），规划型 PRD 无已授权客户需求输入",
-        evidence="（暂无）",
-        suggestion="逐项确认 R-03/R-04/R-08/R-11 后回写 owner-decisions 与版本规划",
-    ),
-    ReviewItem(
-        priority="高优先级",
-        title="跨产品契约：POS↔lnkcard",
-        problem="POS 与 lnkcard（独立预付费卡系统）之间的 tender 对接契约未确认（D-007：lnkretail 不作必经中转层）",
-        reason="status=present-unconfirmed，跨产品契约无单侧代码基线可佐证",
-        evidence="（暂无）",
-        suggestion="与 lnkcard 侧对齐 POS↔lnkcard 契约边界后回写词表",
-    ),
-    ReviewItem(
-        priority="高优先级",
-        title="跨产品契约：POS↔lnkretail",
-        problem="POS 与 lnkretail 之间的对接契约（接口/职责边界）未确认",
-        reason="status=present-unconfirmed，跨产品契约无单侧代码基线可佐证",
-        evidence="（暂无）",
-        suggestion="确认 POS↔lnkretail 契约范围后纳入版本规划",
-    ),
-    ReviewItem(
-        priority="中优先级",
-        title="业态/财务专项：便利店/卖菜/财务",
-        problem="便利店、卖菜业态专项与财务专项能力范围未确认",
-        reason="status=present-unconfirmed，业态/财务专项为目标能力，无代码基线佐证",
-        evidence="（暂无）",
-        suggestion="按业态/财务逐项确认能力范围后回写词表",
-    ),
-)
+        title="产品级待确认项：见产品 reconciliation 台账",
+        problem=(
+            f"{project} 能力全为 present-unconfirmed（目标能力，未经代码证据确认）；"
+            f"产品待决策项、跨产品契约等产品级待确认项不在 skill 侧维护，{where}"
+        ),
+        reason="status=present-unconfirmed（目标能力，未经代码证据确认）",
+        evidence=pointer or "（暂无）",
+        suggestion="核对产品侧 open 项台账，收敛后回写 owner-decisions 与版本规划",
+    )
 
 
 def _build_item(capability: Mapping[str, object]) -> ReviewItem:
@@ -156,12 +147,12 @@ def build_report(reconcile: Mapping[str, object]) -> ReviewReport:
         for capability in capabilities
         if isinstance(capability, Mapping)
     }
-    # lnkretail 规划型基线（2026-11-21）：能力全为 present-unconfirmed 时，
-    # capability 维度不产生任何 item，会导致 pending-items.md 各优先级均无项——
-    # 与 render.py 高优先级清单的规划型兜底文案（指向 pending-items.md）不一致。
-    # 此处补齐规划待确认项（与 render._render_priority_review 的列举保持一致）。
-    if project == "lnkretail" and capabilities and statuses == {"present-unconfirmed"}:
-        items.extend(_LNKRETAIL_PLANNING_PENDING_ITEMS)
+    # 规划型基线（与产品无关）：能力全为 present-unconfirmed。2026-11-21 曾按 lnkretail
+    # 硬编码四条产品待确认项，lnkmember 首版生成（2026-11-27）把 LnkRetail 的条目原样
+    # 带进自己的清单，且硬编码副本相对产品台账已过时——产品级待确认项只留在产品侧，
+    # 这里只追加一条指针。
+    if capabilities and statuses == {"present-unconfirmed"}:
+        items.append(_planning_pending_pointer_item(project))
     return ReviewReport(project=project, items=tuple(items))
 
 

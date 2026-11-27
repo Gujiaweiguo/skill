@@ -23,6 +23,10 @@ class ReviewBriefInput:
     requirement_count: int
     tables_by_module: Mapping[str, Sequence[TableMeta]]
     unmatched_table_count: int
+    # 规划型由调用方（render._is_planning_mode）统一判定后传入：能力全部 present-unconfirmed
+    # 且 docs 输入无已授权需求。2026-11-27 前这里按 project == "lnkretail" 自行判定，
+    # 其他规划型产品（lnkmember 首版）因此拿不到规划型说明。
+    planning: bool = False
 
 
 def _mi_strategy_lines() -> list[str]:
@@ -58,7 +62,8 @@ def _generic_sources_lines() -> list[str]:
 def render_review_brief(data: ReviewBriefInput) -> str:
     total_capabilities = sum(data.status_stats.values())
     mapped_tables = sum(len(tables) for tables in data.tables_by_module.values())
-    planning = data.project == "lnkretail" and data.status_stats.get("present-unconfirmed", 0) == total_capabilities and total_capabilities > 0
+    # 规划型标志由调用方传入（render._is_planning_mode），这里不再按产品名自行判定。
+    planning = data.planning
     strategy = _mi_strategy_lines() if _is_lnkcre_project(data.project) else _generic_sources_lines()
     if planning:
         strategy = [

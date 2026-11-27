@@ -257,6 +257,24 @@ def resolve_product_paths(project: str) -> ProductPaths:
     )
 
 
+def reconciliation_pointer_for_project(project: str) -> str:
+    """产品 reconciliation 目录的基座相对路径（如 ``30-products/lnkmember/reconciliation/``）。
+
+    2026-11-27 规划型兜底泛化：产品级待确认项（open 项台账、owner 决策记录）由产品侧在
+    该目录维护，skill 只指过去、不复制——此前把 lnkretail 的待确认项硬编码在 skill 里，
+    副本随台账推进即过时。目录不存在、产品未登记或基座无法解析时返回空串，
+    调用方据此不写指针（指不到就不写，不编造）。
+    """
+    try:
+        reconciliation = resolve_product_paths(project).docs_root / "reconciliation"
+        if not reconciliation.is_dir():
+            return ""
+        pointer = reconciliation.relative_to(_lanlnk_base()).as_posix()
+    except (SystemExit, MissingProductDataError, InvalidProjectError, LookupError, ValueError, OSError):
+        return ""
+    return f"{pointer}/"
+
+
 def feature_baseline_path_for_project(project: str) -> Path:
     """功能基线：canonical 优先，legacy 仅迁移期 fallback，都缺则显式报错。"""
     paths = resolve_product_paths(project)

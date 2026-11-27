@@ -13,7 +13,7 @@ from typing import Any
 
 import yaml
 
-from ._paths import _lanlnk_base, ontology_path_for_project
+from ._paths import _lanlnk_base, ontology_path_for_project, reconciliation_pointer_for_project
 from .competitor_render import render_competitor_feature_list
 from .data_model import (
     TableMeta,
@@ -1000,21 +1000,37 @@ def _render_module_summary(requirements: list[dict[str, Any]], project: str = "�
     return "\n".join(lines) + "\n"
 
 
-def _render_priority_review(requirements: list[dict[str, Any]], planning: bool = False) -> str:  # noqa: ANY_OK
-    """高优先级需求 review 清单 — standalone file for human review."""
+def _render_priority_review(
+    requirements: list[dict[str, Any]],  # noqa: ANY_OK
+    planning: bool = False,
+    pending_pointer: str = "",
+) -> str:
+    """高优先级需求 review 清单 — standalone file for human review。
+
+    规划型兜底与产品无关（2026-11-27 泛化）：能力级待确认项指向 pending-items.md；
+    产品级待确认项只指向产品自己的 reconciliation 台账（``pending_pointer``，解析不到
+    就不写），不在文案里列举任何产品的待决策项。
+    """
     high_reqs = sorted(
         [r for r in requirements if r.get("priority") == "高"],
         key=lambda r: (r.get("scenario", ""), r.get("source_customer", "")),
     )
     if not high_reqs:
         if planning:
-            return (
-                "# 高优先级需求 review 清单\n\n"
-                "当前无已授权高优先级客户需求（docs 输入均为历史参考资料，未经客户/owner 授权）。\n\n"
-                "目标能力均为 present-unconfirmed，待确认项包括：产品待决策项（如 R-03/R-04/R-08/R-11）、"
-                "跨产品契约（如 POS↔lnkcard、POS↔lnkretail）、业态/财务专项（如便利店、卖菜、财务）；"
-                "逐项清单见 review/pending-items.md，需求授权后本清单再行更新。\n"
-            )
+            sentence = "目标能力均为 present-unconfirmed。能力级待确认项逐项见 review/pending-items.md"
+            if pending_pointer:
+                sentence += (
+                    f"；产品级待确认项（待决策项、跨产品契约等）以 `{pending_pointer}` 下的 "
+                    "open 项台账与 owner 决策记录为准，不在本 PRD 内复制"
+                )
+            lines = [
+                "# 高优先级需求 review 清单",
+                "",
+                "当前无已授权高优先级客户需求（docs 输入均为历史参考资料，未经客户/owner 授权）。",
+                "",
+                sentence + "。需求授权后本清单再行更新。",
+            ]
+            return "\n".join(lines) + "\n"
         return "# 高优先级需求 review 清单\n\n当前无高优先级需求。\n"
     lines = [
         "# 高优先级需求 review 清单",
@@ -1507,6 +1523,7 @@ def render_prd(inputs: RenderInputs, code_root: str = "") -> str:
         requirement_count=len(requirements),
         tables_by_module=tables_by_mod,
         unmatched_table_count=len(unmatched_tables),
+        planning=planning,
     ))
     sources_desc, dirty_note = _baseline_notes(inputs.doc_map, code_root, inputs.reconcile.get("scan_coverage"))
     parts = [
@@ -1573,7 +1590,12 @@ def main() -> int:
     (output_dir / "差距分析.md").write_text(_render_gap_analysis(capabilities, planning), encoding="utf-8")
     (output_dir / "需求证据表.md").write_text(_render_evidence_table(capabilities), encoding="utf-8")
     (output_dir / "需求清单.md").write_text(_render_requirement_list_file(requirements, planning), encoding="utf-8")
-    (output_dir / "高优先级需求review清单.md").write_text(_render_priority_review(requirements, planning), encoding="utf-8")
+    pending_pointer = (
+        reconciliation_pointer_for_project(str(inputs.reconcile.get("project", args.project))) if planning else ""
+    )
+    (output_dir / "高优先级需求review清单.md").write_text(
+        _render_priority_review(requirements, planning, pending_pointer), encoding="utf-8"
+    )
     _write_handoff_outputs(inputs, output_dir, code_root=args.code_root)
 
     print(f"rendered 10 files to {output_dir}/")
