@@ -82,6 +82,10 @@ def test_json_marks_direct_runtime_and_tests_not_scanned(tmp_path: Path) -> None
         for cap in serialized["spec_capabilities"]
         for item in cap["evidence"]
     )
+    # 两个 direct 扫描器都没扫过 → 顶层沿用既有合并文案
+    assert serialized["scan_coverage"]["limitations"] == [
+        "Direct runtime code and test evidence are not scanned."
+    ]
 
 
 def test_enabled_direct_scanners_propagate_static_evidence(tmp_path: Path) -> None:
@@ -141,3 +145,78 @@ def test_enabled_direct_scanners_propagate_static_evidence(tmp_path: Path) -> No
     assert matches[0]["evidence_id"]
     assert matches[0]["spec_capability_id"] == "capability-a-spec"
     assert matches[0]["role"] in {"declaration", "mapping", "other"}
+
+
+_STATIC_EVIDENCE_CAVEAT = (
+    "Direct evidence is static source/test-file scanning only; "
+    "it is not runtime verification or test execution."
+)
+
+
+def _write_direct_sources(code_root: Path) -> None:
+    _write_spec(code_root)
+    (code_root / "src").mkdir()
+    (code_root / "tests").mkdir()
+    (code_root / "src" / "service.py").write_text("Example capability\n", encoding="utf-8")
+    (code_root / "tests" / "test_service.py").write_text("Example capability\n", encoding="utf-8")
+
+
+def _write_direct_rules(skill_root: Path, *, code: bool, tests: bool) -> Path:
+    def block(name: str, folder: str, enabled: bool) -> list[str]:
+        if not enabled:
+            return []
+        return [
+            f"{name}:",
+            "  enabled: true",
+            f"  include_paths: [{folder}/**/*.py]",
+            "  extensions: [.py]",
+            "  capabilities:",
+            "    example: [Example capability]",
+        ]
+
+    rules_dir = skill_root / "references"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "code-map-rules-langchat.yaml").write_text(
+        "\n".join(
+            [
+                "project: langchat",
+                "specs:",
+                "  path: openspec/specs",
+                "matrix:",
+                "  enabled: false",
+                *block("direct_code", "src", code),
+                *block("direct_tests", "tests", tests),
+                "exclude_paths: []",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return skill_root
+
+
+def test_top_level_limitations_drop_not_scanned_claim_once_direct_scanners_ran(tmp_path: Path) -> None:
+    """两个 direct 扫描器启用并扫完后，顶层不得再声称 “not scanned”（2026-11-27）。
+
+    lnkcard 2026-11-01 起启用 direct_code / direct_tests，顶层 limitations 却恒为
+    “Direct runtime code and test evidence are not scanned.”；如实只保留静态证据的真实限制。
+    """
+    _write_direct_sources(tmp_path)
+    skill_root = _write_direct_rules(tmp_path / "skill", code=True, tests=True)
+
+    coverage = to_json(extract(tmp_path, "langchat", skill_root=skill_root))["scan_coverage"]
+
+    assert isinstance(coverage, dict)
+    assert coverage["status"] == "complete"
+    assert coverage["limitations"] == [_STATIC_EVIDENCE_CAVEAT]
+
+
+def test_top_level_limitations_name_the_scanner_that_did_not_run(tmp_path: Path) -> None:
+    """只启用 direct_code 时，顶层点名未扫的 test 证据，而不是笼统说两者都没扫。"""
+    _write_direct_sources(tmp_path)
+    skill_root = _write_direct_rules(tmp_path / "skill", code=True, tests=False)
+
+    coverage = to_json(extract(tmp_path, "langchat", skill_root=skill_root))["scan_coverage"]
+
+    assert isinstance(coverage, dict)
+    assert coverage["status"] == "partial"
+    assert coverage["limitations"] == ["Direct test evidence is not scanned.", _STATIC_EVIDENCE_CAVEAT]

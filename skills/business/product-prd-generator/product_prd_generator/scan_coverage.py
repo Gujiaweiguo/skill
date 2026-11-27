@@ -27,6 +27,40 @@ class ScanCoverageJSON(TypedDict):
     scanners: ScannersJSON
 
 
+# 顶层 limitations 如实反映 direct 扫描器是否真的扫过（2026-11-27）。此前恒为
+# “Direct runtime code and test evidence are not scanned.”——direct_code / direct_tests
+# 显式启用并扫完后（lnkcard 2026-11-01 起）这句话不成立。两个扫描器都没扫过时
+# 沿用既有文案（存量产物与测试 fixture 不变）；只要有一个扫过，就不再声称
+# not scanned，并保留真实限制：静态源码/测试文件证据不等于运行时验证或测试执行。
+_LEGACY_NOT_SCANNED = "Direct runtime code and test evidence are not scanned."
+_CODE_NOT_SCANNED = "Direct runtime code evidence is not scanned."
+_TESTS_NOT_SCANNED = "Direct test evidence is not scanned."
+_STATIC_EVIDENCE_CAVEAT = (
+    "Direct evidence is static source/test-file scanning only; "
+    "it is not runtime verification or test execution."
+)
+
+
+def _actually_scanned(scanner: ScannerCoverage) -> bool:
+    return scanner.status in (ScanStatus.COMPLETE, ScanStatus.PARTIAL)
+
+
+def _top_level_limitations(
+    direct_code: ScannerCoverage, direct_tests: ScannerCoverage
+) -> tuple[str, ...]:
+    code_scanned = _actually_scanned(direct_code)
+    tests_scanned = _actually_scanned(direct_tests)
+    if not code_scanned and not tests_scanned:
+        return (_LEGACY_NOT_SCANNED,)
+    limitations: list[str] = []
+    if not code_scanned:
+        limitations.append(_CODE_NOT_SCANNED)
+    if not tests_scanned:
+        limitations.append(_TESTS_NOT_SCANNED)
+    limitations.append(_STATIC_EVIDENCE_CAVEAT)
+    return tuple(limitations)
+
+
 def build_scan_coverage(
     code_root: Path,
     specs_root: Path,
@@ -108,7 +142,7 @@ def build_scan_coverage(
             else ScanStatus.COMPLETE
         ),
         scope=("configured OpenSpec specs", "configured alignment matrix", "direct runtime code", "direct tests"),
-        limitations=("Direct runtime code and test evidence are not scanned.",),
+        limitations=_top_level_limitations(direct_code, direct_tests),
         specs=specs,
         matrix=matrix,
         direct_code=direct_code,
