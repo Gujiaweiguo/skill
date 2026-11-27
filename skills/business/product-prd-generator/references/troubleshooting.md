@@ -779,21 +779,23 @@ print('ontology OK')
 
 **验证**：`uv run --extra dev pytest tests/test_technical_only_baseline.py tests/test_empty_baseline_reconcile.py -v`。
 
-## 规划型产品：代码基线不可用时的措辞，与三处 lnkretail 硬编码
+## 规划型产品：代码基线不可用时的措辞，与产品级待确认项的来源
 
 **症状**（2026-11-21 lnkretail 首版、2026-11-27 lnkmember 首版）：代码基线不可用（空仓或技术骨架），docs 输入又只有历史参考资料时，能力全部是 present-unconfirmed。按常规路径渲染会把“未确认”写成确定性的差距/需求结论；lnkretail 还出现过 review/pending-items.md 各优先级均无项、而高优先级清单的兜底文案却指向它的不一致。
 
-**判定**：`render._is_planning_mode`——能力全部 present-unconfirmed（没有任何 existing / partial / missing），且 doc_map 里没有 `source_type` 为 `customer-requirements` 或 `owner-decisions` 的条目。`generation-manifest.md` 的 `baseline_status` 写 `baseline-unavailable`。
+**判定**：`render._is_planning_mode`——能力全部 present-unconfirmed（没有任何 existing / partial / missing），且 doc_map 里没有 `source_type` 为 `customer-requirements` 或 `owner-decisions` 的条目。`generation-manifest.md` 的 `baseline_status` 写 `baseline-unavailable`。 规划型判定只有这一个来源；`review_format.render_review_brief` 的 `planning` 标志由调用方（render / word_export）传入。
 
 **处置**：规划型下差距分析、需求清单、客户摘要、交接包改用规划型措辞；建议 change 的状态为 `baseline-unavailable`，原因分两类——零提交骨架仓与 technical-only（后者措辞见上条）。`changes` 为空不等于无需实施。
 
-**注意（未修的已知缺口）**：有三处仍按 lnkretail 写死，给其他规划型产品出 PRD 时须人工核对：
+**产品级待确认项只指不抄（2026-11-27 泛化）**：2026-11-21 曾把 lnkretail 的四条产品待确认项硬编码进 `review.py`，review 简报的规划型判定也只认 lnkretail。两个后果：lnkmember 首版生成的「高优先级需求 review 清单」原样带出了 LnkRetail 的条目（R-03/R-04/R-08/R-11、POS↔lnkcard 等），而这几项在 lnkretail 自己的台账里早已全部裁定——副本一落地就过时；lnkmember 的 review 简报也拿不到规划型说明。现行做法：
 
-1. `render._render_priority_review` 的兜底文案把 lnkretail 的待决策项与契约当示例（R-03/R-04/R-08/R-11、POS↔lnkcard / POS↔lnkretail、便利店/卖菜/财务）。lnkmember 首版的「高优先级需求 review 清单」原样带出了这些 LnkRetail 条目。
-2. `review.py` 的规划待确认项兜底只在 `project == "lnkretail"` 时追加。
-3. `review_format.py` review 简报的 planning 判定同样只认 lnkretail。其他规划型产品的简报拿不到规划型说明：“0.2 输入来源”走通用文案，指标行仍标“需求条目”（lnkmember 首版实证，写作“需求条目 | 0”）。
+1. 规划型判定只有一个来源 `render._is_planning_mode`；review 简报的 `planning` 标志由调用方传入，不再按产品名自行判定。
+2. 「高优先级需求 review 清单」的规划型兜底与产品无关：能力级待确认项指向 `review/pending-items.md`；产品级待确认项只指向产品自己的 `30-products/<pid>/reconciliation/` 台账（`_paths.reconciliation_pointer_for_project`，目录解析不到就不写）。
+3. `review.build_report` 对任何产品（能力全为 present-unconfirmed 时）都只追加一条指向该台账的待确认项，不列举具体条目。
 
-**验证**：`uv run --extra dev pytest tests/test_review_lnkretail_planning_pending.py tests/test_technical_only_baseline.py -v`。
+**不要**把产品待决策项写回 skill（代码常量，或 docs 侧再建一份结构化 YAML 逐条渲染）——那会再造一份会过时的台账副本。规划型下逐能力的“代码基线未建立”待确认项（lnkmember 首版为 55 条）目前保留原样，是否折叠另行决定。
+
+**验证**：`uv run --extra dev pytest tests/test_review_planning_pending.py tests/test_technical_only_baseline.py -v`。
 
 ## 文档扫描：历史客户资料混入需求来源（--exclude-dir / --exclude-source）
 

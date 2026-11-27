@@ -684,7 +684,6 @@ uv run pytest tests/ -v
 
 ## 已知限制
 
-- **规划型兜底仍带 lnkretail 专属内容（2026-11-27 记录，未修）**：`render._render_priority_review` 的规划型兜底文案把 lnkretail 的待决策项与契约当示例写死（R-03/R-04/R-08/R-11、POS↔lnkcard / POS↔lnkretail、便利店/卖菜/财务），任何规划型产品都会原样带出；`review.py` 的规划待确认项兜底与 `review_format.py` review 简报的 planning 判定按 `project == "lnkretail"` 硬编码。实证：lnkmember 首版生成（2026-11-27）的 review 清单出现了上述 LnkRetail 条目，其 review 简报也没有规划型说明（“0.2 输入来源”走通用文案、指标行仍标“需求条目”）。给 lnkretail 之外的规划型产品出 PRD 时，这三处须人工核对；排查见 troubleshooting「规划型产品：代码基线不可用时的措辞，与三处 lnkretail 硬编码」。
 - **PDF 转换需要 poppler-utils**：`apt install poppler-utils`。无 sudo 权限时，PDF 无法用 markitdown 转换，需要 LibreOffice 预转换或手动转 md。当前项目有 6 个竞品 PDF 受此影响（政策文件，影响小）。
 - **匹配率 ~19%**：瓶颈是**术语覆盖率**（ontology 572+ 术语），不是匹配策略。两阶段匹配提升精确度但不提升召回率。继续扩 ontology 术语是唯一提升路径。
 - **business-ontology.yaml 运行时依赖**：doc_map 从 `$LANLNK_BASE/config/ontology/business-ontology.yaml` 加载。文件缺失时退化为纯 term-aliases 匹配（匹配率回到 ~12%）。
@@ -910,6 +909,12 @@ PRD 是中文业务单据与流程，代码 OpenSpec/能力名是英文工程 ID
 **做法**：交接文档的"能力域对照"表必须同时列出 PRD 业务名和代码 OpenSpec 能力 ID，并标注状态（existing/partial/missing/defer）。
 
 **案例**：商管 PRD 中"预存款"对应代码 `surplus` / `advance charge`，但语义不完全一致，需要独立预存款账户模型。不做映射就会误判为"已有"。
+
+### 规划型 PRD：产品级待确认项只指不抄
+
+规划型产品（能力全部 present-unconfirmed）的 review 清单与 `review/pending-items.md` 不列举任何产品的待决策项：能力级待确认项指向 `review/pending-items.md`，产品级待确认项（待决策项、跨产品契约等）只指向产品自己的 `30-products/<pid>/reconciliation/` 台账（`_paths.reconciliation_pointer_for_project`，目录解析不到就不写）。规划型判定只有一个来源 `render._is_planning_mode`，review 简报的 `planning` 标志由调用方传入。
+
+**被否决的做法**：把产品待确认项写在 skill 里（代码常量，或 docs 侧再建一份结构化 YAML 逐条渲染）。实证（2026-11-27）：2026-11-21 硬编码的 lnkretail 四条待确认项，在产品台账里早已全部裁定，副本一落地就过时；lnkmember 首版生成还把这些 LnkRetail 条目原样带进了自己的清单。产品知识只留在产品侧台账，skill 不复制。排查见 troubleshooting「规划型产品：代码基线不可用时的措辞，与产品级待确认项的来源」。
 
 ## 维护规则
 
