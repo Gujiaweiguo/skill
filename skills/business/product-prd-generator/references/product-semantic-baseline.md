@@ -40,11 +40,10 @@
 
 ## 3. 产品注册表
 
-已注册产品以 company.yaml products（唯一产品台账）为准：lnkcre / lnkcrm / lnkreport / lnkchatbi / lnkchat / lnkvision / lnkgateway / lnkwebsite。`references/product-registry.yaml` 已退役（D1，2026-10-04 删除；产品与路径事实 = company.yaml + shared.product_context resolver）；adapter 支持度权威源见 `references/adapter-capabilities.yaml`。路径、状态和权威仍由产品 owner 所有。规则：
+已注册产品以 company.yaml products（唯一产品台账）为准，本文不罗列产品名（曾罗列 8 个，随后漏了 3 个）。`references/product-registry.yaml` 已退役（D1，2026-10-04 删除；产品与路径事实 = company.yaml + shared.product_context resolver）；adapter 支持度权威源见 `references/adapter-capabilities.yaml`。路径、状态和权威仍由产品 owner 所有。规则：
 
 - 新产品加入 = 补一条 entry；路径未确认写 `null` + `*_note` 说明，不编造。
-- 2026-11-23 补登记：lnkretail（LnkRetail 连锁零售 ERP）为业务系统，`product_class=business`、`ontology_profile=business-ontology`，已进 layer-reference / ontology-change-set / reconciliation-record / implementation-return 四个 schema 的产品枚举。产品上线时只登记了 company.yaml 与 adapter，漏了治理契约这一层——新产品上线须四处同步登记。
-- 2026-11-27 补登记：lnkmember（LnkMember 零售会员 CRM）为业务系统，`product_class=business`、`ontology_profile=business-ontology`（ontology v1.1 自述），同批补齐四个 schema 的产品枚举、`adapter-capabilities.yaml` 与 shared 钉线。company.yaml 2026-11-22 登记后治理契约层再次漏登记，与 lnkretail 是同一处缺口。
+- **新产品接入必须同批登记治理契约层**：四个 schema 的产品枚举、`SOFTWARE_PRODUCT_PROFILES`、`adapter-capabilities.yaml` 与 shared 钉线、`_paths.py` 目录段，步骤与验证命令见 SKILL.md「Step 7：治理层登记」。只登记 company.yaml 与目录段不算完成——实证：lnkretail（2026-11-21 接入，11-23 补登记治理契约层）、lnkmember（2026-11-22 登记台账，11-27 补登记治理契约层与 adapter）连续漏在同一处。
 - 未知/未注册产品必须显式降级说明，**不得静默回退到商管 ontology**。
 - `model_kind` 等旧分类字段仅为可选内部提示，不作为入口概念。
 

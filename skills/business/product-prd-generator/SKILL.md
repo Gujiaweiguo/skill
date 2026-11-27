@@ -672,7 +672,35 @@ uv run product-prd-generator --project <project> \
 - 术语不归一 → 检查 Step 2 term-aliases.yaml 的 key 是否与 ontology.sub_functions.capabilities 中的 ID 一致
 - spec IDs 不对 → 检查 Step 5 code-map-rules 的 `specs.path`
 
-### 跑测试套件（可选）
+### Step 7：治理层登记（必做）
+
+只登记 company.yaml、目录段和 code-map 规则不算接入完成：治理契约层漏登记不报错，只会让台账测试变红。2026-11 一周内 lnkretail、lnkmember 连续漏在同一处，本步为此而设。
+
+输入：company.yaml 已登记该产品；Step 1 的 ontology.yaml 已写明 `ontology_profile`。
+动作：下表五处同批登记。
+
+| 落点 | 位置 | 写什么 |
+|---|---|---|
+| 治理 schema 产品枚举 | `references/product-governance/` 下 `layer-reference` / `ontology-change-set` / `reconciliation-record` / `implementation-return` 四个 `.schema.json` | `product_id` enum 补产品 id |
+| 基线契约映射 | `tests/test_product_governance_contracts.py` 的 `SOFTWARE_PRODUCT_PROFILES` | `"<产品>": (product_class, ontology_profile)`；并加一条四 schema 接受性用例 |
+| adapter 支持度 | `references/adapter-capabilities.yaml` | 新增本 skill × 产品一格，状态 `onboarding`；evidence 不写本机绝对路径和提交号 |
+| shared 钉线 | 仓根 `shared/product_context/tests/test_adapter_capabilities_schema.py` | `EXPECTED_MATRIX` 补格、`EXPECTED_DISTRIBUTION` 改计数、`ONBOARDING_DATES` 补登记日期 |
+| 目录段映射 | `product_prd_generator/_paths.py` | `_PRODUCT_DIR_SEGMENTS` 与 `_PRODUCT_CANONICAL_DIR` |
+
+输出：五处登记齐全，且下面的验证命令全绿。
+
+```bash
+cd <skill>
+uv run pytest tests/test_product_governance_contracts.py tests/test_paths.py -q
+PYTHONPATH=$(git rev-parse --show-toplevel) uv run python -m pytest "$(git rev-parse --show-toplevel)/shared/product_context/tests" -q
+```
+
+失败处置：
+- `test_company_ledger_registers_seven_software_products_and_lnkwebsite_prd_only` 报多出某个产品 → 该产品缺 `SOFTWARE_PRODUCT_PROFILES`。
+- 钉线测试报单元数、分布或日期不符 → `EXPECTED_MATRIX`、`EXPECTED_DISTRIBUTION`、`ONBOARDING_DATES` 没有同批改。
+- 四 schema 用例报 `product_id` 不合法 → 对应 schema 的 enum 漏了该产品。
+
+### 跑测试套件（全量可选，Step 7 验证必跑）
 
 ```bash
 cd <skill>
@@ -680,7 +708,7 @@ uv sync --extra dev  # 一次性安装 pytest
 uv run pytest tests/ -v
 ```
 
-测试套件覆盖 `_paths.py` / `_load_code_map_rules` 的 fallback 语义 + 5 个端到端场景（商管/langchat/LnkChatBI × generate/coverage-validate）。新产品 onboarding 后，可在 `tests/test_integration_e2e.py` 加一个对应场景，确保不退化。
+测试套件覆盖 `_paths.py` / `_load_code_map_rules` 的 fallback 语义 + 5 个端到端场景（商管/langchat/LnkChatBI × generate/coverage-validate）。新产品 onboarding 后，可在 `tests/test_integration_e2e.py` 加一个对应场景，确保不退化。全量套件可以后置；Step 7 的验证命令是接入时的必跑项，全绿才算接入完成。
 
 ## 已知限制
 
