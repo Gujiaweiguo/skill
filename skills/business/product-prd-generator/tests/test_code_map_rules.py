@@ -110,12 +110,18 @@ def test_extract_lnkcard_repo_renders_populated_spec_baseline():
     动态派生（2026-11-01 起改为派生式——spec 基线随归档持续推进，手动钉死
     已连续两次在提交时才发现漂移，见 e15af95 / 534d680），基线下限 >= 6
     （Change A/B/C/D 时代规模，防 specs 目录意外清空后空集平凡通过）。
-    本测试真正钉死的守卫不变：commit_sha=真实 HEAD、matrix/direct 全
-    not-scanned——不得产出任何 LnkCRE matrix/ontology 引用（此处的 LnkCRE 是
-    刻意提及的跨域污染守卫：rules 加载失败会静默回落商管 LnkCRE legacy 默认
-    规则，matrix.enabled 默认 True 且指向 LnkCRE 专属
-    product-definition-matrix.md；下述 matrix_rows==() 与 matrix not-scanned
-    断言即守住该回落不得发生）。"""
+    本测试钉死的守卫：commit_sha=真实 HEAD；matrix 不扫且零行——不得产出任何
+    LnkCRE matrix/ontology 引用（此处的 LnkCRE 是刻意提及的跨域污染守卫：rules
+    加载失败会静默回落商管 LnkCRE legacy 默认规则，matrix.enabled 默认 True 且
+    指向 LnkCRE 专属 product-definition-matrix.md；下述 matrix_rows==() 与
+    matrix not-scanned 断言即守住该回落不得发生）。
+    2026-11-01（62fcd97）起 lnkcard 进入 spec 驱动阶段，期望随之更新：roadmap
+    播种开关关闭（rules 文件 ontology_roadmap_seeding 注释：规划能力由
+    canonical ontology/PRD 管理，不再自动注入为 missing）；direct_code /
+    direct_tests 已显式启用并须真实扫完；两个 direct 扫描器 complete 且 specs
+    根存在时整体覆盖度为 complete（build_scan_coverage 聚合规则，matrix 不参与）。
+    旧断言“direct 未启用 → 整体不得报 complete”自 62fcd97 起失配，
+    2026-11-27 对齐；规则与实现未改动。"""
     import unittest
     code_root = Path("/opt/code/lnkcard")
     if not code_root.is_dir():
@@ -133,14 +139,17 @@ def test_extract_lnkcard_repo_renders_populated_spec_baseline():
     assert spec_ids == expected_specs
     assert code_map.matrix_rows == ()
     assert payload["commit_sha"] not in ("", "unknown", None)
-    # 真实 lnkcard rules 已开启 roadmap 播种开关（早期产品）
-    assert payload["ontology_roadmap_seeding"] is True
+    # spec 驱动阶段（62fcd97）：roadmap 播种开关关闭，本体目标能力不得再注入 missing
+    assert payload["ontology_roadmap_seeding"] is False
     scanners = payload["scan_coverage"]["scanners"]
     assert scanners["matrix"]["status"] == "not-scanned"
-    assert scanners["direct_code"]["status"] == "not-scanned"
-    assert scanners["direct_tests"]["status"] == "not-scanned"
     assert scanners["specs"]["artifact_count"] == len(expected_specs)
     assert scanners["specs"]["status"] == "complete"
     assert not scanners["specs"]["limitations"]
-    # direct 扫描器未启用 → 整体不得报 complete
-    assert payload["scan_coverage"]["status"] != "complete"
+    # direct_code / direct_tests 已显式启用，须真实扫完；回落 not-scanned 即 rules 未生效
+    assert scanners["direct_code"]["status"] == "complete"
+    assert not scanners["direct_code"]["limitations"]
+    assert scanners["direct_tests"]["status"] == "complete"
+    assert not scanners["direct_tests"]["limitations"]
+    # 两个 direct 扫描器 complete 且 specs 根存在 → 整体覆盖度据实为 complete
+    assert payload["scan_coverage"]["status"] == "complete"
