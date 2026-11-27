@@ -513,3 +513,18 @@ def test_real_env_lnkcre_feature_baseline_resolves() -> None:
     """真实 docs 仓（合并完成后）：canonical lnkcre 基线必须可解析。"""
     p = feature_baseline_path_for_project("LnkCRE")
     assert p.is_file(), f"feature baseline should resolve: {p}"
+
+
+def test_lnkretail_dir_segment_registered() -> None:
+    """2026-11-21 lnkretail onboarding：目录段必须注册，未注册会导致 doc_map 过滤回落。"""
+    from product_prd_generator._paths import _PRODUCT_DIR_SEGMENTS, product_dir_aliases
+    assert product_dir_aliases("lnkretail") == ("lnkretail",)
+    assert "lnkretail" in _PRODUCT_DIR_SEGMENTS
+
+
+def test_lnkmember_dir_segment_registered() -> None:
+    """2026-11-27 lnkmember onboarding：目录段必须注册，未注册会导致 doc_map 过滤回落。"""
+    from product_prd_generator._paths import _PRODUCT_CANONICAL_DIR, _PRODUCT_DIR_SEGMENTS, product_dir_aliases
+    assert product_dir_aliases("lnkmember") == ("lnkmember",)
+    assert "lnkmember" in _PRODUCT_DIR_SEGMENTS
+    assert _PRODUCT_CANONICAL_DIR["lnkmember"] == "lnkmember"

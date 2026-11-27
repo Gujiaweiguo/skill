@@ -106,6 +106,11 @@ _PRODUCT_DIR_SEGMENTS: dict[str, tuple[str, ...]] = {
     "lnkcrm": ("lnkcrm",),
     "lnkwebsite": ("lnkwebsite",),
     "lnkcard": ("lnkcard",),
+    # 2026-11-21 lnkretail onboarding：目录段同名（30-products/lnkretail/），
+    # 未登记会导致 doc_map 产品过滤/路径解析未注册回落。
+    "lnkretail": ("lnkretail",),
+    # 2026-11-27 lnkmember onboarding：目录段同名（30-products/lnkmember/）。
+    "lnkmember": ("lnkmember",),
 }
 
 _REGISTERED_PRODUCTS = frozenset(_PRODUCT_DIR_SEGMENTS)
@@ -341,6 +346,12 @@ _PRODUCT_CANONICAL_DIR: dict[str, str] = {
     # 仅登记目录段供 doc 扫描过滤与 canonical 探测；ontology 解析在
     # ontology_path_for_project 中对该产品显式报错（拒绝回落商管）。
     "lnkwebsite": "lnkwebsite",
+    # 2026-11-21 lnkretail onboarding：能力地图级 canonical ontology 已批准
+    # （target-capability-map.md），机器本体 onboarding；目录段同名，仅登记映射。
+    "lnkretail": "lnkretail",
+    # 2026-11-27 lnkmember onboarding：canonical 业务本体已在位
+    # （30-products/lnkmember/ontology/ontology.yaml，Owner 审定）；目录段同名，仅登记映射。
+    "lnkmember": "lnkmember",
 }
 
 

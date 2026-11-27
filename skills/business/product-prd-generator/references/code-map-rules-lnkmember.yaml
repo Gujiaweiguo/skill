@@ -1,0 +1,42 @@
+project: lnkmember
+description: >-
+  LnkMember 零售会员 CRM 产品代码基线。代码仓 /opt/code/lnkmember 已建仓但为空
+  （2026-11-27 核对：0 个受控文件、0 个提交、无 openspec/specs）。当前没有任何
+  业务代码或技术骨架：不得凭空声明任何代码能力，禁止用静态关键词扫描或 lnkcrm
+  的在研实现替代本产品的实现基线。canonical 业务本体已建立
+  （30-products/lnkmember/ontology/ontology.yaml v1.1，10 模块 / 55 子功能 / 55 能力）。
+  全部能力的 implementation status 为 unknown；业务能力保持"目标能力、代码基线未建立"，
+  不记为 missing。业务实现扫描待首批 change 归档后另行启用。
+specs:
+  path: openspec/specs
+  # 当前为空仓，没有可排除的 scope。技术骨架 scope 建立后，如不属业务能力，
+  # 在此排除（参照 code-map-rules-lnkretail.yaml 的做法与适用边界说明）。
+  exclude: []
+matrix:
+  enabled: false
+future_scanners:
+  direct_runtime_sources:
+    enabled: false
+    note: 无业务代码（代码仓为空），禁止使用静态关键词扫描替代实现基线。
+  tests:
+    enabled: false
+    note: 业务测试待首批 change 归档后另行配置扫描。
+direct_code:
+  enabled: false
+  note: 代码仓为空，不启用直接代码扫描。
+direct_tests:
+  enabled: false
+  note: 代码仓为空，不启用测试扫描。
+exclude_paths:
+  - "**/.git/**"
+  - "**/.opencode/**"
+  - "**/node_modules/**"
+  - "**/.venv/**"
+  - "**/__pycache__/**"
+  - "artifacts/**"
+  - "tmp/**"
+  - "openspec/**"
+  - "migrations/**"
+# 规划能力由 canonical ontology/PRD 管理（30-products/lnkmember/ontology/），
+# 不自动注入 missing。
+ontology_roadmap_seeding: false
