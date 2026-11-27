@@ -155,6 +155,21 @@ def _iter_matrix_rows(matrix_path: Path) -> tuple[MatrixRow, ...]:
     return tuple(rows)
 
 
+def _spec_exclude_scopes(rules: dict[str, Any]) -> frozenset[str]:
+    """Spec scope names excluded from the business baseline by code-map rules.
+
+    2026-11-23 lnkretail：技术骨架的 scope（service-health 等）不是业务能力，
+    ``specs.exclude`` 把它们排除在业务能力对账之外。默认空集，既有产品零影响。
+    """
+    specs_cfg = rules.get("specs") or {}
+    if not isinstance(specs_cfg, dict):
+        return frozenset()
+    raw = specs_cfg.get("exclude") or []
+    if not isinstance(raw, (list, tuple, set)):
+        return frozenset()
+    return frozenset(str(item) for item in raw)
+
+
 def _load_code_map_rules(project: str, skill_root: Path | None) -> dict[str, Any]:
     """Load project-specific code-map scanning rules.
 
@@ -180,6 +195,8 @@ def _load_code_map_rules(project: str, skill_root: Path | None) -> dict[str, Any
     data.setdefault("project", project)
     data.setdefault("description", "")
     data.setdefault("specs", {"path": "openspec/specs"})
+    if isinstance(data["specs"], dict):
+        data["specs"].setdefault("exclude", [])
     data.setdefault("matrix", {"enabled": True, "path": "artifacts/alignment/product-definition-matrix.md"})
     data.setdefault("future_scanners", {})
     data.setdefault("exclude_paths", [])
@@ -195,6 +212,9 @@ def extract(
     rules = _load_code_map_rules(project, skill_root)
     specs_root = code_root / rules["specs"]["path"]
     spec_capabilities = _iter_spec_capabilities(specs_root, code_root)
+    exclude_scopes = _spec_exclude_scopes(rules)
+    excluded_specs = tuple(cap for cap in spec_capabilities if str(cap.id) in exclude_scopes)
+    spec_capabilities = tuple(cap for cap in spec_capabilities if str(cap.id) not in exclude_scopes)
     matrix_cfg = rules.get("matrix", {})
     matrix_rows: tuple[MatrixRow, ...] = ()
     if matrix_cfg.get("enabled", True):
@@ -229,6 +249,7 @@ def extract(
         len(matrix_rows),
         direct_code=direct_evidence.code,
         direct_tests=direct_evidence.tests,
+        excluded_spec_count=len(excluded_specs),
     )
     return CodeMap(
         project=project,
@@ -239,6 +260,7 @@ def extract(
         scan_coverage=scan_coverage,
         direct_evidence=direct_evidence.matches,
         ontology_roadmap_seeding=bool(rules.get("ontology_roadmap_seeding", False)),
+        excluded_spec_capabilities=excluded_specs,
     )
 
 
@@ -248,6 +270,7 @@ def to_json(code_map: CodeMap) -> dict[str, object]:
         "source_path": code_map.source_path,
         "commit_sha": code_map.commit_sha,
         "ontology_roadmap_seeding": code_map.ontology_roadmap_seeding,
+        "excluded_spec_scopes": [str(cap.id) for cap in code_map.excluded_spec_capabilities],
         "scan_coverage": scan_coverage_to_json(code_map.scan_coverage),
         "direct_evidence": {
             "matches": [

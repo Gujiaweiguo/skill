@@ -100,3 +100,13 @@ capabilities:
     verified_at: "2026-10-26"
     owner: opc
     notes: "initial-baseline 治理入口；registration-only：adapter 能力未评估（unassessed），未经一次真实运行不得升 implemented/partial。"
+  - consumer_id: product-prd-generator
+    product_id: lnkretail
+    status: onboarding
+    evidence:
+      - "lnkretail onboarding 登记（2026-11-21）：canonical 能力地图级 ontology 已获 Owner 批准（30-products/lnkretail/ontology/target-capability-map.md，28 能力族、四业态、W0-W4，裁决 D-001～D-009）"
+      - "机器本体 30-products/lnkretail/ontology/{ontology.yaml,term-aliases.yaml} 为 onboarding 初始版（schema 对齐 lnkcard 样例，按 9 业务域聚合）"
+      - "实现基线代码仓为空仓（baseline-unavailable；代码仓路径经 resolver 解析，不在此登记），code-map-rules-lnkretail.yaml 全部扫描器 enabled false，不声明任何代码能力"
+    verified_at: "2026-11-21"
+    owner: opc
+    notes: "canonical 能力地图已批准、机器本体为 onboarding、代码基线为空/baseline-unavailable；registration-only，未经一次真实运行不得升 implemented/partial。储值卡边界（D-007）：POS tender 直接对接独立 lnkcard，lnkretail 不作必经中转层。"

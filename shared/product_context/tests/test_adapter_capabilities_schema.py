@@ -30,6 +30,8 @@ CONSUMERS = (
     "strategy-brief-generator",
 )
 
+# 基线产品宇宙：每个消费者都必须登记。基线之外的产品按消费者登记，只钉在
+# EXPECTED_MATRIX（lnkretail 2026-11-21 仅 product-prd-generator 一格）。
 PRODUCTS = (
     "lnkcre",
     "lnkcrm",
@@ -44,8 +46,14 @@ PRODUCTS = (
     "lnkcard",
 )
 
-# lnkcard 六格的登记日期（区别于 O2 首版矩阵的 2026-10-04 冻结日期）。
+# onboarding 登记格的 verified_at（区别于 O2 首版矩阵的 2026-10-04 冻结日期）：
+# lnkcard 六格 2026-10-26；lnkretail 2026-11-21 仅 product-prd-generator 一格。
 LNKCARD_ONBOARDING_DATE = "2026-10-26"
+LNKRETAIL_ONBOARDING_DATE = "2026-11-21"
+ONBOARDING_DATES: dict[tuple[str, str], str] = {
+    **{(consumer, "lnkcard"): LNKCARD_ONBOARDING_DATE for consumer in CONSUMERS},
+    ("product-prd-generator", "lnkretail"): LNKRETAIL_ONBOARDING_DATE,
+}
 
 ALLOWED_STATUSES = {
     "implemented",
@@ -124,6 +132,10 @@ AUDIT_DATE = "2026-10-04"
 # 修订（LNKCARD-ONBOARD，2026-10-26）：六消费者各新增 lnkcard = onboarding
 # （registration-only / unassessed：仅登记产品宇宙，未经任何真实 adapter 运行评估，
 # 不标 implemented/partial；verified_at = 2026-10-26，与 O2 冻结日期区分）。
+# 修订（LNKRETAIL-ONBOARD，2026-11-21）：product-prd-generator 新增 lnkretail = onboarding
+# （registration-only / unassessed：仅登记 PRD 生成入口，未经真实运行不标
+# implemented/partial；verified_at = 2026-11-21；其余五消费者暂不登记，
+# 该消费者单元数 9→10，EXPECTED_DISTRIBUTION onboarding 11→12）。
 EXPECTED_MATRIX: dict[str, dict[str, str]] = {
     "product-prd-generator": {
         "lnkcre": "implemented",
@@ -135,6 +147,7 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
         "lnkgateway": "not-applicable",
         "lnkwebsite": "not-applicable",
         "lnkcard": "onboarding",
+        "lnkretail": "onboarding",
     },
     "requirement-evaluator": {
         "lnkcre": "implemented",
@@ -196,7 +209,7 @@ EXPECTED_MATRIX: dict[str, dict[str, str]] = {
 EXPECTED_DISTRIBUTION = {
     "implemented": 16,
     "partial": 13,
-    "onboarding": 11,
+    "onboarding": 12,
     "unsupported": 1,
     "not-applicable": 12,
     "blocked": 1,
@@ -311,11 +324,14 @@ class AdapterCapabilityFilesTest(unittest.TestCase):
             self.assertEqual(top.get("verified_at"), AUDIT_DATE, consumer)
             self.assertEqual(top.get("decision_record"), DECISION_RECORD, consumer)
 
-    def test_exactly_nine_units_covering_all_products(self) -> None:
+    def test_units_exactly_cover_matrix_products(self) -> None:
+        """单元集合 = EXPECTED_MATRIX 该行；基线产品宇宙每个消费者都必须登记。"""
         for consumer, (_top, units) in load_all().items():
             product_ids = [unit.get("product_id") for unit in units]
-            self.assertEqual(len(units), 9, consumer)
-            self.assertEqual(set(product_ids), set(PRODUCTS), consumer)
+            expected = EXPECTED_MATRIX[consumer]
+            self.assertLessEqual(set(PRODUCTS), set(product_ids), consumer)
+            self.assertEqual(len(units), len(expected), consumer)
+            self.assertEqual(set(product_ids), set(expected), consumer)
             self.assertEqual(len(product_ids), len(set(product_ids)), f"{consumer}: 产品重复")
 
     def test_unit_contract_all_required_keys_non_empty(self) -> None:
@@ -339,11 +355,9 @@ class AdapterCapabilityFilesTest(unittest.TestCase):
                 label = f"{consumer}/{unit['product_id']}"
                 self.assertIn(unit["status"], ALLOWED_STATUSES, label)
                 self.assertTrue(_DATE_RE.match(unit["verified_at"]), label)
-                # lnkcard 六格为 2026-10-26 onboarding 登记；其余维持 O2 冻结日期。
-                expected_date = (
-                    LNKCARD_ONBOARDING_DATE
-                    if unit["product_id"] == "lnkcard"
-                    else AUDIT_DATE
+                # onboarding 登记格取各自登记日期；其余维持 O2 冻结日期。
+                expected_date = ONBOARDING_DATES.get(
+                    (consumer, unit["product_id"]), AUDIT_DATE
                 )
                 self.assertEqual(unit["verified_at"], expected_date, label)
                 self.assertEqual(unit["owner"], "opc", label)

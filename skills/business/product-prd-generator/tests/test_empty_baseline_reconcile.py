@@ -93,6 +93,22 @@ POPULATED_COVERAGE = {
     "scanners": {"specs": {"status": "complete", "artifact_count": 3, "limitations": []}}
 }
 
+# 2026-11-21 lnkretail：specs root 整体不存在（status=inaccessible, artifact_count=0）
+# —— 扫描已运行且确认零产物，与 "empty baseline" limitation 语义等价，
+# 必须进入 ontology present-unconfirmed 播种路径，不得标 missing。
+MISSING_SPECS_ROOT_COVERAGE = {
+    "status": "partial",
+    "scanners": {
+        "specs": {
+            "status": "inaccessible",
+            "artifact_count": 0,
+            "limitations": [
+                "Configured OpenSpec specs root does not exist."
+            ],
+        },
+    },
+}
+
 
 def test_iter_ontology_capabilities_dict_shape() -> None:
     caps = _iter_ontology_capabilities(ONT_INPUT)
@@ -114,8 +130,28 @@ def test_iter_ontology_capabilities_list_shape() -> None:
 
 def test_is_empty_code_baseline() -> None:
     assert _is_empty_code_baseline(EMPTY_BASELINE_COVERAGE) is True
+    assert _is_empty_code_baseline(MISSING_SPECS_ROOT_COVERAGE) is True
     assert _is_empty_code_baseline(POPULATED_COVERAGE) is False
     assert _is_empty_code_baseline(None) is False
+
+
+def test_reconcile_seeds_present_unconfirmed_when_specs_root_missing(monkeypatch, tmp_path) -> None:
+    """specs root 不存在（inaccessible/0 artifacts）→ present-unconfirmed，非 missing。"""
+    _patch_ontology(monkeypatch, tmp_path, ONT_INPUT)
+    code_map = {
+        "project": "lnkretail",
+        "source_path": str(tmp_path),
+        "commit_sha": "unknown",
+        "scan_coverage": MISSING_SPECS_ROOT_COVERAGE,
+        "spec_capabilities": [],
+        "matrix_rows": [],
+    }
+    result = reconcile(code_map, {"features": [], "requirements": []})
+    assert len(result.capabilities) == 4
+    by_status = {cap.reconciled_status for cap in result.capabilities}
+    assert by_status == {"present-unconfirmed"}
+    for cap in result.capabilities:
+        assert "empty-baseline" in cap.gaps[0]
 
 
 def _patch_ontology(monkeypatch, tmp_path: Path, data: dict) -> Path:

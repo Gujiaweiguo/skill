@@ -35,6 +35,7 @@ def build_scan_coverage(
     matrix_count: int,
     direct_code: ScannerCoverage | None = None,
     direct_tests: ScannerCoverage | None = None,
+    excluded_spec_count: int = 0,
 ) -> ScanCoverage:
     specs_exists = specs_root.is_dir()
     # 空基线显式化（2026-10-26 lnkcard 实证）：specs 目录存在但零 spec scope 时，
@@ -43,9 +44,22 @@ def build_scan_coverage(
     specs_limitations: tuple[str, ...] = ()
     if not specs_exists:
         specs_limitations = ("Configured OpenSpec specs root does not exist.",)
+    elif spec_count == 0 and excluded_spec_count:
+        # 技术骨架基线（2026-11-23 lnkretail）：specs 目录里只有被规则文件排除的技术骨架 scope，
+        # 业务基线为空。仍属 empty-baseline 语义（下游按 present-unconfirmed 播种本体能力，不得记为
+        # missing），但原因必须如实说明，并带 technical-only 标记供措辞区分。
+        specs_limitations = (
+            f"OpenSpec specs root contains only {excluded_spec_count} spec scope(s) excluded by code-map "
+            "rules as technical-only (non-business); the business baseline is empty "
+            "(empty baseline; no business code capability claims).",
+        )
     elif spec_count == 0:
         specs_limitations = (
             "OpenSpec specs root exists but contains no spec scopes (empty baseline; no code capability claims).",
+        )
+    elif excluded_spec_count:
+        specs_limitations = (
+            f"{excluded_spec_count} technical-only spec scope(s) excluded by code-map rules from the business baseline.",
         )
     specs = ScannerCoverage(
         status=ScanStatus.COMPLETE if specs_exists else ScanStatus.INACCESSIBLE,

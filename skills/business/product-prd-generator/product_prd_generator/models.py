@@ -110,6 +110,7 @@ class CodeMap:
     scan_coverage: ScanCoverage
     direct_evidence: tuple[object, ...] = ()
     ontology_roadmap_seeding: bool = False
+    excluded_spec_capabilities: tuple[CodeCapability, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

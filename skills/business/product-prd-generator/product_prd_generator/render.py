@@ -57,6 +57,31 @@ def _status_stats(capabilities: list[dict[str, Any]]) -> Counter[str]:  # noqa: 
     return Counter(cap.get("reconciled_status", "missing") for cap in capabilities)
 
 
+def _has_authorized_requirements(doc_map: dict[str, Any] | None) -> bool:  # noqa: ANY_OK
+    """doc_map 中是否存在已授权需求输入（客户需求 / owner 决策）。"""
+    if not isinstance(doc_map, dict):
+        return False
+    features = doc_map.get("features", [])
+    if not isinstance(features, list):
+        return False
+    return any(
+        isinstance(f, dict) and str(f.get("source_type", "")) in {"customer-requirements", "owner-decisions"}
+        for f in features
+    )
+
+
+def _is_planning_mode(capabilities: list[dict[str, Any]], doc_map: dict[str, Any] | None = None) -> bool:  # noqa: ANY_OK
+    """规划型 PRD 判定：代码基线 baseline-unavailable（全部能力 present-unconfirmed，
+    无任何 existing/partial/missing 确认状态）且 docs 输入无已授权客户需求/owner 决策
+    （仅为历史参考资料）。此时不得输出确定性需求/差距/覆盖结论。"""
+    stats = _status_stats(capabilities)
+    if stats.get("present-unconfirmed", 0) <= 0:
+        return False
+    if stats.get("existing", 0) + stats.get("partial", 0) + stats.get("missing", 0) > 0:
+        return False
+    return not _has_authorized_requirements(doc_map)
+
+
 def _git_dirty(code_root: str) -> bool:
     try:
         completed = subprocess.run(
@@ -102,6 +127,15 @@ def _is_empty_baseline_coverage(scan_coverage: object) -> bool:
     return any("empty baseline" in str(item).lower() for item in limitations)
 
 
+def _is_technical_only_baseline_coverage(scan_coverage: object) -> bool:
+    """empty-baseline 且 specs 的 limitation 带 technical-only 标记：仓库为技术骨架
+    （有提交与技术 scope），业务代码基线未建立。见 scan_coverage.build_scan_coverage。"""
+    if not isinstance(scan_coverage, dict) or not _is_empty_baseline_coverage(scan_coverage):
+        return False
+    limitations = scan_coverage.get("scanners", {}).get("specs", {}).get("limitations", [])
+    return isinstance(limitations, list) and any("technical-only" in str(item).lower() for item in limitations)
+
+
 def _baseline_notes(
     doc_map: dict[str, Any] | None,
     code_root: str,
@@ -133,7 +167,13 @@ def _baseline_notes(
     empty_baseline = _is_empty_baseline_coverage(scan_coverage) or (
         code_root and not _git_has_commits(code_root)
     )
-    if empty_baseline:
+    if empty_baseline and _is_technical_only_baseline_coverage(scan_coverage):
+        dirty_note = (
+            "- 基线说明：代码仓库为技术骨架（已有提交与技术的 scope，无业务代码与业务 spec），"
+            "业务代码基线未建立、本轮未做业务实现扫描（scan coverage: empty-baseline；"
+            "code authority: present-unconfirmed）；目标能力不得据此判为已确认缺失或已完备"
+        )
+    elif empty_baseline:
         dirty_note = (
             "- 基线说明：代码仓库为骨架仓（仓库骨架存在、无提交/无业务代码/无测试），"
             "代码基线未建立、本轮未做代码扫描（scan coverage: empty-baseline；"
@@ -259,7 +299,13 @@ def _render_approval_flow_evidence(requirements: list[dict[str, Any]], docs_root
     return "\n".join(lines)
 
 
-def _render_customer_summary(doc_map: dict[str, Any] | None) -> str:  # noqa: ANY_OK
+_PLANNING_NO_COVERAGE_NOTE = (
+    "当前 docs 输入均为历史参考资料、无已授权客户需求；Owner 蓝图裁决经 ontology 场景进入模块设计，"
+    "不能据此得出需求覆盖结论。"
+)
+
+
+def _render_customer_summary(doc_map: dict[str, Any] | None, planning: bool = False) -> str:  # noqa: ANY_OK
     if not doc_map:
         return "## 2A. 需求与决策汇总\n\n（待 doc-map 提供 source_type=customer-requirements / owner-decisions 的 features 后填充）\n"
     grouped: dict[str, dict[str, list[str]]] = defaultdict(lambda: {"files": [], "items": []})
@@ -282,7 +328,8 @@ def _render_customer_summary(doc_map: dict[str, Any] | None) -> str:  # noqa: AN
                 continue
             if term not in grouped[current_module]["items"]:
                 grouped[current_module]["items"].append(term)
-    lines = ["## 2A. 需求与决策汇总（客户需求 + owner 决策）", "", f"共 {len(grouped)} 个模块。", ""]
+    section = "## 2A. 历史资料与已授权决策" if planning else "## 2A. 需求与决策汇总（客户需求 + owner 决策）"
+    lines = [section, "", f"共 {len(grouped)} 个模块。", ""]
     for module, payload in grouped.items():
         files = ", ".join(dict.fromkeys(payload["files"]))
         items = payload["items"]
@@ -296,7 +343,11 @@ def _render_customer_summary(doc_map: dict[str, Any] | None) -> str:  # noqa: AN
             lines.append("- 需求：无下级标题，待补充")
         lines.append("")
     if len(grouped) == 0:
-        lines.append("- （暂无）")
+        if planning:
+            lines.append(f"- （暂无已授权客户需求模块。{_PLANNING_NO_COVERAGE_NOTE}）")
+            lines.append("- 历史系统资料抽取结果不作为客户需求，见 [需求清单.md](需求清单.md)（历史参考索引）与 3.2 结构类型概览（历史参考证据）。")
+        else:
+            lines.append("- （暂无）")
     return "\n".join(lines) + "\n"
 
 
@@ -381,9 +432,17 @@ def _render_feature_list(
     return f"---\n{front_matter}---\n\n" + "\n".join(lines) + "\n"
 
 
-def _render_gap_analysis(capabilities: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
+def _render_gap_analysis(capabilities: list[dict[str, Any]], planning: bool = False) -> str:  # noqa: ANY_OK
     gapped = [cap for cap in capabilities if cap.get("gaps")]
     lines = ["# 差距分析", "", f"共 {len(gapped)} 项存在差距。", ""]
+    if not gapped and planning:
+        pu = sum(1 for cap in capabilities if cap.get("reconciled_status") == "present-unconfirmed")
+        lines.append(
+            f"说明：代码基线不可用（baseline-unavailable），本轮没有可确认的 existing/partial/missing 差距；"
+            f"{pu} 项 present-unconfirmed 为目标能力清单，不是已确认 gap 数量。"
+            "差距结论待 W0 领域/契约基线建立后形成。"
+        )
+        lines.append("")
     for cap in gapped:
         name = cap.get("name", cap.get("id", ""))
         status = cap.get("reconciled_status", "missing")
@@ -556,11 +615,35 @@ def _build_handoff_changes(capabilities: list[dict[str, Any]]) -> list[dict[str,
     return sorted(changes, key=lambda c: (priority_rank.get(str(c["priority"]), 9), str(c["change_id"])))
 
 
-def _render_prd_handoff(inputs: RenderInputs, output_dir: Path, code_root: str) -> str:
+_PLANNING_CHANGES_STATUS = "baseline-unavailable"
+_PLANNING_CHANGES_REASON = (
+    "代码基线不可用（baseline-unavailable：仓库骨架存在、无提交/无业务代码/无测试），"
+    "没有可确认的 existing/partial/missing gap；changes 为空不等于无需实施。"
+    "当前不生成 OpenSpec change，后续先做 W0 领域/契约基线，"
+    "待基线建立且需求获得授权后再评估差距与 change 拆分。"
+)
+_PLANNING_CHANGES_REASON_TECHNICAL_ONLY = (
+    "业务代码基线不可用（baseline-unavailable：仓库为技术骨架，已有提交与技术的 scope，无业务代码与业务 spec），"
+    "没有可确认的 existing/partial/missing gap；changes 为空不等于无需实施。"
+    "当前不生成 OpenSpec change，后续先做 W0 领域/契约基线，"
+    "待基线建立且需求获得授权后再评估差距与 change 拆分。"
+)
+
+
+def _planning_changes_reason(scan_coverage: object) -> str:
+    return (
+        _PLANNING_CHANGES_REASON_TECHNICAL_ONLY
+        if _is_technical_only_baseline_coverage(scan_coverage)
+        else _PLANNING_CHANGES_REASON
+    )
+
+
+def _render_prd_handoff(inputs: RenderInputs, output_dir: Path, code_root: str, planning: bool = False) -> str:
     project = str(inputs.reconcile.get("project", "商管系统"))
     capabilities = inputs.reconcile.get("capabilities", [])
     stats = _status_stats(capabilities)
     changes = _build_handoff_changes(capabilities)
+    planning = planning or _is_planning_mode(capabilities, inputs.doc_map)
     by_priority: dict[str, list[dict[str, Any]]] = {"P0": [], "P1": [], "P2": []}
     for change in changes:
         by_priority.setdefault(str(change["priority"]), []).append(change)
@@ -608,7 +691,10 @@ def _render_prd_handoff(inputs: RenderInputs, output_dir: Path, code_root: str) 
         "",
     ]
     if not changes:
-        lines.append("当前未发现需要交接给目标项目的 missing/partial gap。")
+        if planning:
+            lines.append(_planning_changes_reason(inputs.reconcile.get("scan_coverage")))
+        else:
+            lines.append("当前未发现需要交接给目标项目的 missing/partial gap。")
     for priority in ("P0", "P1", "P2"):
         items = by_priority.get(priority, [])
         lines.extend([f"### {priority}（{len(items)} 项）", ""])
@@ -669,6 +755,7 @@ def _write_handoff_outputs(inputs: RenderInputs, output_dir: Path, code_root: st
     project = str(inputs.reconcile.get("project", "商管系统"))
     capabilities = inputs.reconcile.get("capabilities", [])
     changes = _build_handoff_changes(capabilities)
+    planning = _is_planning_mode(capabilities, inputs.doc_map)
     payload = {
         "project": project,
         "generated_by": "product-prd-generator",
@@ -681,6 +768,9 @@ def _write_handoff_outputs(inputs: RenderInputs, output_dir: Path, code_root: st
         },
         "changes": changes,
     }
+    if planning and not changes:
+        payload["changes_status"] = _PLANNING_CHANGES_STATUS
+        payload["changes_reason"] = _planning_changes_reason(inputs.reconcile.get("scan_coverage"))
     (output_dir / "PRD实施交接包.md").write_text(
         _render_prd_handoff(inputs, output_dir, code_root), encoding="utf-8"
     )
@@ -692,9 +782,18 @@ def _write_handoff_outputs(inputs: RenderInputs, output_dir: Path, code_root: st
     )
 
 
-def _render_unmatched_requirements(capabilities: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
+def _render_unmatched_requirements(capabilities: list[dict[str, Any]], planning: bool = False) -> str:  # noqa: ANY_OK
     missing = [cap for cap in capabilities if cap.get("reconciled_status") == "missing"]
     if not missing:
+        if planning:
+            pu = sum(1 for cap in capabilities if cap.get("reconciled_status") == "present-unconfirmed")
+            return (
+                "## 5. 需求覆盖结论\n\n"
+                f"{_PLANNING_NO_COVERAGE_NOTE}\n\n"
+                f"- 现有 {pu} 项均为目标能力清单（present-unconfirmed），不是已确认 gap 数量；"
+                "代码基线不可用（baseline-unavailable），没有可确认的 existing/partial/missing gap。\n"
+                "- 需求覆盖结论待 W0 领域/契约基线建立且客户需求获得授权后才能形成。\n"
+            )
         return "## 5. 客户需求未覆盖\n\n当前所有客户需求均在代码能力范围内有对应。\n"
     missing.sort(key=lambda c: (-len(c.get("evidence", [])), c.get("name", "")))
     # roadmap 播种项：本体目标需求暂无代码承接，属规划元数据——正文聚合，
@@ -723,7 +822,12 @@ def _render_unmatched_requirements(capabilities: list[dict[str, Any]]) -> str:  
     return "\n".join(lines) + "\n"
 
 
-def _render_requirement_list(requirements: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
+def _req_source_cell(req: dict[str, Any]) -> str:  # noqa: ANY_OK
+    """来源列：客户名缺失时回退原始资料路径（禁止空来源列）。"""
+    return str(req.get("source_customer", "") or req.get("source_file", "") or "—").replace("|", "\\|")
+
+
+def _render_requirement_list(requirements: list[dict[str, Any]], planning: bool = False) -> str:  # noqa: ANY_OK
     """Six-dimension requirement table with auto-suggested priority (Rule 3B)."""
     if not requirements:
         return ""
@@ -742,11 +846,17 @@ def _render_requirement_list(requirements: list[dict[str, Any]]) -> str:  # noqa
     high = sum(1 for r in reqs_sorted if r.get("priority") == "高")
     med = sum(1 for r in reqs_sorted if r.get("priority") == "中")
     low = sum(1 for r in reqs_sorted if r.get("priority") == "低")
+    if planning:
+        section_title = "## 3.5 需求清单（历史参考索引）"
+        count_line = f"共 {len(reqs_sorted)} 条历史参考条目（历史系统资料抽取，非已授权客户需求；来源列为原始资料相对路径）。"
+    else:
+        section_title = "## 3.5 需求清单（六维框架）"
+        count_line = f"共 {len(reqs_sorted)} 条需求。优先级分布：高 {high} / 中 {med} / 低 {low}。"
     lines = [
-        "## 3.5 需求清单（六维框架）",
+        section_title,
         "",
         f"结构分布：合同条款组 {kind_counts.get('合同条款组', 0)} / 合同字段 {kind_counts.get('合同字段', 0)} / 数据结构 {kind_counts.get('数据结构', 0)} / 流程 {kind_counts.get('流程', 0)} / 权限 {kind_counts.get('权限', 0)} / 功能 {kind_counts.get('功能', 0)}。",
-        f"共 {len(reqs_sorted)} 条需求。优先级分布：高 {high} / 中 {med} / 低 {low}。",
+        count_line,
         f"本节列出前 100 条（按优先级排序），完整清单见 [需求清单.md](需求清单.md)。",
         "",
         "| 类型 | 场景 | 子场景 | 功能 | 条款路径 | 痛点/描述 | 来源 | 优先级 | 代码状态 | 匹配能力 |",
@@ -761,7 +871,7 @@ def _render_requirement_list(requirements: list[dict[str, Any]]) -> str:  # noqa
         nearby = req.get("nearby_text", "") or "—"
         if len(nearby) > 60:
             nearby = nearby[:60] + "…"
-        customer = req.get("source_customer", "") or "—"
+        customer = _req_source_cell(req)
         priority = req.get("priority", "低")
         status = req.get("code_status", "unmatched")
         matched = req.get("matched_capability", "") or "—"
@@ -769,7 +879,7 @@ def _render_requirement_list(requirements: list[dict[str, Any]]) -> str:  # noqa
     return "\n".join(lines) + "\n"
 
 
-def _render_requirement_list_file(requirements: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
+def _render_requirement_list_file(requirements: list[dict[str, Any]], planning: bool = False) -> str:  # noqa: ANY_OK
     """Standalone 需求清单.md with groupable six-dimension table."""
     if not requirements:
         return "# 需求清单\n\n（暂无结构化需求）\n"
@@ -782,14 +892,25 @@ def _render_requirement_list_file(requirements: list[dict[str, Any]]) -> str:  #
             priority_order.get(r.get("priority", "低"), 3),
         ),
     )
-    lines = [
-        "# 需求清单（六维框架）",
-        "",
-        f"共 {len(reqs_sorted)} 条需求。",
-        "",
-        "| 类型 | 场景 | 子场景 | 功能 | 条款路径 | 痛点/描述 | 来源 | 优先级 | 代码状态 | 匹配能力 |",
-        "|------|------|--------|------|------|-----------|------|--------|---------|---------|",
-    ]
+    if planning:
+        lines = [
+            "# 需求清单（历史参考索引）",
+            "",
+            f"共 {len(reqs_sorted)} 条历史参考条目（历史系统资料抽取，非已授权客户需求，不构成需求授权）。",
+            "来源列为原始资料相对路径（provenance），供审计追溯；需求授权与优先级确认待客户/owner 输入后进行。",
+            "",
+            "| 类型 | 场景 | 子场景 | 功能 | 条款路径 | 痛点/描述 | 来源 | 优先级 | 代码状态 | 匹配能力 |",
+            "|------|------|--------|------|------|-----------|------|--------|---------|---------|",
+        ]
+    else:
+        lines = [
+            "# 需求清单（六维框架）",
+            "",
+            f"共 {len(reqs_sorted)} 条需求。",
+            "",
+            "| 类型 | 场景 | 子场景 | 功能 | 条款路径 | 痛点/描述 | 来源 | 优先级 | 代码状态 | 匹配能力 |",
+            "|------|------|--------|------|------|-----------|------|--------|---------|---------|",
+        ]
     for req in reqs_sorted:
         kind = _structure_kind_label(str(req.get("kind", "feature")))
         scenario = req.get("scenario", "未分类")
@@ -799,7 +920,7 @@ def _render_requirement_list_file(requirements: list[dict[str, Any]]) -> str:  #
         nearby = req.get("nearby_text", "") or "—"
         if len(nearby) > 80:
             nearby = nearby[:80] + "…"
-        customer = req.get("source_customer", "") or "—"
+        customer = _req_source_cell(req)
         priority = req.get("priority", "低")
         status = req.get("code_status", "unmatched")
         matched = req.get("matched_capability", "") or "—"
@@ -837,7 +958,7 @@ def _classify_module(req: dict[str, Any], ontology: dict[str, Any]) -> str:  # n
     return best_module
 
 
-def _render_module_summary(requirements: list[dict[str, Any]], project: str = "商管系统") -> str:  # noqa: ANY_OK
+def _render_module_summary(requirements: list[dict[str, Any]], project: str = "商管系统", planning: bool = False) -> str:  # noqa: ANY_OK
     ontology = _load_ontology(project)
     if not ontology:
         return ""
@@ -855,27 +976,45 @@ def _render_module_summary(requirements: list[dict[str, Any]], project: str = "�
         stats[req.get("priority", "低")] += 1
     if not requirements:
         return "## 3A. 需求模块汇总\n\n（本次生成未纳入需求材料，无需求-模块映射。）\n"
-    lines = [
-        "## 3A. 需求模块汇总",
-        "",
-        f"按业务模块聚合 {len(requirements)} 条需求：",
-        "",
-        "| 模块 | 需求数 | 已匹配 | 未匹配 | 高 | 中 | 低 |",
-        "|------|--------|--------|--------|---|---|---|",
-    ]
+    if planning:
+        lines = [
+            "## 3A. 历史参考条目分布（非客户需求）",
+            "",
+            f"按业务模块聚合 {len(requirements)} 条历史参考条目（历史系统资料抽取，非已授权客户需求）：",
+            "",
+            "| 模块 | 条目数 | 已匹配 | 未匹配 | 高 | 中 | 低 |",
+            "|------|--------|--------|--------|---|---|---|",
+        ]
+    else:
+        lines = [
+            "## 3A. 需求模块汇总",
+            "",
+            f"按业务模块聚合 {len(requirements)} 条需求：",
+            "",
+            "| 模块 | 需求数 | 已匹配 | 未匹配 | 高 | 中 | 低 |",
+            "|------|--------|--------|--------|---|---|---|",
+        ]
     for module in sorted(module_stats, key=lambda m: -module_stats[m]["total"]):
         s = module_stats[module]
         lines.append(f"| {module} | {s['total']} | {s['matched']} | {s['unmatched']} | {s['高']} | {s['中']} | {s['低']} |")
     return "\n".join(lines) + "\n"
 
 
-def _render_priority_review(requirements: list[dict[str, Any]]) -> str:  # noqa: ANY_OK
+def _render_priority_review(requirements: list[dict[str, Any]], planning: bool = False) -> str:  # noqa: ANY_OK
     """高优先级需求 review 清单 — standalone file for human review."""
     high_reqs = sorted(
         [r for r in requirements if r.get("priority") == "高"],
         key=lambda r: (r.get("scenario", ""), r.get("source_customer", "")),
     )
     if not high_reqs:
+        if planning:
+            return (
+                "# 高优先级需求 review 清单\n\n"
+                "当前无已授权高优先级客户需求（docs 输入均为历史参考资料，未经客户/owner 授权）。\n\n"
+                "目标能力均为 present-unconfirmed，待确认项包括：产品待决策项（如 R-03/R-04/R-08/R-11）、"
+                "跨产品契约（如 POS↔lnkcard、POS↔lnkretail）、业态/财务专项（如便利店、卖菜、财务）；"
+                "逐项清单见 review/pending-items.md，需求授权后本清单再行更新。\n"
+            )
         return "# 高优先级需求 review 清单\n\n当前无高优先级需求。\n"
     lines = [
         "# 高优先级需求 review 清单",
@@ -1357,6 +1496,7 @@ def render_prd(inputs: RenderInputs, code_root: str = "") -> str:
     capabilities = inputs.reconcile.get("capabilities", [])
     requirements = inputs.reconcile.get("requirements", [])
     stats = _status_stats(capabilities)
+    planning = _is_planning_mode(capabilities, inputs.doc_map)
     ontology = _load_ontology(str(project))
     all_tables = parse_data_dict_files(inputs.docs_root)
     tables_by_mod = group_by_module(all_tables)
@@ -1373,18 +1513,18 @@ def render_prd(inputs: RenderInputs, code_root: str = "") -> str:
         f"# {project} 产品 PRD\n",
         review_brief,
         _render_project_context(str(project), stats, code_root, sources_desc, dirty_note),
-        _render_customer_summary(inputs.doc_map),
+        _render_customer_summary(inputs.doc_map, planning),
         _render_structure_summary(requirements),
         _render_blueprint_modules(requirements, capabilities, ontology, tables_by_mod, project=str(project)) if ontology else _render_requirement_list(requirements),
         _render_data_model_index(tables_by_mod, unmatched_tables),
         _render_approval_flow_evidence(requirements, inputs.docs_root),
-        _render_module_summary(requirements, project=str(project)),
+        _render_module_summary(requirements, project=str(project), planning=planning),
         "## 4. 功能清单",
         "",
         f"共 {len(capabilities)} 项能力，详见 [功能清单.md](功能清单.md)。",
         "",
         _render_engineering_notes(capabilities, ontology),
-        _render_unmatched_requirements(capabilities),
+        _render_unmatched_requirements(capabilities, planning),
         _render_version_plan(capabilities),
         _render_image_refs(capabilities),
         _render_risks(capabilities),
@@ -1419,6 +1559,7 @@ def main() -> int:
     inputs = _load_inputs(args.reconcile, doc_map_path, args.docs_root)
     capabilities = inputs.reconcile.get("capabilities", [])
     requirements = inputs.reconcile.get("requirements", [])
+    planning = _is_planning_mode(capabilities, inputs.doc_map)
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1429,10 +1570,10 @@ def main() -> int:
         encoding="utf-8",
     )
     (output_dir / "竞品功能清单.md").write_text(render_competitor_feature_list(capabilities), encoding="utf-8")
-    (output_dir / "差距分析.md").write_text(_render_gap_analysis(capabilities), encoding="utf-8")
+    (output_dir / "差距分析.md").write_text(_render_gap_analysis(capabilities, planning), encoding="utf-8")
     (output_dir / "需求证据表.md").write_text(_render_evidence_table(capabilities), encoding="utf-8")
-    (output_dir / "需求清单.md").write_text(_render_requirement_list_file(requirements), encoding="utf-8")
-    (output_dir / "高优先级需求review清单.md").write_text(_render_priority_review(requirements), encoding="utf-8")
+    (output_dir / "需求清单.md").write_text(_render_requirement_list_file(requirements, planning), encoding="utf-8")
+    (output_dir / "高优先级需求review清单.md").write_text(_render_priority_review(requirements, planning), encoding="utf-8")
     _write_handoff_outputs(inputs, output_dir, code_root=args.code_root)
 
     print(f"rendered 10 files to {output_dir}/")

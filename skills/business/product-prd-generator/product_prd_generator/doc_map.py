@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import re
 from collections import defaultdict
@@ -238,7 +239,52 @@ def _classify_source_type(rel_path: Path) -> str:
     return SourceType.UNKNOWN.value
 
 
-def _iter_markdown_files(docs_root: Path, project: str | None = None) -> tuple[Path, ...]:
+def _normalize_exclude_specs(specs: list[str] | None) -> tuple[tuple[str, ...], ...]:
+    """把 CLI 排除参数规范化为目录段元组（相对 docs_root）。
+
+    支持目录前缀（``congou/SCM``、``myshop/BMS060616``）与裸目录名两种
+    语义（单段 = 任意层命中同名目录段即排除其子树）。分隔符兼容 ``/``
+    与 ``\\``；空段与 ``.`` 丢弃；按 Path.parts 逐段精确比对，
+    不做子串匹配（避免同名文件被误排）。
+    """
+    normalized: list[tuple[str, ...]] = []
+    for spec in specs or []:
+        parts = tuple(
+            p for p in spec.replace("\\", "/").split("/") if p and p not in (".", "..")
+        )
+        if parts:
+            normalized.append(parts)
+    return tuple(normalized)
+
+
+def _is_excluded(rel_parts: tuple[str, ...], exclude_specs: tuple[tuple[str, ...], ...]) -> bool:
+    """rel_parts 是文件相对路径（末段为文件名）；目录段 = 去掉末段。"""
+    dir_parts = rel_parts[:-1]
+    for spec in exclude_specs:
+        if len(spec) == 1:
+            if spec[0] in dir_parts:
+                return True
+        elif tuple(dir_parts[: len(spec)]) == spec:
+            return True
+    return False
+
+
+def _is_excluded_source(rel_posix: str, exclude_sources: tuple[str, ...]) -> bool:
+    """按相对 docs_root 的 glob 模式排除平铺文件/路径。
+
+    模式对完整相对路径（``/`` 分隔）做 fnmatch 全路径匹配（左锚定，
+    非子串 contains），如 ``document-batch-01/百丽*.md`` 只命中该目录
+    下的匹配文件，不波及其他目录同名文件。
+    """
+    return any(fnmatch.fnmatchcase(rel_posix, pattern) for pattern in exclude_sources)
+
+
+def _iter_markdown_files(
+    docs_root: Path,
+    project: str | None = None,
+    exclude_dirs: list[str] | None = None,
+    exclude_sources: list[str] | None = None,
+) -> tuple[Path, ...]:
     """Enumerate markdown files under ``docs_root``.
 
     When ``project`` is given, only files whose relative path contains a
@@ -252,9 +298,18 @@ def _iter_markdown_files(docs_root: Path, project: str | None = None) -> tuple[P
     产品专属根特例：当 docs_root 自身目录名已含产品别名（如
     ``raw/prd-商管系统`` 或 ``30-products/lnkcre``）时跳过段过滤——
     该根下所有文件本就属于该产品，逐段匹配反而会过滤掉全部文件。
+
+    ``exclude_dirs``（显式传入才生效，默认不排除任何目录）：按相对
+    目录前缀/目录段排除命中目录及其整个子树，用于 generate 时剔除
+    历史客户资料污染源（如 lnkretail 的 congou/SCM、myshop/BMS060616）。
+
+    ``exclude_sources``（显式传入才生效，默认不排除）：按相对 docs_root
+    的 glob 模式排除平铺文件（fnmatch 全路径匹配，目录排除命中不了的
+    docs-root 直下平铺污染文件用它，如 ``document-batch-03/Mengniu-*.md``）。
     """
     if not docs_root.is_dir():
         return ()
+    exclude_specs = _normalize_exclude_specs(exclude_dirs)
     alias_set: set[str] | None = None
     root_is_product_scoped = False
     if project is not None:
@@ -267,12 +322,17 @@ def _iter_markdown_files(docs_root: Path, project: str | None = None) -> tuple[P
             for alias in alias_set
         )
     result: list[Path] = []
+    exclude_source_patterns = tuple(exclude_sources or ())
     for p in docs_root.rglob("*.md"):
         if not p.is_file():
             continue
         rel = p.relative_to(docs_root)
         rel_parts = rel.parts
         if any(part.startswith(".") for part in rel_parts):
+            continue
+        if exclude_specs and _is_excluded(rel_parts, exclude_specs):
+            continue
+        if exclude_source_patterns and _is_excluded_source(rel.as_posix(), exclude_source_patterns):
             continue
         if alias_set is not None and not root_is_product_scoped:
             part_lower = {part.lower() for part in rel_parts}
@@ -975,9 +1035,13 @@ def extract(
     skill_root: Path,
     project: str = "商管系统",
     extra_roots: list[Path] | None = None,
+    exclude_dirs: list[str] | None = None,
+    exclude_sources: list[str] | None = None,
 ) -> DocMap:
     aliases, ontology = _load_aliases(skill_root, project)
-    md_files = _iter_markdown_files(docs_root, project=project)
+    md_files = _iter_markdown_files(
+        docs_root, project=project, exclude_dirs=exclude_dirs, exclude_sources=exclude_sources
+    )
     features: dict[str, DocFeature] = {}
     requirements: dict[tuple[str, str], Requirement] = {}
     for md_path in md_files:
@@ -1045,10 +1109,29 @@ def main() -> int:
     parser.add_argument("--project", default="商管系统")
     parser.add_argument("--output", default="-")
     parser.add_argument("--extra-docs-root", action="append", default=[])
+    parser.add_argument(
+        "--exclude-dir",
+        action="append",
+        default=[],
+        help="Directory prefix (relative to docs-root, e.g. congou/SCM) or bare dir name to exclude with its subtree. Repeatable.",
+    )
+    parser.add_argument(
+        "--exclude-source",
+        action="append",
+        default=[],
+        help="Glob pattern relative to docs-root (e.g. document-batch-03/Mengniu-*.md) to exclude flat files. Repeatable.",
+    )
     args = parser.parse_args()
 
     extra_roots = [Path(r) for r in args.extra_docs_root if r]
-    doc_map = extract(Path(args.docs_root), Path(args.skill_root), args.project, extra_roots or None)
+    doc_map = extract(
+        Path(args.docs_root),
+        Path(args.skill_root),
+        args.project,
+        extra_roots or None,
+        exclude_dirs=args.exclude_dir or None,
+        exclude_sources=args.exclude_source or None,
+    )
     payload = json.dumps(to_json(doc_map), ensure_ascii=False, indent=2)
     if args.output == "-":
         print(payload)

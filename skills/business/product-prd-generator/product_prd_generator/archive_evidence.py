@@ -174,14 +174,21 @@ def _read_short_description(readme_path: Path, fallback_change_id: str) -> str:
 def apply_archive_evidence(
     by_id: dict[str, ReconciledCapability],
     evidence: tuple[ArchiveEvidence, ...],
+    excluded_capabilities: frozenset[str] = frozenset(),
 ) -> None:
     """Attach archive references without promoting implementation status.
 
     Capabilities already present in `by_id` keep their statuses. Unknown IDs
     are inserted as unverified capabilities with a reviewable gap.
+
+    ``excluded_capabilities``（2026-11-23 lnkretail）：code-map rules ``specs.exclude``
+    排除的技术骨架 scope（current-code-map.json 的 ``excluded_spec_scopes``）不在对账
+    结果里新建条目——它们不是业务能力，归档证据不能把它们带回业务基线。
     """
     for entry in evidence:
         for capability_id in (*entry.new_capabilities, *entry.modified_capabilities):
+            if str(capability_id) in excluded_capabilities:
+                continue
             archive_ref = EvidenceRef(
                 kind=EvidenceKind.OPENSPEC_ARCHIVE,
                 ref=f"{entry.change_id}@{entry.archive_date}",

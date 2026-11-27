@@ -58,7 +58,16 @@ def _generic_sources_lines() -> list[str]:
 def render_review_brief(data: ReviewBriefInput) -> str:
     total_capabilities = sum(data.status_stats.values())
     mapped_tables = sum(len(tables) for tables in data.tables_by_module.values())
+    planning = data.project == "lnkretail" and data.status_stats.get("present-unconfirmed", 0) == total_capabilities and total_capabilities > 0
     strategy = _mi_strategy_lines() if _is_lnkcre_project(data.project) else _generic_sources_lines()
+    if planning:
+        strategy = [
+            "### 0.2 输入来源",
+            "",
+            f"当前输入为历史系统参考资料，不构成已授权客户需求；{total_capabilities} 项能力是目标蓝图（Owner 裁决经 ontology 场景进入模块设计），代码基线 baseline-unavailable。",
+            "需求覆盖结论须待 W0 领域/契约基线和 Owner/客户授权输入后再形成。",
+            "",
+        ]
     review_step2 = (
         "1. 先看本节：确认海鼎主干 + 证据叠层策略是否接受。"
         if _is_lnkcre_project(data.project)
@@ -96,7 +105,7 @@ def render_review_brief(data: ReviewBriefInput) -> str:
         "| 指标 | 数量 |",
         "| --- | --- |",
         f"| 能力项 | {total_capabilities} |",
-        f"| 需求条目 | {data.requirement_count} |",
+        f"| {'历史参考条目（非已授权需求）' if planning else '需求条目'} | {data.requirement_count} |",
         f"| 已映射数据表 | {mapped_tables} |",
         f"| 未归类数据表 | {data.unmatched_table_count} |",
         f"| existing | {data.status_stats.get('existing', 0)} |",

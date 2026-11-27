@@ -196,7 +196,9 @@ def reconcile(code_map: Mapping[str, object], doc_map: Mapping[str, object]) -> 
     if code_root_str:
         archive_evidence = load_archive_evidence(Path(code_root_str))
         if archive_evidence:
-            apply_archive_evidence(by_id, archive_evidence)
+            # 与 code_map 的 specs.exclude 同步：技术骨架 scope 不进对账结果（2026-11-23 lnkretail）
+            excluded_scopes = frozenset(str(item) for item in (code_map.get("excluded_spec_scopes") or []))
+            apply_archive_evidence(by_id, archive_evidence, excluded_capabilities=excluded_scopes)
 
     direct_evidence = code_map.get("direct_evidence", {})
     direct_matches_list = direct_matches if isinstance(direct_matches, list) else []
@@ -472,6 +474,31 @@ _EMPTY_BASELINE_GAP = (
     "该能力为产品本体声明的目标能力，未经代码扫描确认（code authority: present-unconfirmed）"
 )
 
+_TECHNICAL_ONLY_BASELINE_GAP = (
+    "业务代码基线未建立（technical-only baseline）：代码仓库为技术骨架"
+    "（已有提交与技术的 scope，无业务代码与业务 spec），"
+    "该能力为产品本体声明的目标能力，未经业务实现扫描确认（code authority: present-unconfirmed）"
+)
+
+
+def _is_technical_only_baseline(scan_coverage: object) -> bool:
+    """True when the specs scanner counted zero artifacts only because every spec
+    scope was excluded as technical-only (code-map rules ``specs.exclude``).
+
+    2026-11-23 lnkretail：技术骨架已建立（有提交、有技术 scope），业务模块未实现。
+    与零提交骨架仓同属 empty-baseline（按 present-unconfirmed 播种，不记 missing），
+    但措辞必须如实——不得写成“无提交/无测试”。
+    """
+    if not isinstance(scan_coverage, Mapping) or not _is_empty_code_baseline(scan_coverage):
+        return False
+    specs = scan_coverage.get("scanners", {}).get("specs", {})
+    if not isinstance(specs, Mapping):
+        return False
+    limitations = specs.get("limitations", [])
+    if not isinstance(limitations, list):
+        return False
+    return any("technical-only" in str(item).lower() for item in limitations)
+
 
 def _is_empty_code_baseline(scan_coverage: object) -> bool:
     """True when the code scan ran but found zero spec/code artifacts.
@@ -480,6 +507,12 @@ def _is_empty_code_baseline(scan_coverage: object) -> bool:
     completed with ``artifact_count == 0`` and an explicit ``empty baseline``
     limitation. Empty set must NOT be read as a verified complete baseline,
     nor as per-capability confirmed absence.
+
+    2026-11-21 lnkretail: specs root missing entirely (status
+    ``inaccessible``) with ``artifact_count == 0`` is the same empty
+    code baseline — the scan ran and confirmed zero artifacts, so the
+    ontology roadmap/present-unconfirmed seeding path must run (NOT
+    per-capability missing).
     """
     if not isinstance(scan_coverage, Mapping):
         return False
@@ -491,6 +524,8 @@ def _is_empty_code_baseline(scan_coverage: object) -> bool:
         return False
     if int(specs.get("artifact_count", 0) or 0) != 0:
         return False
+    if str(specs.get("status", "")).lower() == "inaccessible":
+        return True
     limitations = specs.get("limitations", [])
     if not isinstance(limitations, list):
         return False
@@ -537,6 +572,8 @@ def _add_ontology_declared_capabilities(
         return
     data = yaml.safe_load(ontology_path.read_text(encoding="utf-8"))
     ref = f"ontology:{ontology_path.name}"
+    technical_only = empty_baseline and _is_technical_only_baseline(scan_coverage)
+    seed_gap = _TECHNICAL_ONLY_BASELINE_GAP if technical_only else _EMPTY_BASELINE_GAP
     added = 0
     for cap_id, cap_name in _iter_ontology_capabilities(data):
         if cap_id in by_id:
@@ -549,7 +586,7 @@ def _add_ontology_declared_capabilities(
                 doc_status=CapabilityStatus.EXISTING.value,
                 reconciled_status="present-unconfirmed",
                 confidence=Confidence.LOW.value,
-                gaps=(_EMPTY_BASELINE_GAP,),
+                gaps=(seed_gap,),
                 evidence=(EvidenceRef(kind="doc", ref=ref),),
             )
         else:
@@ -566,7 +603,8 @@ def _add_ontology_declared_capabilities(
             )
         added += 1
     if added and empty_baseline:
-        print(f"  ontology declared capabilities: +{added} present-unconfirmed (empty code baseline)")
+        kind = "technical-only" if technical_only else "empty"
+        print(f"  ontology declared capabilities: +{added} present-unconfirmed ({kind} code baseline)")
     elif added:
         print(f"  ontology declared capabilities: +{added} missing (roadmap seeding, populated baseline)")
 

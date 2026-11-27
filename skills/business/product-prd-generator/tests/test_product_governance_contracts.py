@@ -117,6 +117,9 @@ SOFTWARE_PRODUCT_PROFILES: dict[str, tuple[str, str]] = {
     # lnkcard（LnkCard 预付费卡系统）2026-10-26 onboarding：owner 决策 ID=lnkcard、
     # class=business（业务系统，非工具/平台）；ontology/PRD authority 均 draft/unresolved。
     "lnkcard": ("business", "business-ontology"),
+    # lnkretail（LnkRetail 连锁零售 ERP）2026-11-21 onboarding、2026-11-23 补登记进治理契约产品宇宙：
+    # 业务系统，class=business、profile=business-ontology（ontology.yaml 的 ontology_profile）。
+    "lnkretail": ("business", "business-ontology"),
     "lnkchatbi": ("tool", "tool-ontology"),
     "lnkreport": ("tool", "tool-ontology"),
     "lnkvision": ("tool", "tool-ontology"),
@@ -225,6 +228,39 @@ def test_lnkcard_baseline_semantics_after_foundation_changes() -> None:
         "review": {"status": "draft"},
     }
     assert _validate("ontology-change-set.schema.json", lnkcard_change_set) == []
+
+
+def test_lnkretail_registered_in_governance_product_universe() -> None:
+    """lnkretail（2026-11-21 onboarding，2026-11-23 补登记）：治理契约四 schema 均接受该产品。"""
+    assert SOFTWARE_PRODUCT_PROFILES["lnkretail"] == ("business", "business-ontology")
+    assert _validate("layer-reference.schema.json", {
+        "product_id": "lnkretail",
+        "product_class": "business",
+        "ontology_profile": "business-ontology",
+        "layer": "ontology",
+        "status": "resolved",
+        "authority_ref": "30-products/lnkretail/ontology/README.md",
+    }) == []
+    assert _validate("ontology-change-set.schema.json", {
+        "schema_version": "1.0",
+        "change_set_id": "ONT-LNKRETAIL-ONBOARD-20261121",
+        "product_id": "lnkretail",
+        "ontology_profile": "business-ontology",
+        "change_mode": "initial-baseline",
+        "origin_flow": "forward-governance",
+        "baseline": {"status": "absent"},
+        "inputs": [],
+        "changes": [],
+        "review": {"status": "draft"},
+    }) == []
+    # 残缺对象必然报必填字段缺失；这里只断言产品枚举接受 lnkretail（错误里不出现 product_id）
+    assert all("product_id" not in err for err in _validate("reconciliation-record.schema.json", {"product_id": "lnkretail"}))
+    assert _validate("implementation-return.schema.json", {
+        "schema_version": "1.0",
+        "return_id": "lnkretail-w0-cross-cutting-baseline-20261123",
+        "product_id": "lnkretail",
+        "origin_flow": "implementation-package-execution",
+    }) == []
 
 
 def test_source_reference_keeps_decisions_separate_from_observations() -> None:

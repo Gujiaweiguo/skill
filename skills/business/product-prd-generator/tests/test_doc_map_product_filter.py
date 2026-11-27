@@ -138,3 +138,171 @@ def test_shared_root_still_filters(tmp_path):
     (chat / "b.md").write_text("# b\n")
     files = _iter_markdown_files(shared, project="LnkCRE")
     assert [f.name for f in files] == ["a.md"]
+
+
+# ─── --exclude-dir 目录排除（2026-11-21 lnkretail 历史客户资料污染治理）───
+
+
+@pytest.fixture()
+def retail_tree(tmp_path):
+    root = tmp_path / "prd-lnkretail"
+    for rel in (
+        "congou/SCM/需求.md",
+        "congou/百丽滔博/需求.md",
+        "congou/keep/需求.md",
+        "myshop/BMS060616/需求.md",
+        "myshop/current/需求.md",
+    ):
+        p = root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("# 需求\n")
+    return root
+
+
+def test_exclude_dir_prefix_skips_subtree(retail_tree):
+    files = _iter_markdown_files(retail_tree, project="lnkretail", exclude_dirs=["congou/SCM", "myshop/BMS060616"])
+    rels = sorted(str(f.relative_to(retail_tree)) for f in files)
+    assert rels == ["congou/keep/需求.md", "congou/百丽滔博/需求.md", "myshop/current/需求.md"]
+
+
+def test_exclude_dir_without_filter_still_excludes(retail_tree):
+    files = _iter_markdown_files(retail_tree, exclude_dirs=["congou"])
+    assert all(f.relative_to(retail_tree).parts[0] != "congou" for f in files)
+    assert len(files) == 2  # myshop/current + myshop/BMS060616
+
+
+def test_exclude_dir_no_specs_keeps_all(retail_tree):
+    files = _iter_markdown_files(retail_tree, project="lnkretail")
+    assert len(files) == 5
+
+
+def test_exclude_dir_single_name_matches_any_level(retail_tree):
+    files = _iter_markdown_files(retail_tree, project="lnkretail", exclude_dirs=["SCM"])
+    assert all("SCM" not in f.relative_to(retail_tree).parts[:-1] for f in files)
+
+
+def test_exclude_dir_no_substring_false_positive(tmp_path):
+    """段精确比对：排除 SCM 不能误排 SCM-backup 或 SCM.md 文件。"""
+    root = tmp_path / "prd-lnkretail"
+    (root / "SCM-backup").mkdir(parents=True)
+    (root / "SCM-backup" / "a.md").write_text("# a\n")
+    (root / "SCM.md").write_text("# b\n")
+    files = _iter_markdown_files(root, project="lnkretail", exclude_dirs=["SCM"])
+    assert sorted(f.name for f in files) == ["SCM.md", "a.md"]
+
+
+def test_cli_exclude_dir_repeatable(tmp_path, monkeypatch):
+    """doc_map CLI 可重复 --exclude-dir 并透传到扫描。"""
+    from product_prd_generator.doc_map import main as doc_map_main
+    root = tmp_path / "prd-lnkretail"
+    for rel in ("congou/SCM/a.md", "congou/keep/b.md"):
+        p = root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("# 需求\n## 功能 会员管理\n")
+    out = tmp_path / "doc-map.json"
+    monkeypatch.setattr(
+        "sys.argv",
+        ["doc_map", "--docs-root", str(root), "--project", "lnkretail",
+         "--exclude-dir", "congou/SCM", "--exclude-dir", "myshop/BMS060616",
+         "--output", str(out)],
+    )
+    assert doc_map_main() == 0
+    import json
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    sources = {f["source_file"] for f in payload["features"]}
+    assert all("SCM" not in s for s in sources)
+    assert any("keep" in s for s in sources)
+
+
+def test_main_doc_map_args_passthrough():
+    """main.generate 链路把 --exclude-dir 透传给 doc_map 子命令。"""
+    import argparse
+    from product_prd_generator.main import build_parser, _doc_map_args
+    args = build_parser().parse_args([
+        "--project", "lnkretail",
+        "--exclude-dir", "congou/SCM",
+        "--exclude-dir", "congou/百丽滔博",
+    ])
+    cmd = _doc_map_args(args, "/tmp/out.json")
+    i = cmd.index("--exclude-dir")
+    assert cmd[i + 1] == "congou/SCM" and cmd[i + 3] == "congou/百丽滔博"
+
+
+# ─── --exclude-source 平铺文件排除（2026-11-21 lnkretail docs-root 平铺污染治理）───
+
+
+@pytest.fixture()
+def flat_tree(tmp_path):
+    root = tmp_path / "prd-lnkretail"
+    for rel in (
+        "document-batch-01/百丽滔搏运动城业务管理系统解决方案V1.5.md",
+        "document-batch-03/Mengniu-ChainOne-SA-01.md",
+        "document-batch-03/Mengniu-ChainOne-SA-02.md",
+        "document-batch-03/BMS-P74-Script-首府广场客户化说明.md",
+        "document-batch-03/keep.md",
+        "congou/Congou手册.md",
+    ):
+        p = root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(f"# 需求\n## 功能 会员管理-{rel}\n")
+    return root
+
+
+def test_exclude_source_exact_and_glob(flat_tree):
+    files = _iter_markdown_files(
+        flat_tree,
+        project="lnkretail",
+        exclude_sources=[
+            "document-batch-01/百丽滔搏运动城业务管理系统解决方案V1.5.md",
+            "document-batch-03/Mengniu-ChainOne-SA-*.md",
+            "document-batch-03/BMS-P74-Script-首府广场客户化说明.md",
+        ],
+    )
+    rels = sorted(str(f.relative_to(flat_tree)) for f in files)
+    assert rels == ["congou/Congou手册.md", "document-batch-03/keep.md"]
+
+
+def test_exclude_source_keeps_unmatched(flat_tree):
+    files = _iter_markdown_files(flat_tree, project="lnkretail", exclude_sources=["document-batch-01/百丽*.md"])
+    rels = {str(f.relative_to(flat_tree)) for f in files}
+    assert "document-batch-03/keep.md" in rels
+    assert len(files) == 5
+
+
+def test_exclude_source_repeatable_via_cli(tmp_path, monkeypatch, flat_tree):
+    from product_prd_generator.doc_map import main as doc_map_main
+    out = tmp_path / "doc-map.json"
+    monkeypatch.setattr(
+        "sys.argv",
+        ["doc_map", "--docs-root", str(flat_tree), "--project", "lnkretail",
+         "--exclude-source", "document-batch-01/百丽滔搏运动城业务管理系统解决方案V1.5.md",
+         "--exclude-source", "document-batch-03/Mengniu-ChainOne-SA-*.md",
+         "--exclude-source", "document-batch-03/BMS-P74-Script-首府广场客户化说明.md",
+         "--output", str(out)],
+    )
+    assert doc_map_main() == 0
+    import json
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    sources = {r["source_file"] for r in payload["requirements"]} | {f["source_file"] for f in payload["features"]}
+    assert all("百丽" not in s and "Mengniu" not in s and "首府广场" not in s for s in sources)
+    assert any("keep.md" in s for s in sources)
+
+
+def test_exclude_source_main_passthrough():
+    import argparse  # noqa: F401
+    from product_prd_generator.main import build_parser, _doc_map_args
+    args = build_parser().parse_args([
+        "--project", "lnkretail",
+        "--exclude-source", "document-batch-01/百丽*.md",
+        "--exclude-source", "document-batch-03/Mengniu-*.md",
+    ])
+    cmd = _doc_map_args(args, "/tmp/out.json")
+    i = cmd.index("--exclude-source")
+    assert cmd[i + 1] == "document-batch-01/百丽*.md" and cmd[i + 3] == "document-batch-03/Mengniu-*.md"
+
+
+def test_exclude_source_no_substring_false_positive(flat_tree):
+    """全路径锚定匹配：排除 batch-01 的百丽文件不误排其他目录文件。"""
+    files = _iter_markdown_files(flat_tree, project="lnkretail", exclude_sources=["*/百丽*.md"])
+    rels = {str(f.relative_to(flat_tree)) for f in files}
+    assert len(files) == 5
