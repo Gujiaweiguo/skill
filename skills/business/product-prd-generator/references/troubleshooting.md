@@ -795,6 +795,8 @@ print('ontology OK')
 
 **不要**把产品待决策项写回 skill（代码常量，或 docs 侧再建一份结构化 YAML 逐条渲染）——那会再造一份会过时的台账副本。规划型下逐能力的“代码基线未建立”待确认项（lnkmember 首版为 55 条）目前保留原样，是否折叠另行决定。
 
+**docs 输入为空时的措辞（2026-11-27）**：规划型模板曾默认“docs 输入均为历史参考资料”。lnkmember 首版的 docs-root 只有 `parsed/`，doc-map 的 features 为空，PRD 却写“当前输入为历史系统参考资料”（docs 侧重生成回执发现）。现在由 `render._docs_input_empty`（doc_map 没有 feature，且 docs-root 下没有 md）区分两种情况：输入为空时写“当前 docs 输入为空（无客户需求、无参考资料）”，2A 标题改为“需求与决策输入”；输入非空（lnkretail 一类）的文案逐字不变。拿不准（docs-root 未给出或无法读取）时按非空处理。
+
 **验证**：`uv run --extra dev pytest tests/test_review_planning_pending.py tests/test_technical_only_baseline.py -v`。
 
 ## 文档扫描：历史客户资料混入需求来源（--exclude-dir / --exclude-source）

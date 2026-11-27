@@ -912,7 +912,7 @@ PRD 是中文业务单据与流程，代码 OpenSpec/能力名是英文工程 ID
 
 ### 规划型 PRD：产品级待确认项只指不抄
 
-规划型产品（能力全部 present-unconfirmed）的 review 清单与 `review/pending-items.md` 不列举任何产品的待决策项：能力级待确认项指向 `review/pending-items.md`，产品级待确认项（待决策项、跨产品契约等）只指向产品自己的 `30-products/<pid>/reconciliation/` 台账（`_paths.reconciliation_pointer_for_project`，目录解析不到就不写）。规划型判定只有一个来源 `render._is_planning_mode`，review 简报的 `planning` 标志由调用方传入。
+规划型产品（能力全部 present-unconfirmed）的 review 清单与 `review/pending-items.md` 不列举任何产品的待决策项：能力级待确认项指向 `review/pending-items.md`，产品级待确认项（待决策项、跨产品契约等）只指向产品自己的 `30-products/<pid>/reconciliation/` 台账（`_paths.reconciliation_pointer_for_project`，目录解析不到就不写）。规划型判定只有一个来源 `render._is_planning_mode`，review 简报的 `planning` 标志由调用方传入。规划型措辞还须区分 docs 输入为空与仅有历史参考资料（`render._docs_input_empty`）：lnkmember 首版输入实为空，却被告知“输入为历史系统参考资料”。
 
 **被否决的做法**：把产品待确认项写在 skill 里（代码常量，或 docs 侧再建一份结构化 YAML 逐条渲染）。实证（2026-11-27）：2026-11-21 硬编码的 lnkretail 四条待确认项，在产品台账里早已全部裁定，副本一落地就过时；lnkmember 首版生成还把这些 LnkRetail 条目原样带进了自己的清单。产品知识只留在产品侧台账，skill 不复制。排查见 troubleshooting「规划型产品：代码基线不可用时的措辞，与产品级待确认项的来源」。
 
