@@ -120,6 +120,9 @@ SOFTWARE_PRODUCT_PROFILES: dict[str, tuple[str, str]] = {
     # lnkretail（LnkRetail 连锁零售 ERP）2026-11-21 onboarding、2026-11-23 补登记进治理契约产品宇宙：
     # 业务系统，class=business、profile=business-ontology（ontology.yaml 的 ontology_profile）。
     "lnkretail": ("business", "business-ontology"),
+    # lnkmember（LnkMember 零售会员 CRM）2026-11-22 台账登记、2026-11-27 补登记进治理契约产品宇宙：
+    # 业务系统，class=business、profile=business-ontology（ontology v1.1 的 ontology_profile）。
+    "lnkmember": ("business", "business-ontology"),
     "lnkchatbi": ("tool", "tool-ontology"),
     "lnkreport": ("tool", "tool-ontology"),
     "lnkvision": ("tool", "tool-ontology"),
@@ -259,6 +262,41 @@ def test_lnkretail_registered_in_governance_product_universe() -> None:
         "schema_version": "1.0",
         "return_id": "lnkretail-w0-cross-cutting-baseline-20261123",
         "product_id": "lnkretail",
+        "origin_flow": "implementation-package-execution",
+    }) == []
+
+
+def test_lnkmember_registered_in_governance_product_universe() -> None:
+    """lnkmember（2026-11-22 台账登记，2026-11-27 补登记）：治理契约四 schema 均接受该产品，
+    adapter 恰有一条 onboarding 单元。"""
+    assert SOFTWARE_PRODUCT_PROFILES["lnkmember"] == ("business", "business-ontology")
+    assert _capability_status("lnkmember") == "onboarding"
+    assert _validate("layer-reference.schema.json", {
+        "product_id": "lnkmember",
+        "product_class": "business",
+        "ontology_profile": "business-ontology",
+        "layer": "ontology",
+        "status": "resolved",
+        "authority_ref": "30-products/lnkmember/ontology/README.md",
+    }) == []
+    assert _validate("ontology-change-set.schema.json", {
+        "schema_version": "1.0",
+        "change_set_id": "ONT-LNKMEMBER-ONBOARD-20261122",
+        "product_id": "lnkmember",
+        "ontology_profile": "business-ontology",
+        "change_mode": "initial-baseline",
+        "origin_flow": "forward-governance",
+        "baseline": {"status": "absent"},
+        "inputs": [],
+        "changes": [],
+        "review": {"status": "draft"},
+    }) == []
+    # 残缺对象必然报必填字段缺失；这里只断言产品枚举接受 lnkmember（错误里不出现 product_id）
+    assert all("product_id" not in err for err in _validate("reconciliation-record.schema.json", {"product_id": "lnkmember"}))
+    assert _validate("implementation-return.schema.json", {
+        "schema_version": "1.0",
+        "return_id": "lnkmember-schema-acceptance-sample",
+        "product_id": "lnkmember",
         "origin_flow": "implementation-package-execution",
     }) == []
 
