@@ -49,7 +49,7 @@ capabilities:
     product_id: lnkchatbi
     status: implemented
     evidence:
-      - "generate_quote.py LNKCHATBI_DATA 结构 + LNKCHATBI_PRICE_Y1/Y2 环境变量（默认 0/0 = 随单赠送设计语义；打包/单独定价经 env 人工输入）"
+      - "generate_quote.py build_lnkchatbi_data() 结构 + LNKCHATBI_PRICE_Y1/Y2 环境变量（默认 0/0 = 随单赠送设计语义；打包/单独定价经 env 人工输入）"
       - "O8 裁决 rejected-registration（references/adapter-capability-owner-decision-o8-2026-10-04.md）：不登记标准价，现状机制即设计语义非缺口"
       - "云泰荔园报价单 LnkChatBI 首年/次年 0/0 战略赠送实证（lanlnk/out/proposals/广州云泰荔园/报价单_MI+LnkChatBI+接口_SAAS_云泰park荔园_20260806.xlsx）"
     verified_at: "2026-10-04"
