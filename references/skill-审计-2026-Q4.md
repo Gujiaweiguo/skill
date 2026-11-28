@@ -67,6 +67,7 @@
 3. **跨仓在途碰撞**（继承，未变）。
 4. **`.openspec-target` 位置易误读**（新观察）：该标记是 `.agents/skills/` 下的单个目录级文件，不在各 openspec-*/ 目录内 ✓。AGENTS.md「OpenSpec skills」一节写「含 `.openspec-target` 标记文件」，可被读成每目录各有一个。措辞问题，无功能影响。
 5. **验收记录文件名日期少一位**（新观察）：`references/governance-handoff-contracts-acceptance-2026113.md` 应为 `20261113`。现有 1 处引用：`skill-审计-2026-10.md` 开放项 4 的收口注记（`a841844`）✓；本报告落盘后为 2 处。改名需同步这两处。
+   **2026-11-28 已修正**：`git mv` 改为 `…-20261113.md`，两处引用同批更新。
 6. **adapter 证据日期集中**（事实，不作好坏判断）：56 条 capability 的 `verified_at` 分布为 2026-10-04 ×48、2026-10-26 ×6、2026-11-27 ×2 ✓。86% 停留在治理基线建立当日；**implemented 的 16 条 `verified_at` 全部为 2026-10-04，此后无一更新** ✓。按「capability implemented 红线」，升 implemented 需真实运行先例；这些条目的证据是否仍反映当前状态，取决于各条 notes 所记的运行是否仍在有效期内，本轮未逐条复核。
 7. **核心文档体量**（事实）：product-prd-generator SKILL.md 960 行、troubleshooting.md 815 行（39 节）、25 个测试文件 250 个测试函数 ✓；material-importer SKILL.md 821 行；AGENTS.md 471 行。AGENTS.md 的「纯提示词 skill 的契约分层」原则要求 SKILL.md 只保留入口、契约正文放 references；上述两份 SKILL.md 是否符合该原则，本轮未逐节核对。
 

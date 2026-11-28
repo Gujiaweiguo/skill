@@ -14,7 +14,7 @@ Two skill types:
 |------|-------|
 | Edit skills here | `skills/<category>/<name>/` |
 | OpenCode symlinks | `.opencode/skills/<name>` → `../../skills/...` (relative) or `/opt/code/skill/skills/...` (absolute) |
-| OpenSpec skills | `.agents/skills/openspec-*/`（upstream artifacts，read-only；2.1.0 sync，含 `.openspec-target` 标记文件） |
+| OpenSpec skills | `.agents/skills/openspec-*/`（upstream artifacts，read-only；2.1.0 sync。另有一个目录级标记文件 `.agents/skills/.openspec-target`，不在各 openspec-*/ 目录内） |
 | External data (business skills) | `$LANLNK_BASE` = `/opt/code/docs/lanlnk` (not in this repo) |
 | External data (user guides) | `$USERGUIDE_BASE` = `<COMPANY_BASE>/materials/03-products/user-guides` (derived from company base, see COMPANIES.md §3) |
 | Config | `config/lanlnk.yaml` |
