@@ -9,6 +9,9 @@
 > **B类决策** = `产品决策记录-B类决策.md`（2026-08-20 冻结，方向结论权威来源，PRD:103/159）。
 > 推断性/营销化表述一律标「**推断，待批**」并汇入 §7 批注清单。
 > 引用 B类决策 处均以 PRD 转述行号为锚（本文未直接引用 B类决策 原文行号，避免双源漂移）。
+>
+> **状态更新（2026-11-28 注记，正文未改）**：本文为 Stage-1 落盘时快照。OPC 批注 19 项决议已全部生效、Stage-2 docs materials 入库已完成、company-intro × lnkvision capability 已由 onboarding 升 implemented——见 `references/adapter-capability-owner-decision-o10-execution-2026-10-04.md` §8 与 `references/adapter-capability-owner-decision-backlog-inventory-2026-10-04.md` §18。正文与 §7 批注清单中的「推断，待批」均为当时的待批标记，逐项裁决以执行记录 §8 的决议口径为准，**不是开放项**；当前可用的叙事以 docs materials 入库件为准。§5.2「金额留空待定价」已由 PRICING-FINAL 终裁终结（`references/adapter-capability-owner-decision-pricing-final-2026-10-05.md`：lnkreport / lnkvision 不设独立定价）。
+>
 
 ## 1. 一句话定位
 

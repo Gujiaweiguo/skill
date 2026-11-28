@@ -10,6 +10,9 @@
 > `竞品对比-报表与打印模板-积木与帆软-2026-09-23.md`（canonical 竞品结论）；
 > **产品PRD** = `产品PRD.md`（v1.1 历史基线，BI 域能力盘点仍有效、不含报表/打印域，:3）。
 > 推断性/营销化表述一律标「**推断，待批**」并汇入 §7 批注清单。
+>
+> **状态更新（2026-11-28 注记，正文未改）**：本文为 Stage-1 落盘时快照。OPC 批注 19 项决议已全部生效、Stage-2 docs materials 入库已完成、company-intro × lnkreport capability 已由 onboarding 升 implemented——见 `references/adapter-capability-owner-decision-o10-execution-2026-10-04.md` §8 与 `references/adapter-capability-owner-decision-backlog-inventory-2026-10-04.md` §18。正文与 §7 批注清单中的「推断，待批」均为当时的待批标记，逐项裁决以执行记录 §8 的决议口径为准，**不是开放项**；当前可用的叙事以 docs materials 入库件为准。
+>
 
 ## 1. 一句话定位
 
