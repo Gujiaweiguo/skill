@@ -417,6 +417,7 @@ subprocess.run(
 | `product-prd-generator/references/product-governance/ontology-change-set.schema.json` | product-prd-generator (owner), competitor-product-analyzer, openspec-practice |
 | `product-prd-generator/references/product-governance/reconciliation-record.schema.json` | product-prd-generator (owner), openspec-practice |
 | `product-prd-generator/references/product-governance/implementation-return.schema.json` | product-prd-generator (owner), openspec-practice |
+| `product-prd-generator/product_prd_generator/implementation_return_compat.py` | product-prd-generator (owner), openspec-practice, implementation-package-execution（两者**间接**依赖：流程强制运行的 `implementation_return_report.py` 导入并调用本文件；改动 API 或路径前先看这两处流程） |
 | `meta/openspec-practice/references/implementation-package.md` | openspec-practice (owner), implementation-package-execution, product-prd-generator |
 | `$LANLNK_BASE/30-products/lnkcre/ontology/domain-knowledge.md` | product-prd-generator (商管 project only; 域知识跟着项目走，不放 skill 目录), competitor-product-analyzer |
 | `$LANLNK_BASE/config/ontology/business-ontology.yaml` | product-prd-generator (runtime dependency), competitor-product-analyzer |
