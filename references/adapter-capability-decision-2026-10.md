@@ -219,6 +219,8 @@ missing_inputs 或 notes 中显式回指 §3.1 状态。
 > 注：CLI 产品代号 `AI`（岗位 Skill 报价）不是 company.yaml 产品条目，是跨
 > langchat+LnkChatBI+OrchestratorAgent 的编排服务打包，不占矩阵行，在
 > `adapter-capabilities.yaml` 中以 notes 记录归属。
+>
+> **注（2026-11-28 追加，原文未改）**：本文件及配套治理记录（O8 决策记录、O8 执行记录、建议包、backlog 盘点）中写作 `LNKCHATBI_DATA` 的报价数据结构，在 `generate_quote.py` 中自始为函数 `build_lnkchatbi_data()`，从未存在名为 `LNKCHATBI_DATA` 的字典。当时各记录沿用了这个不准确的符号名。历史记录保留原名以反映当时的写法；`pricing-generator/references/adapter-capabilities.yaml` 的 evidence 已改为正确名字（`83d8911`）。复核过程见 `skill-审计-2026-Q4.md` 新观察 6。
 
 #### D. competitor-product-analyzer（status_source：SKILL.md S1.2/S1.3 表 + 基线实测）
 
